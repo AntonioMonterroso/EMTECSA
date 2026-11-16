@@ -10,3 +10,5 @@
 /logo/muestra.html
 /logo/*.webp
 .DS_Store
+!/catalogo/
+/catalogo/**/.DS_Store

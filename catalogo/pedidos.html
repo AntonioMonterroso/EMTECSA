@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="es" data-modo="oscuro" data-modo-fijo>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>EMTECSA · Pedidos</title>
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#07111F">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Pedidos">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="../logo/emtecsa-icono.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="iconos/apple-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../emtecsa-tokens.css">
+<link rel="stylesheet" href="../emtecsa-base.css">
+<link rel="stylesheet" href="catalogo.css">
+<link rel="stylesheet" href="pedidos.css">
+<script src="../emtecsa-ui.js"></script>
+<script src="datos.js"></script>
+<script src="almacen.js"></script>
+<script src="pedidos.js" defer></script>
+</head>
+<body class="app">
+<header class="app-barra">
+  <div class="app-in barra-fila">
+    <a class="logo" href="index.html" aria-label="Ver el catálogo"><img src="../logo/emtecsa-logo-blanco.svg" alt="EMTECSA" width="138" height="22"></a>
+    <div class="e-fila">
+      <button class="e-btn btn-vidrio" type="button" id="instalar" hidden data-i="phone">Instalar app</button>
+      <button class="e-btn btn-vidrio" type="button" id="avisos-btn" data-i="bell">Activar avisos</button>
+    </div>
+  </div>
+</header>
+
+<main class="app-in">
+  <div class="app-cab">
+    <span class="eti">Ventas</span>
+    <h1 class="app-t">Pedidos</h1>
+    <p class="app-sub" id="nota-prueba"></p>
+  </div>
+
+  <div class="cifras" id="cifras"></div>
+
+  <div class="e-chips filtro-ped" id="filtro" role="group" aria-label="Filtrar pedidos"></div>
+
+  <div class="tablero" id="tablero">
+    <section class="lista-ped" id="lista" aria-label="Lista de pedidos"></section>
+    <section class="detalle" id="detalle" aria-label="Detalle del pedido" hidden></section>
+  </div>
+</main>
+
+<div class="velo" id="velo" hidden></div>
+<div class="dialogo" id="dialogo" role="dialog" aria-modal="true" aria-labelledby="dialogo-t" hidden></div>
+<div class="visor-foto" id="visor-foto" role="dialog" aria-modal="true" aria-label="Comprobante" hidden></div>
+<div class="avisos" id="avisos" aria-live="polite"></div>
+</body>
+</html>

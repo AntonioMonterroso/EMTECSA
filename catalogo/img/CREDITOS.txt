@@ -1,0 +1,18 @@
+Fotos de Unsplash con licencia de Unsplash: uso libre, también comercial. Provisionales hasta tener fotos de obras y bodega de EMTECSA.
+transformador-cielo.webp  images.unsplash.com/photo-1783730961436-77f45eec50be
+transformadores-trio.webp images.unsplash.com/photo-1758758184258-fe390c93d1ea
+poste-cruceta.webp        images.unsplash.com/photo-1786374352894-ae71bd543c9c
+cruceta-aisladores.webp   images.unsplash.com/photo-1765850257870-02530a50380f
+aisladores-vidrio.webp    images.unsplash.com/photo-1710953273118-16105b6d86f1
+pasatapas.webp            images.unsplash.com/photo-1509390221805-d1c887a72a00
+pernos.webp               images.unsplash.com/photo-1564226591723-659ff3852b2a
+conectores.webp           images.unsplash.com/photo-1724069479773-9e3bfa494896
+linieros-poste.webp       images.unsplash.com/photo-1759542877886-39d81e8f2eee
+linieros-canastas.webp    images.unsplash.com/photo-1509390726584-faaa21c8ac95
+torre-trabajadores.webp   images.unsplash.com/photo-1775927974219-d41ccccb52fa
+poste-atardecer.webp      images.unsplash.com/photo-1774226905145-5194b9e64677
+
+Modelos y texturas 3D de Poly Haven (polyhaven.com), licencia CC0: uso libre, también comercial, sin obligación de crédito.
+modelos/postes.glb             Modular Electricity Poles (piezas: poste de madera armado, transformador, crucetas, aisladores, cortacircuitos, tornillería), reducido a texturas de 1024
+modelos/texturas/concrete_wall_009-*  Concrete Wall 009
+modelos/texturas/rough_pine_door-*    Rough Pine Door

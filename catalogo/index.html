@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="es" data-modo="oscuro" data-modo-fijo class="cargando">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>EMTECSA · Catálogo de media tensión</title>
+<meta name="description" content="Transformadores, postes, cruceros, herrajes y aislamiento para media tensión. Lo acompañamos desde el pedido hasta la entrega.">
+<meta name="theme-color" content="#07111F">
+<meta property="og:type" content="website">
+<meta property="og:title" content="EMTECSA · Catálogo">
+<meta property="og:description" content="Transformadores, postes, cruceros, herrajes y aislamiento. Lo acompañamos desde el pedido hasta la entrega.">
+<meta property="og:image" content="https://studiomonterroso.com/EMTECSA/img/compartir.jpg">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="../logo/emtecsa-icono.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="iconos/apple-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>html.cargando, html.cargando body { overflow: hidden; } .entrada { position: fixed; inset: 0; z-index: 200; display: grid; place-items: center; background: #07111F; transition: opacity 700ms cubic-bezier(0.23, 1, 0.32, 1), visibility 0s linear 700ms; } .entrada-logo { position: relative; width: clamp(170px, 34vw, 560px); transition: transform 700ms cubic-bezier(0.23, 1, 0.32, 1); } .entrada-logo img { display: block; width: 100%; height: auto; } .entrada-logo .base { opacity: 0.16; } .entrada-logo .lleno-marco { position: absolute; inset: 0; overflow: hidden; transform: translateX(-100%); will-change: transform; } .entrada-logo .lleno { transform: translateX(100%); will-change: transform; } .entrada.fuera { opacity: 0; visibility: hidden; } .entrada.fuera .entrada-logo { transform: scale(1.04); }</style>
+<link rel="stylesheet" href="../emtecsa-tokens.css">
+<link rel="stylesheet" href="../emtecsa-base.css">
+<link rel="stylesheet" href="catalogo.css">
+<script type="importmap">{ "imports": { "three": "./vendor/three.module.min.js" } }</script>
+<script src="../emtecsa-ui.js"></script>
+<script src="datos.js"></script>
+<script src="almacen.js"></script>
+<script src="vendor/lenis.min.js"></script>
+<script src="comprobante.js" defer></script>
+<script src="catalogo.js" defer></script>
+<script type="module" src="escena.js"></script>
+</head>
+<body>
+<div class="entrada" id="entrada" aria-hidden="true"><div class="entrada-logo"><img class="base" src="../logo/emtecsa-logo-blanco.svg" alt="" width="1720" height="276"><div class="lleno-marco"><img class="lleno" src="../logo/emtecsa-logo-blanco.svg" alt="" width="1720" height="276"></div></div></div>
+<script>
+(function () {
+  var m = document.querySelector("#entrada .lleno-marco"), l = document.querySelector("#entrada .lleno");
+  if (!m || !m.animate) return;
+  var quieto = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var o = { duration: quieto ? 200 : 1050, easing: "cubic-bezier(0.33, 0, 0.2, 1)", fill: "forwards" };
+  window.__entrada = { a: m.animate([{ transform: "translateX(-100%)" }, { transform: "translateX(-10%)" }], o), b: l.animate([{ transform: "translateX(100%)" }, { transform: "translateX(10%)" }], o), m: m, l: l };
+})();
+</script>
+<a class="saltar" href="#productos">Ir al catálogo</a>
+<div class="cinta-prueba" id="cinta-prueba" hidden><b>Modo de prueba</b><span> · precios de muestra · cuenta bancaria por confirmar</span></div>
+
+<header class="barra" id="barra">
+  <div class="ancho barra-in">
+    <div class="marca-fila"><a class="logo" href="#inicio" aria-label="EMTECSA, inicio"><img src="../logo/emtecsa-logo-blanco.svg" alt="EMTECSA" width="138" height="22"></a></div>
+    <nav class="menu" aria-label="Secciones">
+      <a href="#lineas">Lo que vendemos</a>
+      <a href="#productos">Catálogo</a>
+      <a href="#comprar">Cómo comprar</a>
+      <a href="#obras">Obras</a>
+    </nav>
+    <button class="carrito-btn" id="abrir-carrito" type="button" aria-label="Abrir el carrito">
+      <span data-i="cart" data-w="18"></span><span class="carrito-txt">Carrito</span><span class="burbuja" id="burbuja" hidden>0</span>
+    </button>
+  </div>
+</header>
+
+<nav class="indice" aria-label="Índice del catálogo">
+  <a href="#lineas" data-ind="lineas" title="Lo que vendemos">01</a><a href="#productos" data-ind="productos" title="Catálogo">02</a><a href="#comprar" data-ind="comprar" title="Cómo comprar">03</a><a href="#obras" data-ind="obras" title="Obras">04</a><a href="#pedir" data-ind="pedir" title="Pedir">05</a>
+</nav>
+<div class="ind-movil fuera" role="navigation" aria-label="Sección actual">
+  <button type="button" data-ind-ir="-1" aria-label="Sección anterior"><span data-i="arrow" data-w="16" style="display:grid;transform:scaleX(-1)"></span></button>
+  <span class="ind-txt" aria-live="polite"><b data-ind-n>01</b> / 05<span data-ind-nombre>Lo que vendemos</span></span>
+  <button type="button" data-ind-ir="1" aria-label="Sección siguiente"><span data-i="arrow" data-w="16" style="display:grid"></span></button>
+</div>
+
+<main>
+  <section class="heroe" id="inicio" aria-labelledby="t-heroe">
+   <div class="heroe-pegado">
+    <canvas class="heroe-lienzo" id="lienzo-heroe" aria-hidden="true"></canvas>
+    <div class="heroe-velo" aria-hidden="true"></div>
+    <div class="ancho heroe-cap" data-cap="1"><span class="eti">Transformadores</span><p class="cap-t">De 10 a 75 kVA,<br>listos para el poste.</p><p class="cap-s">Monofásicos en 13.2 kV y 34.5 kV.</p></div>
+    <div class="ancho heroe-cap" data-cap="2"><span class="eti">Herrajes y aislamiento</span><p class="cap-t">Lo que sostiene la línea,<br><span class="laton">también lo tenemos.</span></p><p class="cap-s">Crucetas, aisladores, cortacircuitos y tornillería.</p></div>
+    <div class="ancho heroe-cap" data-cap="3"><span class="eti">De punta a punta</span><p class="cap-t">Hasta donde<br><span class="laton">llegue su obra.</span></p><a class="e-btn e-btn-p" href="#productos" data-i="arrow">Ver catálogo</a></div>
+    <div class="ancho heroe-in">
+      <h1 class="heroe-t" id="t-heroe"><span class="palabra"><span>Energía</span></span> <span class="palabra"><span>con</span></span> <span class="palabra"><span class="laton">respaldo.</span></span></h1>
+      <p class="heroe-sub aparece" style="--d:4">Transformadores, postes, cruceros, herrajes y aislamiento para su obra. Lo acompañamos desde el pedido hasta la entrega.</p>
+      <div class="e-fila heroe-acc aparece" style="--d:5">
+        <a class="e-btn e-btn-p" href="#productos" data-i="arrow">Ver catálogo</a>
+        <button class="e-btn btn-vidrio" type="button" data-cotizar>Pedir cotización</button>
+      </div>
+    </div>
+    <a class="bajar" href="#lineas" aria-label="Bajar a lo que vendemos"><i></i></a>
+   </div>
+  </section>
+
+
+  <section class="s" id="lineas" aria-labelledby="t-lineas" data-seccion>
+    <div class="ancho">
+      <div class="s-cab revela"><span class="eti">01 · Lo que vendemos</span><h2 class="sec-t" id="t-lineas">Cinco líneas.<br><span class="tenue">Una sola obra.</span></h2></div>
+      <div class="lineas" id="lineas-lista"></div>
+    </div>
+  </section>
+
+  <section class="s" id="productos" aria-labelledby="t-productos" data-seccion>
+    <div class="ancho">
+      <div class="s-cab revela"><span class="eti">02 · Catálogo</span><h2 class="sec-t" id="t-productos">Escoja.<br><span class="tenue">Nosotros lo llevamos.</span></h2></div>
+      <div class="filtros revela">
+        <div class="e-chips" id="chips" role="group" aria-label="Filtrar por línea"></div>
+        <label class="buscar"><span data-i="search" data-w="16"></span><span class="sr">Buscar en el catálogo</span><input id="buscar" type="search" placeholder="Buscar: 50 kVA, perno, 34.5…" autocomplete="off"></label>
+      </div>
+      <p class="nota-iva revela" id="nota-iva"></p>
+      <div class="productos" id="productos-lista" aria-live="polite"></div>
+      <p class="vacio" id="sin-resultados" hidden>No encontramos eso. Pruebe con otra palabra o <button type="button" class="enlace" data-cotizar>pídalo en una cotización</button>.</p>
+    </div>
+  </section>
+
+  <section class="s comprar" id="comprar" aria-labelledby="t-comprar" data-seccion>
+    <div class="ancho">
+      <div class="s-cab revela"><span class="eti">03 · Cómo comprar</span><h2 class="sec-t" id="t-comprar">Cuatro pasos.<br><span class="tenue">Sin vueltas.</span></h2></div>
+      <ol class="pasos" id="pasos">
+        <li class="paso revela" style="--d:0"><span class="num-c">01</span><h3>Arme su pedido</h3><p>Agregue lo que necesita. Lo grande se lo cotizamos.</p></li>
+        <li class="paso revela" style="--d:1"><span class="num-c">02</span><h3>Reciba la cuenta</h3><p>Le damos un ticket con el banco, el tipo de cuenta y el número.</p></li>
+        <li class="paso revela" style="--d:2"><span class="num-c">03</span><h3>Suba el comprobante</h3><p>Una foto o captura basta. La leemos al momento.</p></li>
+        <li class="paso revela" style="--d:3"><span class="num-c">04</span><h3>Arrancamos</h3><p>Confirmado el depósito, su pedido entra a trabajo.</p></li>
+      </ol>
+    </div>
+  </section>
+
+  <section class="banda" aria-labelledby="t-banda">
+    <img class="banda-foto" src="img/poste-atardecer.webp" alt="" loading="lazy" decoding="async">
+    <div class="ancho banda-in revela">
+      <h2 class="banda-t" id="t-banda">Su obra, en buenas manos.<br><span class="laton">Desde el primer día.</span></h2>
+      <button class="e-btn e-btn-p" type="button" data-abrir-carrito data-i="cart">Ver mi carrito</button>
+    </div>
+  </section>
+
+  <section class="s" id="obras" aria-labelledby="t-obras" data-seccion>
+    <div class="ancho">
+      <div class="s-cab revela fila-cab"><div><span class="eti">04 · Obras</span><h2 class="sec-t" id="t-obras">En el poste,<br><span class="tenue">no en el papel.</span></h2></div>
+        <div class="e-fila flechas"><button class="e-btn redondo" type="button" id="obras-ant" aria-label="Obra anterior" data-i="arrow"></button><button class="e-btn redondo" type="button" id="obras-sig" aria-label="Obra siguiente" data-i="arrow"></button></div></div>
+    </div>
+    <div class="obras" id="obras-lista" tabindex="0" aria-label="Galería de obras"></div>
+  </section>
+
+  <section class="final" id="pedir" aria-labelledby="t-final" data-seccion>
+    <img class="final-foto" src="img/torre-trabajadores.webp" alt="" loading="lazy" decoding="async">
+    <div class="ancho final-in revela">
+      <span class="eti">05 · Pedir</span>
+      <h2 class="final-t" id="t-final">¿Qué necesita energizar?</h2>
+      <p>Cuéntenos la obra y le mandamos el precio de lo que no está en el catálogo.</p>
+      <div class="e-fila"><button class="e-btn e-btn-p" type="button" data-cotizar data-i="send">Pedir cotización</button><a class="e-btn btn-vidrio" href="#productos">Seguir viendo</a></div>
+    </div>
+  </section>
+</main>
+
+<footer class="cierre">
+  <img class="cierre-foto" src="../img/cierre-noche.jpg" alt="" loading="lazy" decoding="async">
+  <div class="ancho">
+    <p class="cierre-logo revela"><img src="../logo/emtecsa-logo-blanco.svg" alt="EMTECSA" loading="lazy"></p>
+    <div class="pie-datos" id="pie-datos"></div>
+    <p class="cierre-pie"><span>Energía con respaldo. © <span id="anio"></span> EMTECSA. Fotos provisionales de Unsplash.</span><span>Monterroso Dev Studio</span></p>
+  </div>
+</footer>
+
+<div class="velo" id="velo" hidden></div>
+
+<aside class="carrito claro" id="carrito" role="dialog" aria-modal="true" aria-labelledby="carrito-t" hidden>
+  <div class="carrito-cab">
+    <div class="cab-titulo"><span class="eti" id="carrito-paso">Paso 1 de 4</span><h2 id="carrito-t">Su carrito</h2></div>
+    <ol class="etapas" id="etapas" aria-hidden="true"><li><span>Carrito</span></li><li><span>Datos</span></li><li><span>Pago</span></li><li><span>Comprobante</span></li><i id="etapas-luz"></i><b class="etapas-pulso" id="etapas-pulso"></b></ol>
+    <button class="e-btn redondo" type="button" data-cerrar aria-label="Cerrar el carrito" data-i="x"></button>
+  </div>
+  <div class="carrito-zona">
+    <div class="carrito-cuerpo" id="carrito-cuerpo" data-lenis-prevent></div>
+    <div class="carrito-der" data-lenis-prevent>
+      <div class="resumen" id="carrito-resumen"></div>
+      <div class="carrito-pie" id="carrito-pie"></div>
+    </div>
+  </div>
+</aside>
+
+<div class="ficha" id="ficha" role="dialog" aria-modal="true" aria-labelledby="ficha-t" hidden>
+  <div class="ficha-caja">
+    <button class="e-btn redondo ficha-cerrar" type="button" data-cerrar-ficha aria-label="Cerrar la ficha" data-i="x"></button>
+    <div class="ficha-visor" id="ficha-visor"><span class="visor-ayuda"><span data-i="spark" data-w="14"></span><span class="ayuda-txt">Arrastre para girar · pellizque para acercar</span></span><button class="e-btn btn-vidrio visor-piezas" type="button" id="ver-piezas" hidden data-i="layers">Ver piezas</button></div>
+    <div class="ficha-info" id="ficha-info" data-lenis-prevent></div>
+  </div>
+</div>
+
+<div class="avisos" id="avisos" aria-live="polite"></div>
+</body>
+</html>
