@@ -1,0 +1,12 @@
+/*
+!/.gitignore
+!/index.html
+!/guia-de-marca.html
+!/emtecsa-tokens.css
+!/emtecsa-base.css
+!/emtecsa-ui.js
+!/img/
+!/logo/
+/logo/muestra.html
+/logo/*.webp
+.DS_Store
