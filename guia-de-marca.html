@@ -25,8 +25,7 @@
   .ancho { width: min(1180px, 100% - 32px); margin-inline: auto; }
   .t { font-weight: 800; letter-spacing: -0.05em; line-height: .95; }
   .eti { display: block; font-size: 12px; font-weight: 700; letter-spacing: .2em; text-transform: uppercase; color: var(--laton); }
-  .ceja { display: block; font-size: 13.5px; color: var(--suave); text-align: center; margin-bottom: 10px; }
-  .sec-t { font-weight: 700; text-transform: uppercase; letter-spacing: .18em; font-size: clamp(15px, 1.8vw, 18px); text-align: center; }
+  .sec-t { font-weight: 800; letter-spacing: -0.05em; line-height: .95; font-size: clamp(44px, 7vw, 64px); }
   .ver { display: inline-flex; align-items: center; gap: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: .14em; font-size: 11.5px; color: var(--claro); text-decoration: none; }
   .ver svg { color: var(--laton); transition: transform 200ms var(--ease-out); }
   @media (hover: hover) and (pointer: fine) { .ver:hover svg { transform: translateX(4px); } }
@@ -72,13 +71,13 @@
 
   section.s { padding: clamp(64px, 10vw, 120px) 0 0; scroll-margin-top: 20px; }
   .s-cab { margin-bottom: clamp(28px, 4vw, 44px); }
-  .s-cab p.sub { text-align: center; color: var(--suave); font-size: 14.5px; max-width: 60ch; margin: 14px auto 0; }
-  .num-s { display: block; text-align: center; font-weight: 700; color: var(--laton); letter-spacing: .2em; font-size: 12px; margin-bottom: 8px; }
+  .s-cab p.sub { color: var(--suave); font-size: 15px; max-width: 56ch; margin: 16px 0 0; }
+  .num-s { display: block; font-weight: 700; color: var(--laton); letter-spacing: .2em; font-size: 13px; margin-bottom: 12px; }
 
   .altas { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
   @media (max-width: 960px) { .altas { grid-template-columns: repeat(2, 1fr); } }
   @media (max-width: 520px) { .altas { grid-template-columns: 1fr; } }
-  .alta { position: relative; aspect-ratio: 3 / 4; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; text-align: center; padding: 22px 18px; isolation: isolate; }
+  .alta { border-radius: 26px; position: relative; aspect-ratio: 3 / 4; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; text-align: center; padding: 22px 18px; isolation: isolate; }
   .alta img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: -2; transition: transform 700ms var(--ease-out); }
   .alta.foto::before { content: ""; position: absolute; inset: 0; z-index: -1; background: linear-gradient(180deg, rgba(7,17,31,0) 35%, rgba(7,17,31,.9) 100%); }
   @media (hover: hover) and (pointer: fine) { .alta.foto:hover img { transform: scale(1.04); } }
@@ -87,11 +86,11 @@
   .alta code { font: 600 12.5px var(--fuente); letter-spacing: .06em; margin-top: 8px; opacity: .9; }
   @media (max-width: 520px) { .alta { aspect-ratio: 4 / 3; } }
 
-  .escala { display: grid; grid-template-columns: repeat(11, 1fr); margin-top: 14px; }
+  .escala { border-radius: 16px; overflow: hidden; display: grid; grid-template-columns: repeat(11, 1fr); margin-top: 14px; }
   .escala div { height: 46px; display: flex; align-items: flex-end; padding: 5px 6px; font-size: 10.5px; font-weight: 700; }
   .escala-n { display: flex; justify-content: space-between; margin-top: 28px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; font-size: 11.5px; color: var(--suave); }
   @media (max-width: 640px) { .escala { grid-template-columns: repeat(6, 1fr); } }
-  .estados { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); gap: 1px; background: var(--linea-f); border: 1px solid var(--linea-f); margin-top: 28px; }
+  .estados { border-radius: 22px; overflow: hidden; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); gap: 1px; background: var(--linea-f); border: 1px solid var(--linea-f); margin-top: 28px; }
   .estados > div { background: var(--noche); padding: 18px; display: grid; gap: 4px; font-size: 13px; color: var(--suave); }
   .estados b { color: var(--claro); font-size: 14px; display: flex; align-items: center; gap: 8px; }
   .estados b i { width: 12px; height: 12px; border-radius: 50%; }
@@ -227,7 +226,7 @@
 
   .docs { display: grid; grid-template-columns: 1fr 1fr; gap: clamp(16px, 3vw, 32px); align-items: start; }
   @media (max-width: 860px) { .docs { grid-template-columns: 1fr; } }
-  .hoja { aspect-ratio: 8.5 / 11; background: #fff; color: #0E1D33; box-shadow: 0 30px 60px -20px rgba(0,0,0,.6); position: relative; overflow: hidden; display: flex; flex-direction: column; }
+  .hoja { border-radius: 18px; aspect-ratio: 8.5 / 11; background: #fff; color: #0E1D33; box-shadow: 0 30px 60px -20px rgba(0,0,0,.6); position: relative; overflow: hidden; display: flex; flex-direction: column; }
   .docs figure { container-type: inline-size; min-width: 0; }
   .hoja-portada { color: #fff; isolation: isolate; justify-content: space-between; padding: 7cqi; }
   .hoja-portada > img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: -2; }
@@ -247,7 +246,7 @@
   .hoja-in td { padding: 1.6cqi 0; border-bottom: .2cqi solid var(--gris-100); }
   .hoja-in td:last-child, .hoja-in th:last-child { text-align: right; }
   .hoja-in td + td, .hoja-in th + th { padding-left: 2cqi; }
-  .hoja-in .tot { background: var(--marino-950); color: #fff; padding: 2.6cqi 3cqi; display: flex; justify-content: space-between; align-items: baseline; margin-top: auto; }
+  .hoja-in .tot { border-radius: 2.4cqi; background: var(--marino-950); color: #fff; padding: 2.6cqi 3cqi; display: flex; justify-content: space-between; align-items: baseline; margin-top: auto; }
   .hoja-in .tot span { font-weight: 700; letter-spacing: .16em; text-transform: uppercase; font-size: 2cqi; color: var(--laton); }
   .hoja-in .tot b { font-size: 4.2cqi; }
   .hoja-in .pie { display: flex; justify-content: space-between; color: var(--gris-600); font-size: 1.9cqi; }
@@ -256,7 +255,7 @@
 
   .modos { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
   @media (max-width: 720px) { .modos { grid-template-columns: 1fr; } }
-  .modo { padding: 26px; display: grid; gap: 12px; }
+  .modo { border-radius: 26px; padding: 26px; display: grid; gap: 12px; }
   .modo h3 { font-weight: 800; font-size: 28px; letter-spacing: -0.04em; }
   .modo ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 9px; }
   .modo li { display: grid; grid-template-columns: 22px 1fr auto; gap: 10px; align-items: center; font-size: 13.5px; }
@@ -299,7 +298,7 @@
 <section class="portada" id="inicio" aria-label="Portada">
   <picture><source media="(max-width: 700px)" srcset="img/portada-movil.jpg"><img src="img/portada.jpg" alt="Torre de alta tensión al anochecer con la luna detrás" fetchpriority="high"></picture>
   <div class="ancho">
-    <span class="eti entra">Guía de marca · propuesta 2</span>
+    <span class="eti entra">Guía de marca</span>
     <h1 class="t entra d2">Energía con <em>respaldo.</em></h1>
     <div class="tres entra d3">
       <div><span data-i="torre" data-w="26"></span><p>Transformadores, líneas, acometidas y conexiones para clientes que no pueden quedarse sin luz.</p><a class="ver" href="#color">Los colores <span data-i="arrow" data-w="16"></span></a></div>
@@ -312,7 +311,7 @@
 
 <main>
   <section class="s ancho" id="color" aria-labelledby="t-color">
-    <div class="s-cab"><span class="num-s">01</span><span class="ceja">los que se ven en todo</span><h2 class="sec-t" id="t-color">Color</h2><p class="sub">Marino de noche, gris acero y un toque de latón. El latón es el detalle: líneas, números y el botón principal.</p></div>
+    <div class="s-cab"><span class="num-s">01</span><h2 class="sec-t" id="t-color">Color</h2><p class="sub">Marino de noche, gris acero y un toque de latón. El latón es el detalle: líneas, números y el botón principal.</p></div>
     <div class="altas">
       <div class="alta" style="background:#07111F;border:1px solid var(--linea)"><h3>Marino noche</h3><p>Fondo, menú y portadas</p><code>#07111F</code></div>
       <div class="alta" style="background:#102440"><h3>Marino EMTECSA</h3><p>Color de la marca</p><code>#102440</code></div>
@@ -366,7 +365,7 @@
   </section>
 
   <section class="s ancho" id="fotos" aria-labelledby="t-fotos">
-    <div class="s-cab"><span class="num-s">04</span><span class="ceja">de noche, con niebla o en hora azul</span><h2 class="sec-t" id="t-fotos">Fotografía</h2><p class="sub">Fotos con ambiente, en los mismos azules de la marca. Las de ahora son de uso libre y provisionales: con las obras de EMTECSA quedan aún mejor.</p></div>
+    <div class="s-cab"><span class="num-s">04</span><h2 class="sec-t" id="t-fotos">Fotografía</h2><p class="sub">Fotos con ambiente, en los mismos azules de la marca. Las de ahora son de uso libre y provisionales: con las obras de EMTECSA quedan aún mejor.</p></div>
     <div class="altas">
       <div class="alta foto"><img src="img/aisladores.jpg" alt="Aisladores de una subestación al atardecer" loading="lazy"><h3>Transformadores</h3><p>Montaje, conexión y pruebas</p></div>
       <div class="alta foto"><img src="img/torre-luna.jpg" alt="Torre de alta tensión con la luna de noche" loading="lazy"><h3>Líneas y acometidas</h3><p>Media y baja tensión</p></div>
@@ -380,7 +379,7 @@
   </section>
 
   <section class="s ancho" id="piezas" aria-labelledby="t-piezas">
-    <div class="s-cab"><span class="ceja">botones, filtros y estados</span><h2 class="sec-t" id="t-piezas">Piezas</h2></div>
+    <div class="s-cab"><h2 class="sec-t" id="t-piezas">Piezas</h2></div>
     <div class="piezas">
       <div><h3>Botones</h3><p>Uno solo principal por pantalla. Nunca pegados.</p>
         <div class="e-fila"><button class="e-btn e-btn-p" type="button" data-i="plus">Nueva cotización</button><button class="e-btn" type="button" data-i="pen">Editar</button></div></div>
@@ -398,7 +397,7 @@
   </section>
 
   <section class="s ancho" id="sistema" aria-labelledby="t-sis">
-    <div class="s-cab"><span class="num-s">05</span><span class="ceja">la pantalla de inicio, con datos de ejemplo</span><h2 class="sec-t" id="t-sis">Así se verá el sistema</h2><p class="sub">Solo muestra la línea visual. Cada pantalla se diseña con usted, parte por parte.</p></div>
+    <div class="s-cab"><span class="num-s">05</span><h2 class="sec-t" id="t-sis">El sistema</h2></div>
     <div class="sis">
       <div class="ap-barra">
         <span class="logo"><img src="logo/emtecsa-logo-blanco.svg" alt="EMTECSA" width="125" height="20"></span>
@@ -436,7 +435,7 @@
   </section>
 
   <section class="s ancho" id="documentos" aria-labelledby="t-doc">
-    <div class="s-cab"><span class="num-s">06</span><span class="ceja">lo que recibe el cliente</span><h2 class="sec-t" id="t-doc">Documentos y PDF</h2><p class="sub">La portada lleva una foto con ambiente; las páginas de adentro van en blanco para que se impriman bien y gasten poca tinta.</p></div>
+    <div class="s-cab"><span class="num-s">06</span><h2 class="sec-t" id="t-doc">Documentos y PDF</h2><p class="sub">La portada lleva una foto con ambiente; las páginas de adentro van en blanco para que se impriman bien y gasten poca tinta.</p></div>
     <div class="docs">
       <figure style="margin:0"><div class="hoja hoja-portada" role="img" aria-label="Portada de una propuesta técnica y económica">
         <img src="img/torre-luna-2.jpg" alt="">
@@ -460,7 +459,7 @@
   </section>
 
   <section class="s ancho" aria-labelledby="t-modos">
-    <div class="s-cab"><span class="ceja">cada usuario elige el suyo</span><h2 class="sec-t" id="t-modos">Modo oscuro y modo claro</h2></div>
+    <div class="s-cab"><h2 class="sec-t" id="t-modos">Modo oscuro y modo claro</h2></div>
     <div class="modos">
       <div class="modo modo-os"><h3>Oscuro</h3><ul>
         <li><i style="background:#07111F"></i><span>Fondo</span><code>#07111F</code></li><li><i style="background:#0B1A2E"></i><span>Tarjetas</span><code>#0B1A2E</code></li><li><i style="background:#F2F4F7"></i><span>Texto</span><code>#F2F4F7</code></li><li><i style="background:#C8A96A"></i><span>Botón principal</span><code>#C8A96A</code></li></ul></div>
@@ -470,7 +469,7 @@
   </section>
 
   <section class="s ancho" id="reglas" aria-labelledby="t-reglas">
-    <div class="s-cab"><span class="num-s">07</span><span class="ceja">para que todo se vea de la misma familia</span><h2 class="sec-t" id="t-reglas">Lo que sí y lo que no</h2></div>
+    <div class="s-cab"><span class="num-s">07</span><h2 class="sec-t" id="t-reglas">Lo que sí y lo que no</h2></div>
     <div class="lista2" style="margin-top:0">
       <div><h3>Sí</h3><ul class="si">
         <li><span data-i="check"></span>Colores solo desde el archivo de colores (emtecsa-tokens.css).</li>
