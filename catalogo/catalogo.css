@@ -840,3 +840,4 @@ body.trabado .indice, body.trabado .ind-movil { opacity: 0 !important; pointer-e
 @media (max-width: 1339px) { .indice { display: none; } .ind-movil { display: flex; } }
 @media (max-width: 1339px) { .cinta-prueba { bottom: calc(70px + env(safe-area-inset-bottom)); } }
 .indice { right: 18px; }
+@media (max-width: 640px) { .cinta-prueba { top: calc(var(--barra) + 6px); bottom: auto; right: 16px; left: auto; } }
