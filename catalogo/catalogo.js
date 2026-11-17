@@ -36,6 +36,7 @@
   async function generarMinis() {
     const tipos = [...new Set([...D.lineas.map(l => l.modelo), ...D.productos.map(p => p.modelo)])];
     for (const t of tipos) {
+      await new Promise(r => cuandoQuieto(r));
       await new Promise(r => (window.requestIdleCallback ? requestIdleCallback(r, { timeout: 400 }) : setTimeout(r, 60)));
       try { pintarMini(t, await window.EMT3D.miniatura(t)); } catch (e) {}
     }
@@ -784,6 +785,21 @@
     const pasos = $("#pasos");
     const fotos = $$(".banda-foto, .final-foto");
     const heroe = $("#inicio"), heroeIn = $(".heroe-in"), caps = $$(".heroe-cap");
+    const escenas = $$(".heroe-foto"), lienzoHeroe = $("#lienzo-heroe"), CLAVES = [0, 0.34, 0.64, 1];
+    const suaveP = t => t * t * (3 - 2 * t);
+    const pintarEscenas = ph => {
+      if (lienzoHeroe.classList.contains("listo") && $(".heroe-fotos").classList.contains("tapadas")) return;
+      let k = 0;
+      while (k < CLAVES.length - 2 && ph > CLAVES[k + 1]) k++;
+      const f = Math.max(0, Math.min(1, (ph - CLAVES[k]) / (CLAVES[k + 1] - CLAVES[k])));
+      const mezcla = suaveP(Math.max(0, Math.min(1, (f - 0.3) / 0.4)));
+      escenas.forEach((el, i) => {
+        const o = i === k ? 1 : i === k + 1 ? mezcla : 0;
+        const z = i === k ? 1 + 0.05 * f : 1;
+        el.style.opacity = o;
+        el.style.transform = QUIETO || i !== k ? "none" : `scale(${z.toFixed(4)})`;
+      });
+    };
     if (QUIETO) heroe.classList.add("fijo");
     let pend = false;
     const marco = () => {
@@ -794,6 +810,7 @@
       const rh = heroe.getBoundingClientRect();
       const ph = QUIETO ? 0 : Math.max(0, Math.min(1, -rh.top / Math.max(1, rh.height - vh)));
       heroeIn.classList.toggle("oculto", ph > 0.12);
+      pintarEscenas(ph);
       caps[0].classList.toggle("activa", ph > 0.26 && ph < 0.46);
       caps[1].classList.toggle("activa", ph > 0.56 && ph < 0.76);
       caps[2].classList.toggle("activa", ph > 0.88);
@@ -863,6 +880,20 @@
     if (!$("#carrito").hidden && paso >= 5 && pedido && pedido.id === p.id) { pedido = p; pintarPaso(); }
   }
 
+  let ultimoMovimiento = 0;
+  ["scroll", "wheel", "touchmove", "touchstart", "keydown"].forEach(ev => addEventListener(ev, () => { ultimoMovimiento = performance.now(); }, { passive: true }));
+  function cuandoQuieto(fn) {
+    const ver = () => { if (!document.hidden && performance.now() - ultimoMovimiento > 700) fn(); else setTimeout(ver, 250); };
+    ver();
+  }
+  window.__emtQuieto = cuandoQuieto;
+  const conexion = navigator.connection || {};
+  const senalMala = !!conexion.saveData || /(^|-)2g$/.test(conexion.effectiveType || "");
+  function cargarEscenas() {
+    $$(".heroe-foto[data-k] source[data-srcset]").forEach(s => { s.srcset = s.dataset.srcset; s.removeAttribute("data-srcset"); });
+    $$(".heroe-foto[data-k] img[data-src]").forEach(i => { i.fetchPriority = "high"; i.src = i.dataset.src; i.removeAttribute("data-src"); });
+  }
+
   let entradaFuera = false;
   const t0Entrada = performance.now();
   function cargar() {}
@@ -877,7 +908,8 @@
       setTimeout(() => {
         document.body.classList.add("en-escena");
         dispatchEvent(new Event("emt-entrada-fuera"));
-        setTimeout(() => { import("./escena.js").catch(() => sin3D()); }, 900);
+        setTimeout(cargarEscenas, 200);
+        setTimeout(() => cuandoQuieto(() => { import("./escena.js").catch(() => sin3D()); }), 900);
       }, QUIETO ? 0 : 240);
       puede3D = true;
       setTimeout(() => { if (ent) ent.remove(); }, 800);
@@ -896,9 +928,14 @@
 
   let puede3D = false, con3D = false;
   function iniciar3D() {
-    if (!puede3D || con3D || !window.EMT3D) return;
+    if (!puede3D || con3D || !window.EMT3D || senalMala) return;
     con3D = true;
-    try { window.EMT3D.heroe($("#lienzo-heroe")); } catch (e) {}
+    cuandoQuieto(() => {
+      const lienzo = $("#lienzo-heroe");
+      try { window.EMT3D.heroe(lienzo); } catch (e) { return; }
+      const tapar = () => { if (lienzo.classList.contains("listo")) setTimeout(() => $(".heroe-fotos").classList.add("tapadas"), 1600); else setTimeout(tapar, 300); };
+      tapar();
+    });
   }
 
   document.addEventListener("DOMContentLoaded", () => {

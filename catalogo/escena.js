@@ -31,8 +31,7 @@ const listoPiezas = new Promise(ok => {
   new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).load("modelos/postes.glb",
     g => {
       const seguir = () => { avisarCarga(86); ponerPiezas(g.scene); ok(true); };
-      if (!document.documentElement.classList.contains("cargando")) { seguir(); return; }
-      addEventListener("emt-entrada-fuera", () => setTimeout(seguir, 500), { once: true });
+      (window.__emtQuieto || (f => f()))(seguir);
     },
     ev => { if (ev.total) avisarCarga(32 + (ev.loaded / ev.total) * 52); },
     () => ok(false));
@@ -670,14 +669,14 @@ function heroe(lienzo) {
 
   let entradaFuera = !document.documentElement.classList.contains("cargando");
   addEventListener("emt-entrada-fuera", () => { entradaFuera = true; if (datos) inicio = performance.now(); });
-  listoPiezas.then(real => {
+  listoPiezas.then(real => (window.__emtQuieto || (f => f()))(() => {
     montar(real);
     if (entradaFuera) inicio = performance.now() - 4000;
     avisarCarga(92);
     try { renderer.compile(scene, camara); } catch (e) {}
     cuadro();
     requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(() => dispatchEvent(new Event("emt-portada-lista")))));
-  });
+  }));
 }
 
 let estudio = null;
