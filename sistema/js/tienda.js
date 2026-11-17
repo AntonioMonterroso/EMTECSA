@@ -142,6 +142,7 @@ window.EMT_TIENDA = (() => {
 
   async function insignia() {
     const a = document.querySelector('.barra [data-sec="tienda"]'); if (!a) return;
+    cargar();
     let n = 0;
     try { n = (await D.pedidosTienda()).filter(x => x.estado === "comprobante-recibido").length; } catch (e) {}
     const m = document.querySelector(".barra [data-menu]"); if (m) { m.dataset.pTienda = n; m.classList.toggle("con-punto", Number(m.dataset.pCot || 0) + Number(m.dataset.pEq || 0) + n > 0); m.setAttribute("aria-label", n ? `Abrir el menú, ${n} ${n === 1 ? "comprobante" : "comprobantes"} por revisar` : "Abrir el menú"); }
@@ -152,9 +153,12 @@ window.EMT_TIENDA = (() => {
   }
 
   const conocidos = new Map();
-  D.pedidosTienda().then(l => l.forEach(x => conocidos.set(x.id, x.estado))).catch(() => {});
+  let cargados = null;
+  const cargar = () => cargados || (cargados = (A() && A().sesion() ? D.pedidosTienda() : Promise.resolve(null)).then(l => { if (!l) { cargados = null; return; } l.forEach(x => { if (!conocidos.has(x.id)) conocidos.set(x.id, x.estado); }); }).catch(() => { cargados = null; }));
+  setTimeout(cargar, 0);
   D.alPedido(async msg => {
     if (!msg || msg.tipo !== "pedido") return;
+    if (!cargados) await cargar();
     const antes = conocidos.get(msg.id);
     if (antes === msg.estado) return;
     conocidos.set(msg.id, msg.estado);

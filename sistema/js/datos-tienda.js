@@ -55,7 +55,7 @@
   const deFila = f => ({ ...(f.datos || {}), id: f.id, estado: f.estado, total: Number(f.total), comprobante: f.comprobante, notaEmtecsa: f.nota_emtecsa, historia: f.historia || [], cotizacion_id: f.cotizacion_id, creado: f.creado, actualizado: f.actualizado });
   async function okN(r, msg) { if (r.error) throw new Error(msg); return r.data; }
   const N = {
-    pedidos: async () => (await okN(await sb.from("tienda_pedidos").select(COLS).order("actualizado", { ascending: false }), "No se pudieron leer los pedidos de la tienda.")).map(deFila),
+    pedidos: async () => { const se = await sb.auth.getSession(); if (!se.data || !se.data.session) return []; return (await okN(await sb.from("tienda_pedidos").select(COLS).order("actualizado", { ascending: false }), "No se pudieron leer los pedidos de la tienda.")).map(deFila); },
     pedido: async id => { const f = await okN(await sb.from("tienda_pedidos").select(COLS).eq("id", id).maybeSingle(), "No se pudo leer el pedido."); return f ? deFila(f) : null; },
     comprobante: async id => {
       const f = await okN(await sb.from("tienda_archivos").select("tipo, contenido").eq("pedido_id", id).maybeSingle(), "No se pudo leer el comprobante.");
