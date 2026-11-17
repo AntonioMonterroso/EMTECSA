@@ -37,7 +37,14 @@ const listoPiezas = new Promise(ok => {
     () => ok(false));
 });
 
+const renderers = new Set();
+addEventListener("pagehide", e => {
+  if (e.persisted) return;
+  renderers.forEach(r => { try { r.dispose(); r.forceContextLoss(); } catch (x) {} });
+  renderers.clear();
+});
 function preparar(renderer) {
+  renderers.add(renderer);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.05;

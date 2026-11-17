@@ -936,7 +936,7 @@
     addEventListener("emt-3d-perdido", destapar);
     addEventListener("emt-3d-de-vuelta", tapar);
     const arrancar = () => cuandoQuieto(() => {
-      try { window.EMT3D.heroe(lienzo); } catch (e) { if (++intentos < 2) setTimeout(arrancar, 1500); return; }
+      try { window.EMT3D.heroe(lienzo); } catch (e) { if (++intentos < 4) setTimeout(arrancar, 1200 * intentos); return; }
       tapar();
     });
     arrancar();

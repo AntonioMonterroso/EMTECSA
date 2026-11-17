@@ -59,6 +59,8 @@
 <div class="entrada" id="entrada" aria-hidden="true"><div class="entrada-logo"><img class="base" src="../logo/emtecsa-logo-blanco.svg" alt="" width="1720" height="276"><div class="lleno-marco"><img class="lleno" src="../logo/emtecsa-logo-blanco.svg" alt="" width="1720" height="276"></div></div></div>
 <script>
 (function () {
+  if ("scrollRestoration" in history) history.scrollRestoration = "manual";
+  scrollTo(0, 0);
   var m = document.querySelector("#entrada .lleno-marco"), l = document.querySelector("#entrada .lleno"), caja = document.querySelector("#entrada .entrada-logo"), img = document.querySelector("#entrada .base");
   if (!m || !m.animate) return;
   var quieto = matchMedia("(prefers-reduced-motion: reduce)").matches;
