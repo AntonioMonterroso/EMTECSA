@@ -581,19 +581,33 @@ function heroe(lienzo) {
   }
 
   const reloj = new THREE.Clock();
-  let muestras = 0, sumaDt = 0;
+  let muestras = 0, sumaDt = 0, montado = 0, tMontaje = 0, pasoCalidad = 0, apagaBrillo = -1;
+  function cuidarCalidad(dt) {
+    const ahora = performance.now();
+    if (apagaBrillo >= 0) {
+      apagaBrillo = Math.min(1, apagaBrillo + dt / 1.6);
+      if (bloom) bloom.strength = 0.85 * (1 - suave(apagaBrillo));
+      if (apagaBrillo >= 1) { composer = null; apagaBrillo = -1; medir(); }
+      return;
+    }
+    if (pasoCalidad > 2 || ahora - montado < 3000) return;
+    muestras++; sumaDt += dt;
+    if (muestras < 90) return;
+    const lento = sumaDt / muestras > 0.034;
+    muestras = 0; sumaDt = 0;
+    if (!lento) { pasoCalidad = 3; return; }
+    pasoCalidad++;
+    if (pasoCalidad === 1) { escala = 0.85; medir(); }
+    else if (pasoCalidad === 2 && composer && bloom) apagaBrillo = 0;
+    else { escala = 0.72; medir(); }
+    montado = ahora - 1500;
+  }
   function cuadro() {
     requestAnimationFrame(cuadro);
     if (!visible || document.hidden || !datos) { reloj.getDelta(); return; }
     const dt = Math.min(reloj.getDelta(), 0.05);
     const t = (performance.now() - inicio) / 1000;
-    if (muestras < 120 && t > 1.5) {
-      muestras++; sumaDt += dt;
-      if (muestras === 120 && sumaDt / 120 > 0.034) {
-        if (composer) composer = null; else escala = 0.8;
-        medir();
-      }
-    }
+    cuidarCalidad(dt);
     puntero.x += (puntero.tx - puntero.x) * (1 - Math.exp(-dt * 2.5));
     puntero.y += (puntero.ty - puntero.y) * (1 - Math.exp(-dt * 2.5));
     const pMeta = progreso();
@@ -603,7 +617,8 @@ function heroe(lienzo) {
     const entrada = QUIETO ? 1 : salida(lim(t / 2.6, 0, 1));
     enRuta(p);
     camara.position.copy(tmpP);
-    camara.position.x += puntero.x * 0.45 + (QUIETO ? 0 : Math.sin(t * 0.18) * 0.25);
+    const tv = Math.max(0, t - tMontaje);
+    camara.position.x += puntero.x * 0.45 + (QUIETO ? 0 : Math.sin(tv * 0.18) * 0.25 * suave(lim(tv / 6, 0, 1)));
     camara.position.y += -puntero.y * 0.3 + (1 - entrada) * -1.2;
     camara.position.z += (1 - entrada) * 5;
     camara.lookAt(tmpM);
@@ -671,9 +686,13 @@ function heroe(lienzo) {
   addEventListener("emt-entrada-fuera", () => { entradaFuera = true; if (datos) inicio = performance.now(); });
   listoPiezas.then(real => (window.__emtQuieto || (f => f()))(() => {
     montar(real);
-    if (entradaFuera) inicio = performance.now() - 4000;
     avisarCarga(92);
     try { renderer.compile(scene, camara); } catch (e) {}
+    if (entradaFuera) inicio = performance.now() - 4000;
+    tMontaje = (performance.now() - inicio) / 1000;
+    if (arco) { arco.prox = tMontaje + 6; arco.ultimo = tMontaje + 3.8; }
+    montado = performance.now();
+    reloj.getDelta();
     cuadro();
     requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(() => dispatchEvent(new Event("emt-portada-lista")))));
   }));
