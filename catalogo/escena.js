@@ -589,26 +589,21 @@ function heroe(lienzo) {
   }
 
   const reloj = new THREE.Clock();
-  let muestras = 0, sumaDt = 0, montado = 0, tMontaje = 0, pasoCalidad = 0, apagaBrillo = -1;
+  let montado = 0, tMontaje = 0, pasoCalidad = 0;
+  const tiempos = [];
   function cuidarCalidad(dt) {
     const ahora = performance.now();
-    if (apagaBrillo >= 0) {
-      apagaBrillo = Math.min(1, apagaBrillo + dt / 1.6);
-      if (bloom) bloom.strength = 0.85 * (1 - suave(apagaBrillo));
-      if (apagaBrillo >= 1) { composer = null; apagaBrillo = -1; medir(); }
-      return;
-    }
-    if (pasoCalidad > 2 || ahora - montado < 3000) return;
-    muestras++; sumaDt += dt;
-    if (muestras < 90) return;
-    const lento = sumaDt / muestras > 0.034;
-    muestras = 0; sumaDt = 0;
-    if (!lento) { pasoCalidad = 3; return; }
+    if (pasoCalidad > 1 || ahora - montado < 4000) return;
+    tiempos.push(dt);
+    if (tiempos.length < 120) return;
+    tiempos.sort((a, b) => a - b);
+    const lento = tiempos[60] > 0.034;
+    tiempos.length = 0;
+    if (!lento) { pasoCalidad = 2; return; }
     pasoCalidad++;
-    if (pasoCalidad === 1) { escala = 0.85; medir(); }
-    else if (pasoCalidad === 2 && composer && bloom) apagaBrillo = 0;
-    else { escala = 0.72; medir(); }
-    montado = ahora - 1500;
+    escala = pasoCalidad === 1 ? 0.85 : 0.72;
+    medir();
+    montado = ahora - 2000;
   }
   function cuadro() {
     requestAnimationFrame(cuadro);
@@ -695,7 +690,10 @@ function heroe(lienzo) {
   listoPiezas.then(real => (window.__emtQuieto || (f => f()))(() => {
     try { montar(real); } catch (e) { dispatchEvent(new Event("emt-3d-perdido")); return; }
     avisarCarga(92);
-    try { renderer.compile(scene, camara); } catch (e) {}
+    const compilar = renderer.compileAsync ? renderer.compileAsync(scene, camara) : Promise.resolve(renderer.compile(scene, camara));
+    compilar.catch(() => {}).then(() => (window.__emtQuieto || (f => f()))(arrancar));
+  }));
+  function arrancar() {
     if (entradaFuera) inicio = performance.now() - 4000;
     tMontaje = (performance.now() - inicio) / 1000;
     if (arco) { arco.prox = tMontaje + 1.6; arco.ultimo = tMontaje + 3.8; }
@@ -703,7 +701,7 @@ function heroe(lienzo) {
     reloj.getDelta();
     try { cuadro(); } finally { requestAnimationFrame(() => requestAnimationFrame(() => lienzo.classList.add("listo"))); }
     requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(() => dispatchEvent(new Event("emt-portada-lista")))));
-  }));
+  }
 }
 
 let estudio = null;
