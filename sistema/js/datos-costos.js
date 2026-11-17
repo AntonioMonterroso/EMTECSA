@@ -81,12 +81,8 @@
   async function resumenCostos() {
     const [obras, cat, jor, r, emp] = await Promise.all([D.obras(), D.catalogo(), jornadas(null), D.resumenCobros().catch(() => null), D.empresa()]);
     const l = [];
-    for (const ob of obras) {
-      const o = await D.obra(ob.id);
-      if (!o) continue;
-      const c = await costosObra(ob.id, { o, cat, jor, r, emp });
-      if (c) l.push(c);
-    }
+    const res = await Promise.all(obras.map(async ob => { const o = await D.obra(ob.id); return o ? costosObra(ob.id, { o, cat, jor, r, emp }) : null; }));
+    res.forEach(c => { if (c) l.push(c); });
     return l;
   }
 

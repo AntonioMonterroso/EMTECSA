@@ -1,5 +1,5 @@
-const CACHE = "emtecsa-catalogo-v3";
-const BASE = ["./", "index.html", "catalogo.css", "catalogo.js", "almacen.js", "../sistema/js/config.js", "datos.js", "comprobante.js", "escena.js", "modelos.js", "vendor/three.module.min.js", "vendor/RoomEnvironment.js", "iconos/icono-192.png", "../emtecsa-tokens.css", "../emtecsa-base.css", "../emtecsa-ui.js", "../logo/emtecsa-logo-blanco.svg", "../logo/emtecsa-icono.svg"];
+const CACHE = "emtecsa-catalogo-v4";
+const BASE = ["./", "index.html", "catalogo.css", "catalogo.js", "almacen.js", "../sistema/js/config.js", "../emtecsa-geo.js", "datos.js", "comprobante.js", "escena.js", "modelos.js", "vendor/three.module.min.js", "vendor/RoomEnvironment.js", "iconos/icono-192.png", "../emtecsa-tokens.css", "../emtecsa-base.css", "../emtecsa-ui.js", "../logo/emtecsa-logo-blanco.svg", "../logo/emtecsa-icono.svg"];
 
 self.addEventListener("install", e => {
   e.waitUntil(caches.open(CACHE).then(c => Promise.all(BASE.map(u => c.add(u).catch(() => null)))).then(() => self.skipWaiting()));

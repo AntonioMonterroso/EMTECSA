@@ -30,10 +30,22 @@
 
   function coordsDe(texto) {
     const t = String(texto || "");
-    const m = t.match(/@(-?\d{1,2}\.\d+),(-?\d{1,3}\.\d+)/) || t.match(/[?&](?:q|query|ll)=(-?\d{1,2}\.\d+),\s*(-?\d{1,3}\.\d+)/) || t.match(/^\s*(-?\d{1,2}\.\d+)\s*,\s*(-?\d{1,3}\.\d+)\s*$/);
+    const m = t.match(/!3d(-?\d{1,2}\.\d+)!4d(-?\d{1,3}\.\d+)/) || t.match(/@(-?\d{1,2}\.\d+),(-?\d{1,3}\.\d+)/) || t.match(/[?&](?:q|query|ll)=(-?\d{1,2}\.\d+),\s*(-?\d{1,3}\.\d+)/) || t.match(/^\s*(-?\d{1,2}\.\d+)\s*,\s*(-?\d{1,3}\.\d+)\s*$/);
     if (!m) return null;
     const lat = Number(m[1]), lng = Number(m[2]);
     return Math.abs(lat) <= 90 && Math.abs(lng) <= 180 ? { lat, lng } : null;
+  }
+
+  const esCorto = t => /^\s*https:\/\/(maps\.app\.goo\.gl|goo\.gl\/maps)\//.test(String(t || ""));
+  const largos = new Map();
+  async function resolverMapa(texto) {
+    const t = String(texto || "").trim();
+    const c = coordsDe(t);
+    if (c || !esCorto(t)) return c;
+    if (!nube) throw new Error("Los enlaces cortos de Maps se leen cuando la base está conectada. Pegue las coordenadas o el enlace largo.");
+    if (!largos.has(t)) largos.set(t, sb.rpc("expandir_mapa", { p_url: t.split(/\s/)[0] }).then(r => { if (r.error) throw new Error("No se pudo abrir ese enlace de Maps. Revise que esté completo."); return r.data; }).catch(e => { largos.delete(t); throw e; }));
+    const largo = await largos.get(t);
+    return largo ? coordsDe(largo) : null;
   }
 
   function siguienteCodigo(lista) {
@@ -59,7 +71,8 @@
     if (!nombre) throw new Error("Escriba el nombre del sitio, por ejemplo «Planta Villa Nueva».");
     const c = s.mapa ? coordsDe(s.mapa) : null;
     if (s.mapa && !c) throw new Error("No se encontró la ubicación en el enlace. Pegue el enlace de Google Maps o escriba «latitud, longitud».");
-    return { nombre, direccion: o(s.direccion), municipio: o(s.municipio), departamento: o(s.departamento), lat: c ? c.lat : null, lng: c ? c.lng : null };
+    const g = window.EMT_GEO ? window.EMT_GEO.revisar(s.departamento, s.municipio) : { departamento: s.departamento, municipio: s.municipio };
+    return { nombre, direccion: o(s.direccion), municipio: o(g.municipio), departamento: o(g.departamento), lat: c ? c.lat : null, lng: c ? c.lng : null };
   }
   function revisarContacto(k) {
     const nombre = limpio(k.nombre);
@@ -120,6 +133,7 @@
   }
 
   async function guardarSitio(s) {
+    if (s.mapa && esCorto(s.mapa)) { const k = await resolverMapa(s.mapa); if (!k) throw new Error("No se encontró la ubicación en ese enlace de Maps."); s = { ...s, mapa: `${k.lat}, ${k.lng}` }; }
     const ok = revisarSitio(s);
     if (!nube) {
       const d = leer();
@@ -170,5 +184,5 @@
 
   async function codigoNuevo() { const l = nube ? await nubeOk(await sb.from("clientes").select("codigo"), "") : leer().clientes; return siguienteCodigo(l); }
 
-  Object.assign(D, { TIPOS, DEPARTAMENTOS, normalNit, nitValido, nitBonito, coordsDe, clientes, cliente, guardarCliente, guardarSitio, guardarContacto, guardarEquipo, quitar, codigoNuevo });
+  Object.assign(D, { TIPOS, DEPARTAMENTOS, normalNit, nitValido, nitBonito, coordsDe, resolverMapa, clientes, cliente, guardarCliente, guardarSitio, guardarContacto, guardarEquipo, quitar, codigoNuevo });
 })();

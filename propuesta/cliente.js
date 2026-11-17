@@ -357,10 +357,10 @@
   }
 
   const SOL = [["sol_nombre", "Nombre completo (propietario o representante legal)", "name"], ["sol_dpi", "Número de DPI", "off"], ["sol_telefono", "Teléfono", "tel"], ["sol_correo", "Correo", "email"], ["sol_direccion", "Dirección", "street-address"], ["sol_ref_nombre", "Una referencia: nombre", "off"], ["sol_ref_telefono", "Teléfono de la referencia", "off"]];
-  const TER = [["nombre", "Nombre del poseedor del terreno"], ["dpi", "DPI del poseedor"], ["edad", "Edad"], ["civil", "Estado civil"], ["profesion", "Profesión u oficio"], ["domicilio", "Departamento donde vive"], ["ubicacion", "Ubicación del terreno"], ["municipio", "Municipio"], ["departamento", "Departamento"], ["norte", "Colinda al norte con"], ["sur", "Al sur con"], ["oriente", "Al oriente con"], ["poniente", "Al poniente con"]];
+  const TER = [["nombre", "Nombre del poseedor del terreno"], ["dpi", "DPI del poseedor"], ["edad", "Edad"], ["civil", "Estado civil"], ["profesion", "Profesión u oficio"], ["domicilio", "Departamento donde vive"], ["ubicacion", "Ubicación del terreno"], ["departamento", "Departamento"], ["municipio", "Municipio"], ["norte", "Colinda al norte con"], ["sur", "Al sur con"], ["oriente", "Al oriente con"], ["poniente", "Al poniente con"]];
   function tramite() {
     const t0 = R.tramite || {}, sol = t0.sol || {}, ters = (t0.terrenos || []).map(x => ({ ...x }));
-    const terHTML = (t, i) => `<fieldset class="ter" data-ter="${i}"><legend>Terreno ${i + 1}</legend>${TER.map(([k, n]) => `<label class="campo">${esc(n)}<input data-tk="${k}" value="${esc(t[k] || "")}" autocomplete="off" ${k === "edad" ? 'inputmode="numeric"' : ""}></label>`).join("")}<button class="lnk" type="button" data-ter-q="${i}">Quitar este terreno</button></fieldset>`;
+    const terHTML = (t, i) => `<fieldset class="ter" data-ter="${i}"><legend>Terreno ${i + 1}</legend>${TER.map(([k, n]) => `<label class="campo">${esc(n)}${k === "departamento" || k === "domicilio" ? `<select data-tk="${k}" ${k === "departamento" ? 'data-geo-depto="ter"' : ""}>${window.EMT_GEO.opcionesDepto(t[k])}</select>` : `<input data-tk="${k}" value="${esc(t[k] || "")}" autocomplete="off" ${k === "municipio" ? 'data-geo-muni="ter"' : ""} ${k === "edad" ? 'inputmode="numeric"' : ""}>`}</label>`).join("")}<button class="lnk" type="button" data-ter-q="${i}">Quitar este terreno</button></fieldset>`;
     abrirHoja(`
       <div class="hoja-cab"><h2>Datos para Energuate</h2><button class="x" type="button" aria-label="Cerrar" data-cerrar>${ico("x", 18)}</button></div>
       <form data-f-tr novalidate>
@@ -375,7 +375,7 @@
       const f = h.querySelector("[data-f-tr]"), box = h.querySelector("[data-ters]"), err = h.querySelector("[data-err]");
       const leerT = () => [...box.querySelectorAll("[data-ter]")].map(fs => Object.fromEntries([...fs.querySelectorAll("[data-tk]")].map(i => [i.dataset.tk, i.value.trim()])));
       h.addEventListener("click", e => {
-        if (e.target.closest("[data-ter-mas]")) { const l = leerT(); l.push({}); box.innerHTML = l.map(terHTML).join(""); box.lastElementChild.querySelector("input").focus(); }
+        if (e.target.closest("[data-ter-mas]")) { const l = leerT(); l.push({}); box.innerHTML = l.map(terHTML).join(""); box.lastElementChild.querySelector("input, select").focus(); }
         const q = e.target.closest("[data-ter-q]"); if (q) { const l = leerT(); l.splice(Number(q.dataset.terQ), 1); box.innerHTML = l.map(terHTML).join(""); }
       });
       f.addEventListener("submit", async ev => {
@@ -385,6 +385,7 @@
         if (s.sol_dpi && !/^\d[\d\s-]{11,16}$/.test(s.sol_dpi)) { err.textContent = "Revise el DPI: son 13 números."; err.hidden = false; return; }
         const terrenos = leerT().filter(t => Object.values(t).some(Boolean));
         if (terrenos.some(t => !t.nombre)) { err.textContent = "Cada terreno necesita el nombre de quien lo posee."; err.hidden = false; return; }
+        try { terrenos.forEach((t, i) => { const g = window.EMT_GEO.revisar(t.departamento, t.municipio, ` del terreno ${i + 1}`); t.departamento = g.departamento; t.municipio = g.municipio; }); } catch (e2) { err.textContent = e2.message; err.hidden = false; return; }
         const b = f.querySelector("button[type=submit]"); b.disabled = true;
         try { R.tramite = await API.tramite(token, { sol: s, terrenos }); cerrarHoja(); pintar(); aviso("Datos enviados. Gracias."); }
         catch (e) { err.textContent = ERR[e.message] || ERR.red; err.hidden = false; b.disabled = false; }

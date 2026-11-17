@@ -36,8 +36,8 @@
     F("ing_telefono", "Teléfono del ingeniero", "emp", { docs: ["capacidad"] }),
     F("ing_id", "Identificador del ingeniero en Energuate", "emp", { docs: ["capacidad"], opcional: true }),
     F("obra_direccion", "Dirección de la obra", "obra", { docs: ["boleta", "capacidad", "medida", "requisitos", "carta_licencia"] }),
-    F("obra_municipio", "Municipio de la obra", "obra", { docs: ["boleta", "medida", "paso"] }),
-    F("obra_departamento", "Departamento de la obra", "obra", { docs: ["boleta", "medida", "paso"] }),
+    F("obra_departamento", "Departamento de la obra", "obra", { docs: ["boleta", "medida", "paso"], geoD: "obra", par: "obra_municipio" }),
+    F("obra_municipio", "Municipio de la obra", "obra", { docs: ["boleta", "medida", "paso"], geoM: "obra", par: "obra_departamento" }),
     F("region", "Región de Energuate", "obra", { docs: ["medida"], menu: REGIONES }),
     F("tension", "Tensión de servicio", "obra", { docs: ["capacidad"], menu: MENUS.tension }),
     F("tipo_trafo", "Tipo de transformador", "obra", { docs: ["capacidad"], menu: MENUS.tipo_trafo }),
@@ -69,10 +69,10 @@
     F("panel_marca", "Panel de medidores: marca", "obra", { docs: ["centralizacion"] }), F("panel_tipo", "Panel: tipo", "obra", { docs: ["centralizacion"], menu: MENUS.panel_base }),
     F("panel_base_a", "Medidores base A", "obra", { docs: ["centralizacion"], num: true }), F("panel_socket", "Medidores tipo socket", "obra", { docs: ["centralizacion"], num: true }),
     F("panel_amp_p", "Ampacidad de barras principales", "obra", { docs: ["centralizacion"] }), F("panel_amp_s", "Ampacidad de barras secundarias", "obra", { docs: ["centralizacion"] }),
-    F("paso_desde_mun", "La línea sale del municipio de", "obra", { docs: ["paso"] }), F("paso_desde_dep", "Del departamento de", "obra", { docs: ["paso"] }),
-    F("paso_hasta_mun", "Llega al municipio de", "obra", { docs: ["paso"] }), F("paso_hasta_dep", "Del departamento de", "obra", { docs: ["paso"] })
+    F("paso_desde_dep", "La línea sale del departamento de", "obra", { docs: ["paso"], geoD: "desde", par: "paso_desde_mun" }), F("paso_desde_mun", "Del municipio de", "obra", { docs: ["paso"], geoM: "desde", par: "paso_desde_dep" }),
+    F("paso_hasta_dep", "Llega al departamento de", "obra", { docs: ["paso"], geoD: "hasta", par: "paso_hasta_mun" }), F("paso_hasta_mun", "Del municipio de", "obra", { docs: ["paso"], geoM: "hasta", par: "paso_hasta_dep" })
   ];
-  const TERRENO = [["nombre", "Nombre del poseedor"], ["edad", "Edad"], ["civil", "Estado civil"], ["profesion", "Profesión u oficio"], ["domicilio", "Departamento donde vive"], ["dpi", "DPI"], ["ubicacion", "Ubicación del inmueble"], ["municipio", "Municipio"], ["departamento", "Departamento"], ["norte", "Colinda al norte con"], ["sur", "Al sur con"], ["oriente", "Al oriente con"], ["poniente", "Al poniente con"], ["area", "Metros cuadrados del paso"], ["largo", "Metros de largo"], ["ancho", "Metros de ancho"]];
+  const TERRENO = [["nombre", "Nombre del poseedor"], ["edad", "Edad"], ["civil", "Estado civil"], ["profesion", "Profesión u oficio"], ["domicilio", "Departamento donde vive"], ["dpi", "DPI"], ["ubicacion", "Ubicación del inmueble"], ["departamento", "Departamento"], ["municipio", "Municipio"], ["norte", "Colinda al norte con"], ["sur", "Al sur con"], ["oriente", "Al oriente con"], ["poniente", "Al poniente con"], ["area", "Metros cuadrados del paso"], ["largo", "Metros de largo"], ["ancho", "Metros de ancho"]];
 
   const REQUISITOS = [
     { n: 1, t: "Formato de información del interesado y del constructor", doc: "boleta" },

@@ -537,10 +537,11 @@
         <label class="e-campo">Correo <small>Opcional</small><input name="correo" type="email" autocomplete="email" value="${esc(c.correo)}"></label>
       </div>
       <div class="dos">
-        <label class="e-campo">NIT <small>Opcional</small><input name="nit" autocomplete="off" value="${esc(c.nit)}"></label>
-        <label class="e-campo" data-c="depto">Departamento<select name="depto" required><option value="">Escoja…</option>${DEPTOS.map(d => `<option ${c.depto === d ? "selected" : ""}>${d}</option>`).join("")}</select></label>
+        <label class="e-campo" data-c="depto">Departamento<select name="depto" required data-geo-depto="entrega"><option value="">Escoja…</option>${DEPTOS.map(d => `<option ${c.depto === d ? "selected" : ""}>${d}</option>`).join("")}</select></label>
+        <label class="e-campo" data-c="municipio">Municipio<input name="municipio" required data-geo-muni="entrega" autocomplete="off" value="${esc(c.municipio || "")}"></label>
       </div>
-      <label class="e-campo" data-c="direccion">Dirección de entrega u obra<input name="direccion" autocomplete="street-address" required value="${esc(c.direccion)}" placeholder="Municipio, zona, referencia"></label>
+      <label class="e-campo" data-c="direccion">Dirección de entrega u obra<input name="direccion" autocomplete="street-address" required value="${esc(c.direccion)}" placeholder="Aldea o colonia, zona, referencia"></label>
+      <label class="e-campo">NIT <small>Opcional</small><input name="nit" autocomplete="off" value="${esc(c.nit)}"></label>
     </form>`;
     const conPrecio = totales().total > 0;
     pie.innerHTML = `<div class="fila-btn"><button class="e-btn" type="button" data-atras>Volver</button><button class="e-btn e-btn-p" type="button" data-enviar-datos data-i="${conPrecio ? "wallet" : "send"}">${conPrecio ? "Ver la cuenta" : "Enviar solicitud"}</button></div>`;
@@ -560,6 +561,9 @@
     marca("nombre", d.nombre.trim().length < 3 ? "Escriba su nombre o el de la empresa." : "");
     marca("telefono", d.telefono.replace(/\D/g, "").length < 8 ? "Escriba un número de 8 dígitos." : "");
     marca("depto", d.depto ? "" : "Escoja el departamento.");
+    let geoMsj = "";
+    if (d.depto) { try { const g = window.EMT_GEO.revisar(d.depto, d.municipio); d.depto = g.departamento; d.municipio = g.municipio; if (!d.municipio) geoMsj = "Escoja el municipio."; } catch (e) { geoMsj = e.message; } }
+    marca("municipio", d.depto ? geoMsj : "");
     marca("direccion", d.direccion.trim().length < 5 ? "Díganos dónde entregamos." : "");
     if (!ok) { const e = $(".error input, .error select", f); if (e) e.focus(); return null; }
     ponerLS("emtecsa.cliente", d);

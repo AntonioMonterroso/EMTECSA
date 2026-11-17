@@ -126,9 +126,9 @@ button { font: inherit; }
 form { display: grid; gap: 14px; }
 .campo { display: grid; gap: 6px; font-size: var(--t-sm); font-weight: 650; }
 .campo small { font-weight: 500; color: var(--text-muted); }
-.campo input, .campo textarea { font: inherit; font-size: 16px; font-weight: 500; color: var(--text); background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radio-sm); padding: 12px 14px; min-height: 48px; width: 100%; transition: border-color var(--dur-boton) var(--ease-out), box-shadow var(--dur-boton) var(--ease-out); }
+.campo input, .campo textarea, .campo select { font: inherit; font-size: 16px; font-weight: 500; color: var(--text); background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radio-sm); padding: 12px 14px; min-height: 48px; width: 100%; transition: border-color var(--dur-boton) var(--ease-out), box-shadow var(--dur-boton) var(--ease-out); }
 .campo textarea { resize: vertical; min-height: 120px; }
-.campo input:focus, .campo textarea:focus { outline: none; border-color: var(--marino-600); box-shadow: 0 0 0 3px var(--foco); }
+.campo input:focus, .campo textarea:focus, .campo select:focus { outline: none; border-color: var(--marino-600); box-shadow: 0 0 0 3px var(--foco); }
 .firma-t { display: flex; justify-content: space-between; align-items: center; }
 .lnk { border: 0; background: none; color: var(--link); font-weight: 650; font-size: var(--t-sm); cursor: pointer; padding: 8px 4px; min-height: 36px; }
 .firma-c { position: relative; height: 170px; border-radius: var(--radio-md); background: #fff; border: 1.5px dashed var(--gris-300); overflow: hidden; }

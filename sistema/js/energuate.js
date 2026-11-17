@@ -9,7 +9,9 @@ window.EMT_ENERGUATE = (() => {
   function campoHTML(c, val) {
     const { esc } = A();
     const n = `name="${esc(c.k)}"`;
-    const inp = c.menu ? `<select ${n}><option value="">Escoja</option>${c.menu.map(o => `<option ${String(val) === o ? "selected" : ""}>${esc(o)}</option>`).join("")}</select>`
+    const inp = c.geoD ? `<select ${n} data-geo-depto="${esc(c.geoD)}">${window.EMT_GEO.opcionesDepto(val)}</select>`
+      : c.geoM ? `<input ${n} data-geo-muni="${esc(c.geoM)}" value="${esc(val)}" autocomplete="off">`
+      : c.menu ? `<select ${n}><option value="">Escoja</option>${c.menu.map(o => `<option ${String(val) === o ? "selected" : ""}>${esc(o)}</option>`).join("")}</select>`
       : c.area ? `<textarea ${n} rows="2">${esc(val)}</textarea>`
       : `<input ${n} value="${esc(c.tipo === "date" ? String(val || "").slice(0, 10) : val)}" ${c.tipo === "date" ? 'type="date"' : c.num ? 'inputmode="decimal"' : ""} autocomplete="off">`;
     return `<label class="f-campo">${esc(c.n)}${c.donde === "emp" ? ' <small class="suave">· se guarda en Empresa</small>' : c.donde === "sol" ? ' <small class="suave">· del cliente</small>' : ""}${inp}</label>`;
@@ -20,6 +22,8 @@ window.EMT_ENERGUATE = (() => {
     let lista = D.CAMPOS_EG.filter(c => todos ? (!doc || (c.docs || []).includes(doc)) : (doc ? D.faltanEnerguate(doc, x).some(f => f.k === c.k) : D.REQUISITOS_EG.some(rq => rq.doc && D.faltanEnerguate(rq.doc, x).some(f => f.k === c.k))));
     if (!x.v.centralizacion) lista = lista.filter(c => !(c.docs || []).every(d => d === "centralizacion"));
     if (!(x.kva > 50 || x.v.centralizacion)) lista = lista.filter(c => !(c.docs || []).every(d => d === "medida" || d === "centralizacion"));
+    lista.slice().forEach(c => { if (c.par && !lista.some(z => z.k === c.par)) { const p2 = D.CAMPOS_EG.find(z => z.k === c.par); if (p2) lista.push(p2); } });
+    lista = D.CAMPOS_EG.filter(c => lista.includes(c));
     const otros = doc ? D.faltanEnerguate(doc, x).filter(f => f.k[0] === "_") : [];
     const grupos = [["sol", "Del cliente"], ["emp", "De EMTECSA"], ["obra", "De la obra"]];
     modal({
@@ -34,6 +38,7 @@ window.EMT_ENERGUATE = (() => {
         const val = k => f.elements[k] ? String(f.elements[k].value || "").trim() : undefined;
         const emp = {}, sol = {}, obra = {};
         lista.forEach(c => { const v = val(c.k); if (v === undefined) return; (c.donde === "emp" ? emp : c.donde === "sol" ? sol : obra)[c.k] = v; });
+        lista.filter(c => c.geoD).forEach(c => { const g = window.EMT_GEO.revisar(obra[c.k], obra[c.par], c.geoD === "obra" ? " de la obra" : c.geoD === "desde" ? " de donde sale la línea" : " a donde llega la línea"); obra[c.k] = g.departamento; obra[c.par] = g.municipio; });
         if (todos) { obra.centralizacion = f.elements.centralizacion.checked; ["dictamen_no", "dictamen_fecha", "subestacion", "smt", "fecha_entrega"].forEach(k => { obra[k] = val(k); }); }
         if (Object.keys(emp).length) await D.guardarEmpresa({ ...x.emp, ...emp });
         if (Object.keys(sol).length) { if (x.cot) await D.guardarSolicitante(x.cot.id, sol); else Object.assign(obra, sol); }
@@ -51,10 +56,11 @@ window.EMT_ENERGUATE = (() => {
       const t = i == null ? {} : lista[i];
       modal({ titulo: i == null ? "Terreno nuevo" : "Terreno", guardarTxt: "Guardar",
         quitar: i == null ? null : async () => { lista.splice(i, 1); x.guard.terrenos = lista; await D.guardarEnerguate(x.o.id, x.guard); x.terrenos = lista; cerrarCapas(); aviso("Terreno quitado."); terrenos(x, alGuardar); alGuardar && alGuardar(); },
-        cuerpo: `<p class="suave" style="margin:0;font-size:13.5px">Uno por cada terreno por donde pasa la línea. Con esto se llena el derecho de paso.</p><div class="eg-terreno">${D.TERRENO_EG.map(([k, n]) => `<label class="f-campo">${esc(n)}<input name="${k}" value="${esc(t[k] || "")}" autocomplete="off" ${["edad", "area", "largo", "ancho"].includes(k) ? 'inputmode="decimal"' : ""}></label>`).join("")}</div>`,
+        cuerpo: `<p class="suave" style="margin:0;font-size:13.5px">Uno por cada terreno por donde pasa la línea. Con esto se llena el derecho de paso.</p><div class="eg-terreno">${D.TERRENO_EG.map(([k, n]) => `<label class="f-campo">${esc(n)}${k === "departamento" ? `<select name="${k}" data-geo-depto="ter">${window.EMT_GEO.opcionesDepto(t[k])}</select>` : k === "domicilio" ? `<select name="${k}">${window.EMT_GEO.opcionesDepto(t[k])}</select>` : `<input name="${k}" value="${esc(t[k] || "")}" autocomplete="off" ${k === "municipio" ? 'data-geo-muni="ter"' : ""} ${["edad", "area", "largo", "ancho"].includes(k) ? 'inputmode="decimal"' : ""}>`}</label>`).join("")}</div>`,
         alGuardar: async f => {
           const n = {}; D.TERRENO_EG.forEach(([k]) => { n[k] = String(f.elements[k].value || "").trim(); });
           if (!n.nombre) throw new Error("Escriba el nombre del poseedor.");
+          const g = window.EMT_GEO.revisar(n.departamento, n.municipio, " del terreno"); n.departamento = g.departamento; n.municipio = g.municipio;
           if (i == null) lista.push(n); else lista[i] = n;
           x.guard.terrenos = lista; x.terrenos = lista; await D.guardarEnerguate(x.o.id, x.guard);
           cerrarCapas(); aviso("Terreno guardado."); terrenos(x, alGuardar); alGuardar && alGuardar();

@@ -70,14 +70,14 @@ window.EMT_DATOS = (() => {
     if (!nube) {
       let p = null; try { p = JSON.parse(sessionStorage.getItem(CLAVE_PRUEBA)); } catch (e) {}
       if (!p) return null;
-      if (!p.probando) p.nombre = "Daniel";
+      if (!p.probando) { const m = mioPrueba(); p.nombre = m.nombre || "Daniel"; p.telefono = m.telefono || null; p.puesto = m.puesto || null; p.foto = m.foto || null; }
       await cargarPermisos();
       return { correo: "prueba@emtecsa", perfil: p };
     }
     const { data } = await sb.auth.getSession();
     const u = data.session && data.session.user;
     if (!u) return null;
-    const { data: perfil, error } = await sb.from("perfiles").select("id, nombre, rol, modo, activo, aprobado").eq("id", u.id).maybeSingle();
+    const { data: perfil, error } = await sb.from("perfiles").select("id, nombre, rol, modo, activo, aprobado, telefono, puesto, foto").eq("id", u.id).maybeSingle();
     if (error && !navigator.onLine) { try { const g = JSON.parse(localStorage.getItem("emtecsa.sistema.perfil")); if (g && g.id === u.id) return { correo: u.email, perfil: g }; } catch (e) {} }
     if (!error && perfil && !perfil.activo && !perfil.aprobado) { await sb.auth.signOut(); throw new Error("Su cuenta está esperando que gerencia la apruebe. Le avisarán cuando ya pueda entrar."); }
     if (error || !perfil || !perfil.activo) { await sb.auth.signOut(); throw new Error("Su usuario no tiene acceso. Pídale a gerencia que lo active."); }
@@ -126,6 +126,44 @@ window.EMT_DATOS = (() => {
     if (!nube) throw new Error("La base de EMTECSA todavía no está conectada.");
     const { error } = await sb.auth.resetPasswordForEmail(correo, { redirectTo: location.href.split("#")[0] });
     if (error) throw new Error("No se pudo enviar el correo. Revise la dirección.");
+  }
+
+  const CLAVE_MIO = "emtecsa.sistema.miperfil";
+  const mioPrueba = () => { try { return JSON.parse(localStorage.getItem(CLAVE_MIO)) || {}; } catch (e) { return {}; } };
+  async function guardarMiPerfil(perfil, datos) {
+    const nombre = limpio(datos.nombre), telefono = limpio(datos.telefono) || null, puesto = limpio(datos.puesto) || null;
+    if (nombre.length < 3 || nombre.length > 80) throw new Error("Escriba su nombre completo.");
+    if (telefono && !/^[0-9 +()-]{8,20}$/.test(telefono)) throw new Error("Revise el teléfono: solo números, de 8 dígitos o más.");
+    if (puesto && puesto.length > 60) throw new Error("El puesto es muy largo.");
+    const foto = datos.foto === undefined ? perfil.foto || null : datos.foto;
+    if (foto && foto.length > 300000) throw new Error("La foto pesa mucho. Escoja otra.");
+    const cambios = { nombre, telefono, puesto, foto };
+    if (!nube) { const m = { ...mioPrueba(), ...cambios }; try { localStorage.setItem(CLAVE_MIO, JSON.stringify(m)); } catch (e) { throw new Error("No se pudo guardar en este equipo."); } }
+    else { const { error } = await sb.from("perfiles").update(cambios).eq("id", perfil.id); if (error) throw new Error("No se pudo guardar su perfil. Revise su conexión."); }
+    Object.assign(perfil, cambios);
+    try { if (nube) localStorage.setItem("emtecsa.sistema.perfil", JSON.stringify(perfil)); else sessionStorage.setItem(CLAVE_PRUEBA, JSON.stringify(perfil)); } catch (e) {}
+    return perfil;
+  }
+  async function miFirma(perfil) {
+    if (!nube) return mioPrueba().firma || null;
+    const { data, error } = await sb.from("perfiles").select("firma").eq("id", perfil.id).maybeSingle();
+    if (error) throw new Error("No se pudo leer su firma.");
+    return data ? data.firma : null;
+  }
+  async function guardarFirma(perfil, firma) {
+    if (firma && (!/^data:image\/png;base64,/.test(firma) || firma.length > 200000)) throw new Error("La firma no se pudo guardar. Dibújela otra vez.");
+    if (!nube) { const m = { ...mioPrueba(), firma: firma || null }; try { localStorage.setItem(CLAVE_MIO, JSON.stringify(m)); } catch (e) { throw new Error("No se pudo guardar en este equipo."); } return; }
+    const { error } = await sb.from("perfiles").update({ firma: firma || null }).eq("id", perfil.id);
+    if (error) throw new Error("No se pudo guardar su firma.");
+  }
+  async function cambiarClave(correo, actual, nueva) {
+    if (!nube) throw new Error("En el modo de prueba no hay contraseña.");
+    if (String(nueva || "").length < 8 || !/[0-9]/.test(nueva) || !/[a-zA-Z]/.test(nueva)) throw new Error("La contraseña nueva necesita al menos 8 caracteres, con letras y números.");
+    if (nueva === actual) throw new Error("La contraseña nueva es igual a la actual.");
+    const r1 = await sb.auth.signInWithPassword({ email: correo, password: actual });
+    if (r1.error) throw new Error(/invalid/i.test(r1.error.message) ? "La contraseña actual no es correcta." : "No se pudo revisar su contraseña. Revise su conexión.");
+    const r2 = await sb.auth.updateUser({ password: nueva });
+    if (r2.error) throw new Error(/weak|short|password/i.test(r2.error.message) ? "Esa contraseña es muy débil. Use una más larga." : "No se pudo cambiar la contraseña.");
   }
 
   async function guardarModo(perfil, modo) {
@@ -224,5 +262,5 @@ window.EMT_DATOS = (() => {
 
   function alCambiarSesion(fn) { if (nube) sb.auth.onAuthStateChange((ev) => { if (ev === "SIGNED_OUT" || ev === "PASSWORD_RECOVERY") fn(ev); }); }
 
-  return { nube, sb, ROLES, PERMISOS, CLAVE_EQUIPO, puede, cargarPermisos, registrarse, sesion, entrar, entrarPrueba, salir, recuperar, guardarModo, catalogo, guardarMaterial, guardarEstructura, siguienteCodigo, cambiosLocales, alCambiarSesion };
+  return { nube, sb, ROLES, PERMISOS, CLAVE_EQUIPO, puede, cargarPermisos, registrarse, sesion, entrar, entrarPrueba, salir, recuperar, guardarModo, guardarMiPerfil, miFirma, guardarFirma, cambiarClave, catalogo, guardarMaterial, guardarEstructura, siguienteCodigo, cambiosLocales, alCambiarSesion };
 })();

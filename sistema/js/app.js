@@ -63,6 +63,8 @@
   function saludo() { const h = new Date().getHours(); return h < 12 ? "Buenos días" : h < 19 ? "Buenas tardes" : "Buenas noches"; }
   const fechaLarga = () => new Date().toLocaleDateString("es-GT", { weekday: "long", day: "numeric", month: "long" });
   const iniciales = n => (n || "?").trim().split(/\s+/).slice(0, 2).map(p => p[0]).join("").toUpperCase();
+  const avatar = p => p && p.foto ? `<img src="${esc(p.foto)}" alt="">` : esc(iniciales(p && p.nombre));
+  const pintarAvatar = () => { const b = document.querySelector("[data-cuenta]"); if (b && sesion) b.innerHTML = avatar(sesion.perfil); };
 
   function pintarRegistro() {
     document.title = "Crear mi cuenta · EMTECSA";
@@ -145,7 +147,7 @@
         <div class="der">
           <label class="buscar"><span class="sr">Buscar en el catálogo</span>${ico("search", 15)}<input type="search" placeholder="Buscar" data-buscar></label>
           <button class="s-ib solo-angosto" type="button" aria-label="Abrir el menú" data-menu>${ico("menu", 18)}</button>
-          <button class="av" type="button" aria-label="Su cuenta" aria-haspopup="true" data-cuenta>${esc(iniciales(sesion.perfil.nombre))}</button>
+          <button class="av" type="button" aria-label="Su cuenta" aria-haspopup="true" data-cuenta>${avatar(sesion.perfil)}</button>
         </div>
       </div></header>
       ${sesion.perfil.probando ? `<div class="probando"><span>${ico("shield", 15)}Está viendo el sistema como <b>${esc(D.ROLES[sesion.perfil.rol])}</b></span><button class="s-btn suave-b chico" type="button" data-volver-rol-b>Volver a gerencia</button></div>` : ""}
@@ -210,7 +212,7 @@
     if (guardiaAct && location.hash !== rutaActual && !guardiaAct.limpio()) { const destino = location.hash; ignorarHash = true; location.hash = rutaActual; preguntarSalida(destino); return; }
     guardiaAct = null;
     const [sec = "hoy", sub = "", sub2 = ""] = location.hash.replace(/^#\/?/, "").split("/");
-    const s = SECCIONES.find(x => x.id === sec) || sec === "empresa" || sec === "plano" || sec === "equipo" ? sec : "hoy";
+    const s = SECCIONES.find(x => x.id === sec) || sec === "empresa" || sec === "plano" || sec === "equipo" || sec === "perfil" ? sec : "hoy";
     $$("[data-sec]").forEach(a => { if (a.dataset.sec === s) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current"); });
     const v = $("#vista");
     const clave = pantallaDe(s, sub, sub2);
@@ -220,6 +222,7 @@
     vistaActual = clave;
     v.onclick = v.oninput = v.onchange = null;
     if (!v.children.length) v.innerHTML = `<div class="cargando">Cargando…</div>`;
+    const barra = setTimeout(() => document.body.classList.add("cargando-r"), 150);
     try {
       if (s === "hoy") await vHoy(v);
       else if (s === "catalogo") await vCatalogo(v, ["materiales", "precios", "proveedores"].includes(sub) ? sub : "estructuras");
@@ -231,8 +234,10 @@
       else if (s === "plano") await window.EMT_PLANOS.vista(v, sub, sub2);
       else if (s === "tienda") await window.EMT_TIENDA.vista(v, sub);
       else if (s === "equipo") await window.EMT_EQUIPO.vista(v, sub);
+      else if (s === "perfil") await window.EMT_PERFIL.vista(v);
       else vPendiente(v, s);
     } catch (err) { v.innerHTML = `<div class="vacio"><span class="icono ambar">${ico("alerta", 22)}</span><h2>No se pudo cargar</h2><p>${esc(/[áéíóúñ¿]/i.test(err.message) ? err.message : "Algo falló al abrir esta pantalla. Intente otra vez.")}</p><button class="s-btn lleno" type="button" data-reintentar>Intentar otra vez</button></div>`; }
+    clearTimeout(barra); document.body.classList.remove("cargando-r");
     rutaActual = location.hash;
     chipsASelect(v);
     if (window.EMT_TIENDA) window.EMT_TIENDA.insignia();
@@ -243,6 +248,7 @@
   }
 
   async function vHoy(v) {
+    if (D.nube) [D.catalogo(), D.clientes(), D.obras(), D.cotizaciones(), D.empresa(), D.puede(sesion.perfil, "verCobros") && D.resumenCobros(), D.puede(sesion.perfil, "verTienda") && D.pedidosTienda && D.pedidosTienda(), window.EMT_ENLACES && window.EMT_ENLACES.porAtender(), window.EMT_EQUIPO && window.EMT_EQUIPO.pendientes(), window.EMT_COSTOS && window.EMT_COSTOS.avisos(), window.EMT_SEGUIMIENTO && window.EMT_SEGUIMIENTO.avisos()].forEach(p => { if (p && p.catch) p.catch(() => {}); });
     const c = await D.catalogo();
     const sinPrecio = c.materiales.filter(m => m.costo == null).length;
     const sinMano = c.estructuras.filter(e => e.mano_obra == null).length;
@@ -714,9 +720,9 @@
     pop.style.top = (r.bottom + 10) + "px"; pop.style.right = Math.max(12, innerWidth - r.right) + "px";
     const modo = (() => { try { return localStorage.getItem("emtecsa.sistema.modo") || p.modo; } catch (e) { return p.modo; } })();
     pop.innerHTML = `
-      <div class="pop-cab"><span class="av" style="cursor:default">${esc(iniciales(p.nombre))}</span><span><b>${esc(p.nombre)}</b><small>${esc(D.ROLES[p.rol] || p.rol)} · ${esc(sesion.correo)}</small></span></div>
+      <div class="pop-cab"><span class="av" style="cursor:default">${avatar(p)}</span><span><b>${esc(p.nombre)}</b><small>${esc(D.ROLES[p.rol] || p.rol)} · ${esc(sesion.correo)}</small></span></div>
       <div class="pop-sec"><small class="suave" style="font-size:12.5px;font-weight:600">Modo</small><div class="seg" role="group" aria-label="Modo de la pantalla">${[["oscuro", "Oscuro"], ["claro", "Claro"], ["auto", "Automático"]].map(([k, n]) => `<button type="button" data-modo="${k}" aria-pressed="${modo === k}">${n}</button>`).join("")}</div></div>
-      <div style="padding:6px 0 0">${p.probando ? `<button class="pop-item" type="button" data-volver-rol>${ico("shield", 18)}Volver a gerencia</button>` : ""}${p.rol === "gerencia" ? `<a class="pop-item" href="#/equipo" data-a-empresa>${ico("users", 18)}Equipo y permisos</a>` : ""}${D.puede(p, "editarEmpresa") ? `<a class="pop-item" href="#/empresa" data-a-empresa>${ico("building", 18)}Datos de la empresa</a>` : ""}${D.nube ? "" : `<button class="pop-item" type="button" data-borrar-prueba>${ico("trash", 18)}Borrar los datos de prueba</button>`}${D.appInstalada && !D.appInstalada() ? `<button class="pop-item" type="button" data-instalar>${ico("phone", 18)}Instalar en el teléfono</button>` : ""}<button class="pop-item peligro" type="button" data-salir>${ico("salir", 18)}Cerrar sesión</button></div>`;
+      <div style="padding:6px 0 0"><a class="pop-item" href="#/perfil" data-a-empresa>${ico("pen", 18)}Mi perfil</a>${p.probando ? `<button class="pop-item" type="button" data-volver-rol>${ico("shield", 18)}Volver a gerencia</button>` : ""}${p.rol === "gerencia" ? `<a class="pop-item" href="#/equipo" data-a-empresa>${ico("users", 18)}Equipo y permisos</a>` : ""}${D.puede(p, "editarEmpresa") ? `<a class="pop-item" href="#/empresa" data-a-empresa>${ico("building", 18)}Datos de la empresa</a>` : ""}${D.nube ? "" : `<button class="pop-item" type="button" data-borrar-prueba>${ico("trash", 18)}Borrar los datos de prueba</button>`}${D.appInstalada && !D.appInstalada() ? `<button class="pop-item" type="button" data-instalar>${ico("phone", 18)}Instalar en el teléfono</button>` : ""}<button class="pop-item peligro" type="button" data-salir>${ico("salir", 18)}Cerrar sesión</button></div>`;
     document.body.appendChild(pop);
     const velo = document.createElement("div"); velo.className = "velo"; velo.style.background = "transparent"; velo.addEventListener("click", cerrarCapas);
     document.body.insertBefore(velo, pop);
@@ -767,6 +773,6 @@
     D.alCambiarSesion(ev => { if (ev === "SIGNED_OUT") { sesion = null; pintarEntrada(); } });
     if (sesion) arrancarApp(); else pintarEntrada();
   }
-  window.EMT_APP = { $, $$, esc, ico, Q, cant, aviso, modal, cerrarCapas, numero, montoTxt, campoMonto, formatoAlSalir, ir, guardia, quieto, sostener, filtrar, normal, chipsASelect, sesion: () => sesion, recargarHoy: () => { const v = document.getElementById("vista"); return v && /^#\/hoy$|^#?\/?$/.test(location.hash) ? quieto(() => vHoy(v)) : null; } };
+  window.EMT_APP = { pintarAvatar, iniciales, $, $$, esc, ico, Q, cant, aviso, modal, cerrarCapas, numero, montoTxt, campoMonto, formatoAlSalir, ir, guardia, quieto, sostener, filtrar, normal, chipsASelect, sesion: () => sesion, recargarHoy: () => { const v = document.getElementById("vista"); return v && /^#\/hoy$|^#?\/?$/.test(location.hash) ? quieto(() => vHoy(v)) : null; } };
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", arrancar); else arrancar();
 })();

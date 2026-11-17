@@ -166,11 +166,29 @@ window.EMT_CLIENTES = (() => {
       cuerpo: `
         <label class="f-campo">Nombre del sitio<input name="nombre" value="${esc(s0.nombre)}" autocomplete="off" placeholder="Planta Villa Nueva, Bodega central…"></label>
         <label class="f-campo">Dirección<input name="direccion" value="${esc(s0.direccion || "")}" autocomplete="off"></label>
-        <div class="f-fila"><label class="f-campo">Municipio<input name="municipio" value="${esc(s0.municipio || "")}" autocomplete="off"></label>
-        <label class="f-campo">Departamento<select name="departamento"><option value="">Sin escoger</option>${D.DEPARTAMENTOS.map(d => `<option ${s0.departamento === d ? "selected" : ""}>${d}</option>`).join("")}</select></label></div>
+        <div class="f-fila"><label class="f-campo">Departamento<select name="departamento" data-geo-depto="sitio">${window.EMT_GEO.opcionesDepto(s0.departamento, "Sin escoger")}</select></label>
+        <label class="f-campo">Municipio<input name="municipio" data-geo-muni="sitio" value="${esc(s0.municipio || "")}" autocomplete="off"></label></div>
+        <div class="f-campo"><span>Buscar el lugar en Google Maps</span><div class="mapa-buscar"><input data-mapa-q value="" autocomplete="off" placeholder="Aldea, colonia o referencia" aria-label="Qué buscar en Google Maps"><a class="s-btn suave-b" data-mapa-ir href="#" target="_blank" rel="noopener">${A().ico("map", 15)}Abrir Maps</a></div><small>Escoja el punto en Maps, toque «Compartir», copie el enlace y péguelo abajo.</small></div>
         <label class="f-campo">Ubicación<input name="mapa" value="${s0.lat != null ? esc(s0.lat + ", " + s0.lng) : ""}" autocomplete="off" placeholder="Pegue el enlace de Google Maps"><small data-coords>Abra el lugar en Google Maps, copie el enlace y péguelo aquí.</small></label>`,
       alAbrir: f => {
-        const ver = () => { const el = f.querySelector("[data-coords]"); const t = f.mapa.value.trim(); if (!t) { el.textContent = "Abra el lugar en Google Maps, copie el enlace y péguelo aquí."; el.className = ""; return; } const k = D.coordsDe(t); el.textContent = k ? `Ubicación encontrada: ${k.lat}, ${k.lng}` : "No se encuentra la ubicación en ese texto."; el.className = k ? "ok" : "mal"; };
+        const q = f.querySelector("[data-mapa-q]"), ir = f.querySelector("[data-mapa-ir]");
+        let propio = false;
+        const sugerida = () => [f.direccion.value, f.municipio.value, f.departamento.value].map(x => x.trim()).filter(Boolean).join(", ");
+        const pintarQ = () => { if (!propio) q.value = sugerida(); ir.href = window.EMT_GEO.mapa([q.value]); };
+        q.addEventListener("input", () => { propio = !!q.value.trim(); ir.href = window.EMT_GEO.mapa([q.value]); });
+        ["direccion", "municipio"].forEach(n => f[n].addEventListener("input", pintarQ)); f.departamento.addEventListener("change", pintarQ);
+        pintarQ();
+        let turno = 0;
+        const ver = async () => {
+          const el = f.querySelector("[data-coords]"); const t = f.mapa.value.trim(); const yo = ++turno;
+          if (!t) { el.textContent = "Abra el lugar en Google Maps, copie el enlace y péguelo aquí."; el.className = ""; return; }
+          const k0 = D.coordsDe(t);
+          if (!k0 && /goo\.gl/.test(t)) { el.textContent = "Buscando la ubicación del enlace…"; el.className = ""; }
+          let k = k0, msg = "No se encuentra la ubicación en ese texto.";
+          if (!k0) { try { k = await D.resolverMapa(t); } catch (err) { msg = err.message; } }
+          if (yo !== turno) return;
+          el.textContent = k ? `Ubicación encontrada: ${k.lat}, ${k.lng}` : msg; el.className = k ? "ok" : "mal";
+        };;
         f.mapa.addEventListener("input", ver); ver();
       },
       alGuardar: async f => {
