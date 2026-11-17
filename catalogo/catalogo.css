@@ -85,8 +85,8 @@ img { display: block; max-width: 100%; }
 .heroe-in { position: relative; z-index: 2; min-height: 100svh; display: flex; flex-direction: column; justify-content: center; padding: calc(var(--barra) + 40px) 0 120px; pointer-events: none; }
 .heroe-in a, .heroe-in button { pointer-events: auto; }
 .heroe-t { font-size: clamp(54px, 9.4vw, 136px); font-weight: 800; letter-spacing: -0.058em; line-height: 0.9; margin: 18px 0 26px; max-width: 9ch; }
-.palabra { display: inline-block; overflow: hidden; padding-bottom: 0.08em; margin-bottom: -0.08em; vertical-align: top; }
-.palabra > span { display: inline-block; transform: translateY(105%); transition: transform 1000ms var(--ease-out); }
+.palabra { display: inline-block; overflow: hidden; padding-bottom: 0.22em; margin-bottom: -0.22em; vertical-align: top; }
+.palabra > span { display: inline-block; transform: translateY(135%); transition: transform 1000ms var(--ease-out); }
 .palabra:nth-child(2) > span { transition-delay: 90ms; }
 .palabra:nth-child(3) > span { transition-delay: 180ms; }
 .en-escena .palabra > span { transform: translateY(0); }
