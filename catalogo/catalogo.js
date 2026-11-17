@@ -874,11 +874,13 @@
       if (ent) ent.classList.add("fuera");
       document.documentElement.classList.remove("cargando");
       if (lenis) lenis.start();
-      document.body.classList.add("en-escena");
-      dispatchEvent(new Event("emt-entrada-fuera"));
+      setTimeout(() => {
+        document.body.classList.add("en-escena");
+        dispatchEvent(new Event("emt-entrada-fuera"));
+        setTimeout(() => { import("./escena.js").catch(() => sin3D()); }, 900);
+      }, QUIETO ? 0 : 240);
       puede3D = true;
-      setTimeout(iniciar3D, 120);
-      setTimeout(() => { if (ent) ent.remove(); }, 900);
+      setTimeout(() => { if (ent) ent.remove(); }, 800);
       setTimeout(() => {
         if (!window.EMT3D) { addEventListener("emt3d-listo", () => generarMinis(), { once: true }); return; }
         const meta = $("#lineas");
@@ -886,15 +888,10 @@
         const io = new IntersectionObserver(es => { if (es.some(x => x.isIntersecting)) { io.disconnect(); generarMinis(); } }, { rootMargin: "0px 0px 500px 0px" });
         io.observe(meta);
       }, 900);
-    }, 220);
+    }, QUIETO ? 0 : 260);
     const e = window.__entrada;
     if (!e || document.hidden) { abrir(); return; }
-    Promise.all([e.a.finished, e.b.finished]).catch(() => {}).then(() => {
-      const o = { duration: QUIETO ? 120 : 260, easing: "cubic-bezier(0.23, 1, 0.32, 1)", fill: "forwards" };
-      const c = e.m.animate([{ transform: "translateX(-10%)" }, { transform: "translateX(0)" }], o);
-      e.l.animate([{ transform: "translateX(10%)" }, { transform: "translateX(0)" }], o);
-      c.finished.catch(() => {}).then(abrir);
-    });
+    Promise.race([e.listo, new Promise(r => setTimeout(r, 4500))]).then(abrir);
   }
 
   let puede3D = false, con3D = false;

@@ -16,7 +16,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<style>html.cargando, html.cargando body { overflow: hidden; } .entrada { position: fixed; inset: 0; z-index: 200; display: grid; place-items: center; background: #07111F; transition: opacity 700ms cubic-bezier(0.23, 1, 0.32, 1), visibility 0s linear 700ms; } .entrada-logo { position: relative; width: clamp(204px, 41vw, 672px); transition: transform 700ms cubic-bezier(0.23, 1, 0.32, 1); } .entrada-logo img { display: block; width: 100%; height: auto; } .entrada-logo .base { opacity: 0.16; } .entrada-logo .lleno-marco { position: absolute; inset: 0; overflow: hidden; transform: translateX(-100%); will-change: transform; } .entrada-logo .lleno { transform: translateX(100%); will-change: transform; } .entrada.fuera { opacity: 0; visibility: hidden; } .entrada.fuera .entrada-logo { transform: scale(1.04); }</style>
+<style>html.cargando, html.cargando body { overflow: hidden; } .entrada { position: fixed; inset: 0; z-index: 200; display: grid; place-items: center; background: #07111F; transition: opacity 560ms cubic-bezier(0.23, 1, 0.32, 1), visibility 0s linear 560ms; } .entrada-logo { position: relative; width: clamp(204px, 41vw, 672px); opacity: 0; transition: opacity 260ms cubic-bezier(0.23, 1, 0.32, 1), transform 600ms cubic-bezier(0.23, 1, 0.32, 1); } .entrada-logo.visible { opacity: 1; } .entrada-logo img { display: block; width: 100%; height: auto; } .entrada-logo .base { opacity: 0.16; } .entrada-logo .lleno-marco { position: absolute; inset: 0; overflow: hidden; transform: translateX(-100%); will-change: transform; } .entrada-logo .lleno { transform: translateX(100%); will-change: transform; } .entrada.fuera { opacity: 0; visibility: hidden; } .entrada.fuera .entrada-logo { transform: scale(1.04); }</style>
 <link rel="preload" href="../logo/emtecsa-logo-blanco.svg" as="image" type="image/svg+xml" fetchpriority="high">
 <link rel="preload" href="img/portada-alta.webp" as="image" type="image/webp" media="(max-aspect-ratio: 85/100)" fetchpriority="high">
 <link rel="preload" href="img/portada-ancha.webp" as="image" type="image/webp" media="(min-aspect-ratio: 85/100)" fetchpriority="high">
@@ -54,17 +54,31 @@
 <script src="vendor/lenis.min.js"></script>
 <script src="comprobante.js" defer></script>
 <script src="catalogo.js" defer></script>
-<script type="module" src="escena.js" async></script>
 </head>
 <body>
 <div class="entrada" id="entrada" aria-hidden="true"><div class="entrada-logo"><img class="base" src="../logo/emtecsa-logo-blanco.svg" alt="" width="1720" height="276"><div class="lleno-marco"><img class="lleno" src="../logo/emtecsa-logo-blanco.svg" alt="" width="1720" height="276"></div></div></div>
 <script>
 (function () {
-  var m = document.querySelector("#entrada .lleno-marco"), l = document.querySelector("#entrada .lleno");
+  var m = document.querySelector("#entrada .lleno-marco"), l = document.querySelector("#entrada .lleno"), caja = document.querySelector("#entrada .entrada-logo"), img = document.querySelector("#entrada .base");
   if (!m || !m.animate) return;
   var quieto = matchMedia("(prefers-reduced-motion: reduce)").matches;
-  var o = { duration: quieto ? 200 : 1050, easing: "cubic-bezier(0.33, 0, 0.2, 1)", fill: "forwards" };
-  window.__entrada = { a: m.animate([{ transform: "translateX(-100%)" }, { transform: "translateX(-10%)" }], o), b: l.animate([{ transform: "translateX(100%)" }, { transform: "translateX(10%)" }], o), m: m, l: l };
+  var listo;
+  window.__entrada = { listo: new Promise(function (r) { listo = r; }) };
+  var empezado = false;
+  function empezar() {
+    if (empezado) return;
+    empezado = true;
+    requestAnimationFrame(function () { requestAnimationFrame(function () {
+      caja.classList.add("visible");
+      var o = { duration: quieto ? 200 : 1150, delay: quieto ? 0 : 260, easing: "cubic-bezier(0.45, 0, 0.2, 1)", fill: "forwards" };
+      var a = m.animate([{ transform: "translateX(-100%)" }, { transform: "translateX(0)" }], o);
+      l.animate([{ transform: "translateX(100%)" }, { transform: "translateX(0)" }], o);
+      a.finished.then(listo, listo);
+    }); });
+  }
+  if (img.complete && img.naturalWidth) empezar();
+  else { img.addEventListener("load", empezar); img.addEventListener("error", empezar); }
+  setTimeout(empezar, 2500);
 })();
 </script>
 <a class="saltar" href="#productos">Ir al catálogo</a>

@@ -29,7 +29,11 @@ const avisarCarga = p => dispatchEvent(new CustomEvent("emt-progreso", { detail:
 avisarCarga(32);
 const listoPiezas = new Promise(ok => {
   new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).load("modelos/postes.glb",
-    g => { avisarCarga(86); ponerPiezas(g.scene); ok(true); },
+    g => {
+      const seguir = () => { avisarCarga(86); ponerPiezas(g.scene); ok(true); };
+      if (!document.documentElement.classList.contains("cargando")) { seguir(); return; }
+      addEventListener("emt-entrada-fuera", () => setTimeout(seguir, 500), { once: true });
+    },
     ev => { if (ev.total) avisarCarga(32 + (ev.loaded / ev.total) * 52); },
     () => ok(false));
 });
