@@ -36,7 +36,7 @@
   async function generarMinis() {
     const tipos = [...new Set([...D.lineas.map(l => l.modelo), ...D.productos.map(p => p.modelo)])];
     for (const t of tipos) {
-      await new Promise(r => (window.requestIdleCallback || setTimeout)(r, { timeout: 120 }));
+      await new Promise(r => (window.requestIdleCallback ? requestIdleCallback(r, { timeout: 400 }) : setTimeout(r, 60)));
       try { pintarMini(t, await window.EMT3D.miniatura(t)); } catch (e) {}
     }
   }
@@ -877,7 +877,13 @@
       document.body.classList.add("en-escena");
       dispatchEvent(new Event("emt-entrada-fuera"));
       setTimeout(() => { if (ent) ent.remove(); }, 900);
-      setTimeout(() => { if (window.EMT3D) generarMinis(); else sin3D(); }, 900);
+      setTimeout(() => {
+        if (!window.EMT3D) { sin3D(); return; }
+        const meta = $("#lineas");
+        if (!meta || !("IntersectionObserver" in window)) { generarMinis(); return; }
+        const io = new IntersectionObserver(es => { if (es.some(x => x.isIntersecting)) { io.disconnect(); generarMinis(); } }, { rootMargin: "0px 0px 500px 0px" });
+        io.observe(meta);
+      }, 900);
     }, 220);
     const e = window.__entrada;
     if (!e || document.hidden) { abrir(); return; }

@@ -17,7 +17,7 @@ const lim = (v, a, b) => Math.max(a, Math.min(b, v));
 
 const NIVEL = (() => {
   const mem = navigator.deviceMemory || 8, nucleos = navigator.hardwareConcurrency || 8;
-  if (TACTIL && (mem <= 4 || nucleos <= 4)) return 0;
+  if (TACTIL && (mem <= 2 || nucleos <= 2)) return 0;
   if (TACTIL) return 1;
   return 2;
 })();
@@ -353,9 +353,10 @@ function farolCalle(scene, nivel) {
 function heroe(lienzo) {
   const seccion = lienzo.closest(".heroe");
   let nivel = NIVEL;
-  const renderer = new THREE.WebGLRenderer({ canvas: lienzo, antialias: nivel > 0, powerPreference: "high-performance" });
+  const renderer = new THREE.WebGLRenderer({ canvas: lienzo, antialias: true, powerPreference: "high-performance" });
   preparar(renderer);
-  const razon = () => Math.min(devicePixelRatio, nivel === 2 ? 2 : nivel === 1 ? 1.5 : 1);
+  let escala = 1;
+  const razon = () => Math.max(1, Math.min(devicePixelRatio, nivel === 0 ? 1.5 : 2) * escala);
   renderer.setPixelRatio(razon());
   const scene = new THREE.Scene();
   scene.fog = new THREE.FogExp2(0x0a1628, 0.024);
@@ -485,7 +486,7 @@ function heroe(lienzo) {
   let composer = null, bloom = null;
   function armarComposer() {
     if (nivel === 0) { composer = null; return; }
-    composer = new EffectComposer(renderer);
+    composer = new EffectComposer(renderer, new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: nivel === 2 ? 4 : 2 }));
     composer.addPass(new RenderPass(scene, camara));
     bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), 0.85, 0.55, 0.78);
     composer.addPass(bloom);
@@ -564,7 +565,10 @@ function heroe(lienzo) {
     const t = (performance.now() - inicio) / 1000;
     if (muestras < 120 && t > 1.5) {
       muestras++; sumaDt += dt;
-      if (muestras === 120 && sumaDt / 120 > 0.03 && nivel > 0) { nivel--; armarComposer(); medir(); }
+      if (muestras === 120 && sumaDt / 120 > 0.034) {
+        if (composer) composer = null; else escala = 0.8;
+        medir();
+      }
     }
     puntero.x += (puntero.tx - puntero.x) * (1 - Math.exp(-dt * 2.5));
     puntero.y += (puntero.ty - puntero.y) * (1 - Math.exp(-dt * 2.5));
@@ -665,7 +669,7 @@ function crearEstudio(tam) {
   const llave = new THREE.DirectionalLight(0xffe7c2, 2.6);
   llave.position.set(-2.5, 5, 3.5);
   llave.castShadow = true;
-  llave.shadow.mapSize.set(1024, 1024);
+  llave.shadow.mapSize.set(TACTIL ? 512 : 1024, TACTIL ? 512 : 1024);
   llave.shadow.radius = 10;
   llave.shadow.blurSamples = 16;
   Object.assign(llave.shadow.camera, { left: -2.5, right: 2.5, top: 2.5, bottom: -2.5, near: 0.5, far: 14 });
@@ -690,7 +694,7 @@ function asentar(m, piso) {
 
 async function miniatura(tipo) {
   await listoPiezas;
-  if (!estudio) estudio = crearEstudio(560);
+  if (!estudio) estudio = crearEstudio(TACTIL ? 380 : 560);
   const { renderer, scene, camara, lienzo, sombra } = estudio;
   const m = crearModelo(tipo, 2.3);
   m.rotation.set(0.12, -0.62, 0);
@@ -735,7 +739,7 @@ function abrirVisor(caja, tipo) {
     const llave = new THREE.DirectionalLight(0xffe7c2, 2.6);
     llave.position.set(-2.5, 5, 3.5);
     llave.castShadow = true;
-    llave.shadow.mapSize.set(1024, 1024);
+    llave.shadow.mapSize.set(TACTIL ? 512 : 1024, TACTIL ? 512 : 1024);
     llave.shadow.radius = 10;
     llave.shadow.blurSamples = 16;
     Object.assign(llave.shadow.camera, { left: -2.6, right: 2.6, top: 2.6, bottom: -2.6, near: 0.5, far: 14 });
@@ -887,7 +891,7 @@ function escenario(caja, alElegir) {
     const llave = new THREE.DirectionalLight(0xffe7c2, 2.2);
     llave.position.set(-3, 7, 5);
     llave.castShadow = true;
-    llave.shadow.mapSize.set(1024, 1024);
+    llave.shadow.mapSize.set(TACTIL ? 512 : 1024, TACTIL ? 512 : 1024);
     llave.shadow.radius = 12;
     llave.shadow.blurSamples = 16;
     Object.assign(llave.shadow.camera, { left: -9, right: 9, top: 6, bottom: -6, near: 0.5, far: 25 });
