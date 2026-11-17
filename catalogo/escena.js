@@ -690,7 +690,7 @@ function heroe(lienzo) {
     try { renderer.compile(scene, camara); } catch (e) {}
     if (entradaFuera) inicio = performance.now() - 4000;
     tMontaje = (performance.now() - inicio) / 1000;
-    if (arco) { arco.prox = tMontaje + 6; arco.ultimo = tMontaje + 3.8; }
+    if (arco) { arco.prox = tMontaje + 1.6; arco.ultimo = tMontaje + 3.8; }
     montado = performance.now();
     reloj.getDelta();
     cuadro();
