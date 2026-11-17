@@ -12,3 +12,8 @@
 .DS_Store
 !/catalogo/
 /catalogo/**/.DS_Store
+!/sistema/
+/sistema/sql/
+/sistema/**/.DS_Store
+!/propuesta/
+/propuesta/**/.DS_Store

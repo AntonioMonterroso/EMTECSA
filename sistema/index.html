@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="es" data-modo="oscuro" data-modo-fijo>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>EMTECSA</title>
+<meta name="description" content="Sistema de EMTECSA: clientes, cotizaciones por estructura, obras, catálogo y cobros.">
+<meta name="theme-color" content="#07111F">
+<link rel="icon" href="../logo/emtecsa-icono.svg" type="image/svg+xml">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="iconos/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="EMTECSA">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../emtecsa-tokens.css">
+<link rel="stylesheet" href="../emtecsa-base.css">
+<link rel="stylesheet" href="css/sistema.css">
+<script>
+  try { const m = localStorage.getItem("emtecsa.sistema.modo"); if (m === "claro" || m === "oscuro") document.documentElement.dataset.modo = m; else if (m === "auto") delete document.documentElement.dataset.modo; } catch (e) {}
+</script>
+</head>
+<body>
+<div id="app" aria-live="polite"></div>
+<div class="avisos" role="status" aria-live="polite" data-avisos></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js" integrity="sha384-GFr3yTh5lJznCbZfpTtXnwboFsxqtTQoeTZCRHhE0579KrRmlCzen5AA8ohaB5ug" crossorigin="anonymous"></script>
+<script src="../emtecsa-ui.js"></script>
+<script src="js/config.js"></script>
+<script src="js/semilla.js"></script>
+<script src="js/datos.js"></script>
+<script src="js/datos-clientes.js"></script>
+<script src="js/datos-cotizaciones.js"></script>
+<script src="js/datos-obras.js"></script>
+<script src="js/datos-cobros.js"></script>
+<script src="js/simbolos.js"></script>
+<script src="js/datos-compras.js"></script>
+<script src="js/datos-planos.js"></script>
+<script src="js/datos-conteo.js"></script>
+<script src="js/datos-energuate.js"></script>
+<script src="js/datos-equipo.js"></script>
+<script src="js/datos-costos.js"></script>
+<script src="js/datos-tienda.js"></script>
+<script src="js/datos-docs.js"></script>
+<script src="js/datos-enlaces.js"></script>
+<script src="js/datos-seguimiento.js"></script>
+<script src="js/cola.js"></script>
+<script src="js/app.js"></script>
+<script src="js/clientes.js"></script>
+<script src="js/cotizaciones.js"></script>
+<script src="js/obras.js"></script>
+<script src="js/cobros.js"></script>
+<script src="js/compras.js"></script>
+<script src="js/planos.js"></script>
+<script src="js/conteo.js"></script>
+<script src="js/tienda.js"></script>
+<script src="js/empresa.js"></script>
+<script src="js/propuesta-pdf.js"></script>
+<script src="js/cobros-pdf.js"></script>
+<script src="js/expediente.js"></script>
+<script src="js/constancia-pdf.js"></script>
+<script src="js/enlaces.js"></script>
+<script src="js/energuate-docs.js"></script>
+<script src="js/energuate.js"></script>
+<script src="js/equipo.js"></script>
+<script src="js/costos.js"></script>
+<script src="js/seguimiento.js"></script>
+</body>
+</html>
