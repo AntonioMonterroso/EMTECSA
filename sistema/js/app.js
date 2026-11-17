@@ -90,7 +90,7 @@
       const b = f.querySelector('[type="submit"]'); b.disabled = true;
       try {
         await D.registrarse({ nombre: f.nombre.value, correo: f.correo.value, clave: f.clave.value });
-        app.querySelector(".entrada-caja").innerHTML = `${LOGO}<div><h1 class="t">Listo</h1><p style="margin-top:10px">Su cuenta quedó esperando que gerencia la apruebe.${D.nube ? " Revise también su correo por si le piden confirmarlo." : ""} Cuando la aprueben ya puede entrar con su correo y contraseña.</p></div><button class="s-btn lleno" type="button" data-volver>Ir a entrar</button>`;
+        app.querySelector(".entrada-caja").innerHTML = `${LOGO}<div><h1 class="t">Listo</h1><p style="margin-top:10px">Su cuenta quedó esperando que gerencia la apruebe. Cuando la aprueben ya puede entrar con su correo y contraseña.</p></div><button class="s-btn lleno" type="button" data-volver>Ir a entrar</button>`;
         app.querySelector("[data-volver]").addEventListener("click", () => pintarEntrada(false));
       } catch (err) { aviso(err.message, "mal"); b.disabled = false; }
     });

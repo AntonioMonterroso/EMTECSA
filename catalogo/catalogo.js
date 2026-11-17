@@ -577,11 +577,11 @@
       historia: [{ estado: total > 0 ? "esperando-pago" : "cotizacion", fecha: new Date().toISOString() }]
     };
     await A.guardar(p);
-    ponerLS("emtecsa.miPedido", id);
+    ponerLS("emtecsa.miPedido", p.id);
     carrito = []; notaObra = "";
     ponerLS("emtecsa.nota", "");
     guardarCarrito();
-    if (D.modoPrueba) A.avisar(total > 0 ? `Nuevo pedido ${id}` : `Nueva cotización ${id}`, `${cliente.nombre} · ${total > 0 ? q(total) : "a cotizar"}`, id);
+    if (D.modoPrueba && !A.nube) A.avisar(total > 0 ? `Nuevo pedido ${id}` : `Nueva cotización ${id}`, `${cliente.nombre} · ${total > 0 ? q(total) : "a cotizar"}`, id);
     return p;
   }
 
@@ -679,13 +679,14 @@
     const b = $("[data-enviar-comp]");
     b.disabled = true;
     const v = veredicto();
+    const antes = { estado: pedido.estado, notaEmtecsa: pedido.notaEmtecsa, comprobante: pedido.comprobante, historia: pedido.historia.slice() };
     await A.guardarArchivo(pedido.id + "-comprobante", archivoComp);
     pedido.comprobante = { nombre: archivoComp.name, tipo: archivoComp.type, subido: new Date().toISOString(), leido: { banco: lectura.banco, monto: lectura.monto, fecha: lectura.fecha, referencia: lectura.referencia, cuenta: lectura.cuenta || null, pedido: lectura.pedido || null }, cuadra: v.ok, texto: (lectura.texto || "").slice(0, 4000) };
     pedido.estado = "comprobante-recibido";
     pedido.notaEmtecsa = null;
     pedido.historia.push({ estado: "comprobante-recibido", fecha: new Date().toISOString() });
-    await A.guardar(pedido);
-    if (D.modoPrueba) A.avisar(`Comprobante de ${pedido.id}`, `${q(lectura.monto)}${lectura.banco ? " · " + lectura.banco : ""} · ${v.ok ? "cuadra" : "revisar monto"}`, pedido.id);
+    try { await A.guardar(pedido); } catch (err) { Object.assign(pedido, antes); b.disabled = false; aviso(err.message, "bell"); return; }
+    if (D.modoPrueba && !A.nube) A.avisar(`Comprobante de ${pedido.id}`, `${q(lectura.monto)}${lectura.banco ? " · " + lectura.banco : ""} · ${v.ok ? "cuadra" : "revisar monto"}`, pedido.id);
     guardarCarrito();
     paso = 5;
     await pintarPaso();
@@ -741,7 +742,7 @@
       const d = validarDatos();
       if (!d) return;
       const b = t.closest("[data-enviar-datos]"); b.disabled = true;
-      pedido = await crearPedido(d);
+      try { pedido = await crearPedido(d); } catch (err) { b.disabled = false; aviso(err.message, "bell"); return; }
       paso = pedido.estado === "esperando-pago" ? 3 : 6;
       pintarPaso();
       return;
@@ -994,6 +995,18 @@
       encerrarFoco(e);
     });
     A.alOir(alCambiar);
+    if (A.nube) {
+      let ultimo = null;
+      const revisar = async () => {
+        const mio = leerLS("emtecsa.miPedido", null);
+        if (!mio || document.hidden) return;
+        const p = await A.leer(mio).catch(() => null);
+        if (!p) return;
+        if (ultimo && ultimo !== p.estado) alCambiar({ tipo: "pedido", id: mio, estado: p.estado });
+        ultimo = p.estado;
+      };
+      revisar(); setInterval(revisar, 30000); addEventListener("visibilitychange", revisar);
+    }
     if (D.modoPrueba) A.sw();
     addEventListener("emt3d-listo", iniciar3D, { once: true });
     setTimeout(() => { if (!window.EMT3D) sin3D(); }, 9000);

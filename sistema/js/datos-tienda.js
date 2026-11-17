@@ -50,5 +50,34 @@
     await op("pedidos", "readwrite", s => s.put(p));
   }
 
-  Object.assign(D, { ESTADOS_TIENDA, pedidosTienda: pedidos, pedidoTienda: pedido, comprobanteTienda: comprobante, cambiarEstadoPedido, ligarCotizacion, alPedido: f => oyentes.add(f), quitarOyentePedido: f => oyentes.delete(f) });
+  const { nube, sb } = D;
+  const COLS = "id, estado, datos, total, comprobante, nota_emtecsa, historia, cotizacion_id, creado, actualizado";
+  const deFila = f => ({ ...(f.datos || {}), id: f.id, estado: f.estado, total: Number(f.total), comprobante: f.comprobante, notaEmtecsa: f.nota_emtecsa, historia: f.historia || [], cotizacion_id: f.cotizacion_id, creado: f.creado, actualizado: f.actualizado });
+  async function okN(r, msg) { if (r.error) throw new Error(msg); return r.data; }
+  const N = {
+    pedidos: async () => (await okN(await sb.from("tienda_pedidos").select(COLS).order("actualizado", { ascending: false }), "No se pudieron leer los pedidos de la tienda.")).map(deFila),
+    pedido: async id => { const f = await okN(await sb.from("tienda_pedidos").select(COLS).eq("id", id).maybeSingle(), "No se pudo leer el pedido."); return f ? deFila(f) : null; },
+    comprobante: async id => {
+      const f = await okN(await sb.from("tienda_archivos").select("tipo, contenido").eq("pedido_id", id).maybeSingle(), "No se pudo leer el comprobante.");
+      if (!f) return null;
+      const b = atob(f.contenido), u = new Uint8Array(b.length);
+      for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i);
+      return new Blob([u], { type: f.tipo });
+    },
+    cambiarEstado: async (id, estado, nota) => {
+      if (!ESTADOS_TIENDA[estado]) throw new Error("Estado no válido.");
+      const p = await N.pedido(id);
+      if (!p) throw new Error("Ese pedido ya no existe.");
+      const ahora = new Date().toISOString();
+      const historia = [...(p.historia || []), { estado, fecha: ahora, nota: nota || null, por: (window.EMT_APP && window.EMT_APP.sesion() && window.EMT_APP.sesion().perfil.nombre) || null }];
+      await okN(await sb.from("tienda_pedidos").update({ estado, nota_emtecsa: nota || null, historia, actualizado: ahora }).eq("id", id), "No se pudo cambiar el pedido.");
+      return { ...p, estado, notaEmtecsa: nota || null, historia, actualizado: ahora };
+    },
+    ligar: async (id, cotId) => { await okN(await sb.from("tienda_pedidos").update({ cotizacion_id: cotId, actualizado: new Date().toISOString() }).eq("id", id), "No se pudo ligar el pedido."); }
+  };
+  if (nube) {
+    try { sb.channel("tienda-pedidos").on("postgres_changes", { event: "*", schema: "public", table: "tienda_pedidos" }, p => { const f = p.new && p.new.id ? p.new : p.old; if (f) oyentes.forEach(fn => { try { fn({ tipo: "pedido", id: f.id, estado: f.estado }); } catch (x) {} }); }).subscribe(); } catch (e) {}
+  }
+
+  Object.assign(D, { ESTADOS_TIENDA, pedidosTienda: nube ? N.pedidos : pedidos, pedidoTienda: nube ? N.pedido : pedido, comprobanteTienda: nube ? N.comprobante : comprobante, cambiarEstadoPedido: nube ? N.cambiarEstado : cambiarEstadoPedido, ligarCotizacion: nube ? N.ligar : ligarCotizacion, alPedido: f => oyentes.add(f), quitarOyentePedido: f => oyentes.delete(f) });
 })();
