@@ -74,7 +74,7 @@ img { display: block; max-width: 100%; }
 .heroe { position: relative; min-height: 100svh; overflow: hidden; background: radial-gradient(ellipse 70% 60% at 72% 34%, #183a66 0%, #0e2340 38%, var(--noche) 78%); isolation: isolate; }
 .heroe::after { content: ""; position: absolute; inset: auto 0 0 0; height: 160px; background: linear-gradient(180deg, transparent, var(--noche)); z-index: 1; pointer-events: none; }
 .heroe-fotos { position: absolute; inset: 0; overflow: hidden; }
-.heroe-foto { position: absolute; inset: 0; will-change: opacity, transform; }
+.heroe-foto { position: absolute; inset: 0; will-change: opacity; }
 .heroe-foto[data-k="1"], .heroe-foto[data-k="2"], .heroe-foto[data-k="3"] { opacity: 0; }
 .heroe-foto img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 50%; }
 @media (min-aspect-ratio: 85/100) { .heroe-foto[data-k="0"] img { object-position: 70% 50%; } }

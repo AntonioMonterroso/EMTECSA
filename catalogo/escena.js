@@ -470,7 +470,6 @@ function heroe(lienzo) {
     const baja = cables.find(c => c.cerca && c.baja) || cables.find(c => c.cerca);
     if (baja) for (const u of [0.31, 0.345, 0.62]) { const b = posada(); b.scale.setScalar(0.9 + Math.random() * 0.3); rig.add(b); posadas.push({ b, c: baja, u, giro: Math.random() * 6 }); }
     armarRuta();
-    lienzo.classList.add("listo");
   }
 
   const nieblas = [];
@@ -694,6 +693,7 @@ function heroe(lienzo) {
     montado = performance.now();
     reloj.getDelta();
     cuadro();
+    requestAnimationFrame(() => requestAnimationFrame(() => lienzo.classList.add("listo")));
     requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(() => dispatchEvent(new Event("emt-portada-lista")))));
   }));
 }

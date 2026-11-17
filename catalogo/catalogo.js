@@ -795,9 +795,7 @@
       const mezcla = suaveP(Math.max(0, Math.min(1, (f - 0.3) / 0.4)));
       escenas.forEach((el, i) => {
         const o = i === k ? 1 : i === k + 1 ? mezcla : 0;
-        const z = i === k ? 1 + 0.05 * f : 1;
         el.style.opacity = o;
-        el.style.transform = QUIETO || i !== k ? "none" : `scale(${z.toFixed(4)})`;
       });
     };
     if (QUIETO) heroe.classList.add("fijo");
