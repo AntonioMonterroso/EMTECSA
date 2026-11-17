@@ -793,6 +793,7 @@
       while (k < CLAVES.length - 2 && ph > CLAVES[k + 1]) k++;
       const f = Math.max(0, Math.min(1, (ph - CLAVES[k]) / (CLAVES[k + 1] - CLAVES[k])));
       const mezcla = suaveP(Math.max(0, Math.min(1, (f - 0.3) / 0.4)));
+      window.__emtClaveFoto = CLAVES[mezcla >= 0.5 ? k + 1 : k];
       escenas.forEach((el, i) => {
         const o = i === k ? 1 : i === k + 1 ? mezcla : 0;
         el.style.opacity = o;
@@ -928,12 +929,17 @@
   function iniciar3D() {
     if (!puede3D || con3D || !window.EMT3D || senalMala) return;
     con3D = true;
-    cuandoQuieto(() => {
-      const lienzo = $("#lienzo-heroe");
-      try { window.EMT3D.heroe(lienzo); } catch (e) { return; }
-      const tapar = () => { if (lienzo.classList.contains("listo")) setTimeout(() => $(".heroe-fotos").classList.add("tapadas"), 1600); else setTimeout(tapar, 300); };
+    const lienzo = $("#lienzo-heroe"), fotos = $(".heroe-fotos");
+    let intentos = 0;
+    const tapar = () => { if (lienzo.classList.contains("listo")) setTimeout(() => { if (lienzo.classList.contains("listo")) fotos.classList.add("tapadas"); }, 1600); else setTimeout(tapar, 300); };
+    const destapar = () => { fotos.classList.remove("tapadas"); dispatchEvent(new Event("scroll")); };
+    addEventListener("emt-3d-perdido", destapar);
+    addEventListener("emt-3d-de-vuelta", tapar);
+    const arrancar = () => cuandoQuieto(() => {
+      try { window.EMT3D.heroe(lienzo); } catch (e) { if (++intentos < 2) setTimeout(arrancar, 1500); return; }
       tapar();
     });
+    arrancar();
   }
 
   document.addEventListener("DOMContentLoaded", () => {

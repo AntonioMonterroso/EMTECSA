@@ -376,6 +376,8 @@ function heroe(lienzo) {
   const seccion = lienzo.closest(".heroe");
   let nivel = NIVEL;
   const renderer = new THREE.WebGLRenderer({ canvas: lienzo, antialias: true, powerPreference: "high-performance" });
+  lienzo.addEventListener("webglcontextlost", e => { e.preventDefault(); lienzo.classList.remove("listo"); dispatchEvent(new Event("emt-3d-perdido")); });
+  lienzo.addEventListener("webglcontextrestored", () => { requestAnimationFrame(() => requestAnimationFrame(() => { lienzo.classList.add("listo"); dispatchEvent(new Event("emt-3d-de-vuelta")); })); });
   preparar(renderer);
   let escala = 1;
   const razon = () => Math.max(1, Math.min(devicePixelRatio, nivel === 0 ? 1.5 : 2) * escala);
@@ -610,7 +612,7 @@ function heroe(lienzo) {
     puntero.x += (puntero.tx - puntero.x) * (1 - Math.exp(-dt * 2.5));
     puntero.y += (puntero.ty - puntero.y) * (1 - Math.exp(-dt * 2.5));
     const pMeta = progreso();
-    if (pSuave < 0) pSuave = pMeta;
+    if (pSuave < 0) pSuave = typeof window.__emtClaveFoto === "number" ? window.__emtClaveFoto : pMeta;
     pSuave += (pMeta - pSuave) * (1 - Math.exp(-dt * 3.2));
     const p = pSuave;
     const entrada = QUIETO ? 1 : salida(lim(t / 2.6, 0, 1));
@@ -684,7 +686,7 @@ function heroe(lienzo) {
   let entradaFuera = !document.documentElement.classList.contains("cargando");
   addEventListener("emt-entrada-fuera", () => { entradaFuera = true; if (datos) inicio = performance.now(); });
   listoPiezas.then(real => (window.__emtQuieto || (f => f()))(() => {
-    montar(real);
+    try { montar(real); } catch (e) { dispatchEvent(new Event("emt-3d-perdido")); return; }
     avisarCarga(92);
     try { renderer.compile(scene, camara); } catch (e) {}
     if (entradaFuera) inicio = performance.now() - 4000;
@@ -692,8 +694,7 @@ function heroe(lienzo) {
     if (arco) { arco.prox = tMontaje + 1.6; arco.ultimo = tMontaje + 3.8; }
     montado = performance.now();
     reloj.getDelta();
-    cuadro();
-    requestAnimationFrame(() => requestAnimationFrame(() => lienzo.classList.add("listo")));
+    try { cuadro(); } finally { requestAnimationFrame(() => requestAnimationFrame(() => lienzo.classList.add("listo"))); }
     requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(() => dispatchEvent(new Event("emt-portada-lista")))));
   }));
 }
