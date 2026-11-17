@@ -876,9 +876,11 @@
       if (lenis) lenis.start();
       document.body.classList.add("en-escena");
       dispatchEvent(new Event("emt-entrada-fuera"));
+      puede3D = true;
+      setTimeout(iniciar3D, 120);
       setTimeout(() => { if (ent) ent.remove(); }, 900);
       setTimeout(() => {
-        if (!window.EMT3D) { sin3D(); return; }
+        if (!window.EMT3D) { addEventListener("emt3d-listo", () => generarMinis(), { once: true }); return; }
         const meta = $("#lineas");
         if (!meta || !("IntersectionObserver" in window)) { generarMinis(); return; }
         const io = new IntersectionObserver(es => { if (es.some(x => x.isIntersecting)) { io.disconnect(); generarMinis(); } }, { rootMargin: "0px 0px 500px 0px" });
@@ -895,9 +897,11 @@
     });
   }
 
+  let puede3D = false, con3D = false;
   function iniciar3D() {
-    if (!window.EMT3D) { quitarEntrada(); return; }
-    try { window.EMT3D.heroe($("#lienzo-heroe")); } catch (e) { quitarEntrada(); }
+    if (!puede3D || con3D || !window.EMT3D) return;
+    con3D = true;
+    try { window.EMT3D.heroe($("#lienzo-heroe")); } catch (e) {}
   }
 
   document.addEventListener("DOMContentLoaded", () => {
@@ -921,9 +925,8 @@
     guardarCarrito();
     window.EMT.iconos();
     revelar(); recorrido();
-    addEventListener("emt-portada-lista", quitarEntrada, { once: true });
-    setTimeout(quitarEntrada, 9000);
     if (lenis) lenis.stop();
+    quitarEntrada();
 
     $("#chips").addEventListener("click", e => { const b = e.target.closest("[data-f]"); if (b) ponerFiltro(b.dataset.f); });
     let tb;
@@ -954,7 +957,7 @@
     });
     A.alOir(alCambiar);
     if (D.modoPrueba) A.sw();
-    if (window.EMT3D) iniciar3D(); else addEventListener("emt3d-listo", iniciar3D, { once: true });
+    addEventListener("emt3d-listo", iniciar3D, { once: true });
     setTimeout(() => { if (!window.EMT3D) sin3D(); }, 9000);
   });
 })();

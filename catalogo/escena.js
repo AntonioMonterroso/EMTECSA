@@ -664,9 +664,11 @@ function heroe(lienzo) {
     if (composer) composer.render(); else renderer.render(scene, camara);
   }
 
-  addEventListener("emt-entrada-fuera", () => { inicio = performance.now(); });
+  let entradaFuera = !document.documentElement.classList.contains("cargando");
+  addEventListener("emt-entrada-fuera", () => { entradaFuera = true; if (datos) inicio = performance.now(); });
   listoPiezas.then(real => {
     montar(real);
+    if (entradaFuera) inicio = performance.now() - 4000;
     avisarCarga(92);
     try { renderer.compile(scene, camara); } catch (e) {}
     cuadro();

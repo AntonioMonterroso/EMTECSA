@@ -17,6 +17,33 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>html.cargando, html.cargando body { overflow: hidden; } .entrada { position: fixed; inset: 0; z-index: 200; display: grid; place-items: center; background: #07111F; transition: opacity 700ms cubic-bezier(0.23, 1, 0.32, 1), visibility 0s linear 700ms; } .entrada-logo { position: relative; width: clamp(204px, 41vw, 672px); transition: transform 700ms cubic-bezier(0.23, 1, 0.32, 1); } .entrada-logo img { display: block; width: 100%; height: auto; } .entrada-logo .base { opacity: 0.16; } .entrada-logo .lleno-marco { position: absolute; inset: 0; overflow: hidden; transform: translateX(-100%); will-change: transform; } .entrada-logo .lleno { transform: translateX(100%); will-change: transform; } .entrada.fuera { opacity: 0; visibility: hidden; } .entrada.fuera .entrada-logo { transform: scale(1.04); }</style>
+<link rel="preload" href="../logo/emtecsa-logo-blanco.svg" as="image" type="image/svg+xml" fetchpriority="high">
+<link rel="preload" href="img/portada-alta.webp" as="image" type="image/webp" media="(max-aspect-ratio: 85/100)" fetchpriority="high">
+<link rel="preload" href="img/portada-ancha.webp" as="image" type="image/webp" media="(min-aspect-ratio: 85/100)" fetchpriority="high">
+<link rel="preload" href="modelos/postes.glb" as="fetch" crossorigin="anonymous" fetchpriority="low">
+<link rel="modulepreload" href="escena.js" fetchpriority="low">
+<link rel="modulepreload" href="modelos.js" fetchpriority="low">
+<link rel="modulepreload" href="vendor/three.module.min.js" fetchpriority="low">
+<link rel="modulepreload" href="vendor/RoomEnvironment.js" fetchpriority="low">
+<link rel="modulepreload" href="vendor/jsm/libs/meshopt_decoder.module.js" fetchpriority="low">
+<link rel="modulepreload" href="vendor/jsm/loaders/GLTFLoader.js" fetchpriority="low">
+<link rel="modulepreload" href="vendor/jsm/utils/BufferGeometryUtils.js" fetchpriority="low">
+<link rel="modulepreload" href="vendor/jsm/postprocessing/EffectComposer.js" fetchpriority="low">
+<link rel="modulepreload" href="vendor/jsm/postprocessing/Pass.js" fetchpriority="low">
+<link rel="modulepreload" href="vendor/jsm/postprocessing/MaskPass.js" fetchpriority="low">
+<link rel="modulepreload" href="vendor/jsm/postprocessing/ShaderPass.js" fetchpriority="low">
+<link rel="modulepreload" href="vendor/jsm/postprocessing/RenderPass.js" fetchpriority="low">
+<link rel="modulepreload" href="vendor/jsm/postprocessing/UnrealBloomPass.js" fetchpriority="low">
+<link rel="modulepreload" href="vendor/jsm/postprocessing/OutputPass.js" fetchpriority="low">
+<link rel="modulepreload" href="vendor/jsm/shaders/CopyShader.js" fetchpriority="low">
+<link rel="modulepreload" href="vendor/jsm/shaders/LuminosityHighPassShader.js" fetchpriority="low">
+<link rel="modulepreload" href="vendor/jsm/shaders/OutputShader.js" fetchpriority="low">
+<link rel="modulepreload" href="vendor/jsm/objects/Reflector.js" fetchpriority="low">
+<link rel="modulepreload" href="vendor/jsm/lines/Line2.js" fetchpriority="low">
+<link rel="modulepreload" href="vendor/jsm/lines/LineSegments2.js" fetchpriority="low">
+<link rel="modulepreload" href="vendor/jsm/lines/LineMaterial.js" fetchpriority="low">
+<link rel="modulepreload" href="vendor/jsm/lines/LineGeometry.js" fetchpriority="low">
+<link rel="modulepreload" href="vendor/jsm/lines/LineSegmentsGeometry.js" fetchpriority="low">
 <link rel="stylesheet" href="../emtecsa-tokens.css">
 <link rel="stylesheet" href="../emtecsa-base.css">
 <link rel="stylesheet" href="catalogo.css">
@@ -27,7 +54,7 @@
 <script src="vendor/lenis.min.js"></script>
 <script src="comprobante.js" defer></script>
 <script src="catalogo.js" defer></script>
-<script type="module" src="escena.js"></script>
+<script type="module" src="escena.js" async></script>
 </head>
 <body>
 <div class="entrada" id="entrada" aria-hidden="true"><div class="entrada-logo"><img class="base" src="../logo/emtecsa-logo-blanco.svg" alt="" width="1720" height="276"><div class="lleno-marco"><img class="lleno" src="../logo/emtecsa-logo-blanco.svg" alt="" width="1720" height="276"></div></div></div>
@@ -70,6 +97,7 @@
 <main>
   <section class="heroe" id="inicio" aria-labelledby="t-heroe">
    <div class="heroe-pegado">
+    <picture class="heroe-foto" aria-hidden="true"><source srcset="img/portada-alta.webp" media="(max-aspect-ratio: 85/100)"><img src="img/portada-ancha.webp" alt="" fetchpriority="high" decoding="async"></picture>
     <canvas class="heroe-lienzo" id="lienzo-heroe" aria-hidden="true"></canvas>
     <div class="heroe-velo" aria-hidden="true"></div>
     <div class="ancho heroe-cap" data-cap="1"><span class="eti">Transformadores</span><p class="cap-t">De 10 a 75 kVA,<br>listos para el poste.</p><p class="cap-s">Monofásicos en 13.2 kV y 34.5 kV.</p></div>
