@@ -71,7 +71,7 @@
   async function avisar(titulo, cuerpo, etiqueta) {
     if (!("Notification" in window) || Notification.permission !== "granted") return false;
     const r = await sw();
-    const ops = { body: cuerpo, icon: "iconos/icono-192.png", badge: "iconos/icono-192.png", tag: etiqueta || titulo, renotify: true, data: { url: "pedidos.html" } };
+    const ops = { body: cuerpo, icon: "iconos/icono-192.png", badge: "iconos/icono-192.png", tag: etiqueta || titulo, renotify: true, data: { url: "../sistema/#/tienda/" + encodeURIComponent(etiqueta || "") } };
     if (r) { await r.showNotification(titulo, ops); return true; }
     new Notification(titulo, ops);
     return true;
