@@ -7,6 +7,9 @@ import { RenderPass } from "./vendor/jsm/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "./vendor/jsm/postprocessing/UnrealBloomPass.js";
 import { OutputPass } from "./vendor/jsm/postprocessing/OutputPass.js";
 import { Reflector } from "./vendor/jsm/objects/Reflector.js";
+import { Line2 } from "./vendor/jsm/lines/Line2.js";
+import { LineMaterial } from "./vendor/jsm/lines/LineMaterial.js";
+import { LineGeometry } from "./vendor/jsm/lines/LineGeometry.js";
 import { crearModelo, ponerPiezas, piezas } from "./modelos.js";
 
 const QUIETO = matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -124,19 +127,35 @@ function cielo() {
 }
 
 function cableVivo(curva, fase, radio = 0.013) {
-  const mat = new THREE.MeshStandardMaterial({ color: 0x1b222b, metalness: 0.6, roughness: 0.38 });
-  const u = { value: 0 };
-  mat.onBeforeCompile = sh => {
-    sh.uniforms.uT = u;
-    sh.vertexShader = sh.vertexShader.replace("#include <common>", "#include <common>\nuniform float uT;").replace("#include <begin_vertex>",
-      `#include <begin_vertex>
-      float sw = sin(3.14159 * uv.x);
-      transformed.x += sin(uT * 0.8 + ${fase.toFixed(2)} + uv.x * 2.0) * 0.16 * sw;
-      transformed.y += sin(uT * 1.1 + ${(fase * 1.7).toFixed(2)}) * 0.05 * sw;`);
+  const N = 96;
+  const base = curva.getSpacedPoints(N);
+  const pos = new Float32Array((N + 1) * 3);
+  base.forEach((q, k) => { pos[k * 3] = q.x; pos[k * 3 + 1] = q.y; pos[k * 3 + 2] = q.z; });
+  const geo = new LineGeometry();
+  geo.setPositions(pos);
+  const mat = new LineMaterial({ color: 0x0c1218, linewidth: 1.5, worldUnits: false, alphaToCoverage: true, fog: true });
+  mat.uniforms.uGrosor = { value: radio * 2 };
+  mat.vertexShader = mat.vertexShader
+    .replace("uniform float linewidth;", "uniform float linewidth;\nuniform float uGrosor;")
+    .replace("offset *= linewidth;", "vec4 cSel = ( position.y < 0.5 ) ? clipStart : clipEnd;\n\t\t\t\toffset *= max( linewidth, uGrosor * projectionMatrix[ 1 ][ 1 ] * resolution.y * 0.5 / max( cSel.w, 0.001 ) );");
+  const m = new Line2(geo, mat);
+  m.frustumCulled = false;
+  const c = { m, mat, curva, fase, radio };
+  c.actualizar = t => {
+    const datos = geo.attributes.instanceStart.data;
+    const arr = datos.array;
+    let ax = 0, ay = 0, az = 0;
+    for (let k = 0; k <= N; k++) {
+      const u = k / N, sw = Math.sin(Math.PI * u), q = base[k];
+      const x = q.x + Math.sin(t * 0.8 + fase + u * 2) * 0.16 * sw;
+      const y = q.y + Math.sin(t * 1.1 + fase * 1.7) * 0.05 * sw;
+      const z = q.z;
+      if (k > 0) { const o = (k - 1) * 6; arr[o] = ax; arr[o + 1] = ay; arr[o + 2] = az; arr[o + 3] = x; arr[o + 4] = y; arr[o + 5] = z; }
+      ax = x; ay = y; az = z;
+    }
+    datos.needsUpdate = true;
   };
-  mat.customProgramCacheKey = () => "cable" + fase.toFixed(2);
-  const m = new THREE.Mesh(new THREE.TubeGeometry(curva, 90, radio, 6, false), mat);
-  return { m, u, curva, fase };
+  return c;
 }
 function puntoCable(c, u, t) {
   const p = c.curva.getPointAt(u);
@@ -414,6 +433,7 @@ function heroe(lienzo) {
         const cerca = Math.abs(orden[k].z) < 1 || Math.abs(orden[k + 1].z) < 1;
         const c = cableVivo(vano(a, b, ln.comba), i * 1.3 + k * 0.7, cerca ? 0.012 : 0.016);
         c.cerca = cerca; c.baja = i >= datos.altas.length;
+        c.mat.resolution.set(ancho, alto);
         rig.add(c.m);
         cables.push(c);
         if (cerca && i < datos.altas.length) {
@@ -505,6 +525,7 @@ function heroe(lienzo) {
     camara.aspect = ancho / alto;
     camara.fov = camara.aspect < 0.85 ? 46 : 32;
     camara.updateProjectionMatrix();
+    for (const c of cables) c.mat.resolution.set(ancho, alto);
   }
   medir();
   new ResizeObserver(medir).observe(lienzo);
@@ -607,7 +628,7 @@ function heroe(lienzo) {
       });
     } else aves.aves.forEach(a => { a.visible = false; });
     if (!QUIETO && p > 0.58 && p < 0.72 && arco.vida < 0 && t - (arco.ultimo || 0) > 2.2) { arco.vida = 0; arco.ultimo = t; soltarChispas(); }
-    for (const c of cables) c.u.value = QUIETO ? 0 : t;
+    for (const c of cables) c.actualizar(QUIETO ? 0 : t);
     for (const q of pulsos) {
       if (!QUIETO) q.t = (q.t + q.v * dt) % 1;
       const u = q.inv ? 1 - q.t : q.t;
