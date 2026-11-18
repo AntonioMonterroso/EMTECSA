@@ -103,6 +103,8 @@ window.EMT_COTIZACIONES = (() => {
   }
 
   const plegados = new Map(); let plegCot = 0;
+  const pasoDe = new Map();
+  const PASOS4 = [["1", "Cliente"], ["2", "Qué se cotiza"], ["3", "Precio"], ["4", "Revisar y enviar"]];
   async function editor(v, id) {
     const { $, $$, esc, ico, Q, cant, aviso, numero, montoTxt } = A();
     const p = A().sesion().perfil;
@@ -128,14 +130,19 @@ window.EMT_COTIZACIONES = (() => {
           <div><span class="eti">${esc(c.numero)} · ${esc(fechaCorta(c.fecha))}</span><h1 class="t" data-h1>${esc(c.titulo || "Sin título")}</h1><p>${cli ? `<a href="#/clientes/${cli.id}">${esc(cli.nombre)}</a> · NIT ${esc(D.nitBonito(cli.nit))}` : "Cliente no encontrado"}</p></div>
           ${obraId ? `<a class="s-btn suave-b" href="#/obras/${obraId}">${ico("hammer", 15)}Ver la obra</a>` : orig.estado === "aprobada" && puedeObra ? `<button class="s-btn suave-b" type="button" data-crear-obra>${ico("hammer", 15)}Crear obra</button>` : ""}
         </div>
-        <div class="pasos-cot" data-pasos></div>
-        <div data-enlace></div>
-        <div data-seg></div>
-        <div class="nota-fija" data-nota-fija hidden>${ico("shield", 18)}<span></span></div>
-        <div class="cot">
+        <nav class="pasos4" data-pasos4 aria-label="Pasos de la cotización"></nav>
+        <div class="pasos-cot" data-pasos data-en-paso="4"></div>
+        <div class="nota-fija" data-nota-fija data-en-paso="4" hidden>${ico("shield", 18)}<span></span></div>
+        <section class="caja prev-cot" data-en-paso="4">
+          <div class="prev-mini"><img src="../img/${esc(c.foto || "torre-luna-2")}.jpg" alt="" data-prev-foto><span>${esc(c.numero)}</span></div>
+          <div class="prev-info"><h2>La propuesta</h2><p class="suave" data-prev-res></p><div class="fila-b"><button class="s-btn suave-b" type="button" data-pdf="ver">${ico("eye", 16)}Ver la propuesta</button><button class="s-btn suave-b" type="button" data-pdf="bajar">${ico("download", 15)}Descargar</button></div></div>
+        </section>
+        <div data-enlace data-en-paso="4"></div>
+        <div data-seg data-en-paso="4"></div>
+        <div class="cot uno">
           <div class="cot-izq">
             <fieldset class="bloq" data-bloq>
-            <details class="caja plegable" data-pl="datos" ${ab("datos", !c.titulo && !c.partidas.length)}><summary><span class="pl-t"><h2>Datos</h2><span class="suave" data-res-datos></span></span><span class="chev">${ico("chev", 16, 2.2)}</span></summary><div class="pl-cuerpo">
+            <details class="caja plegable" data-pl="datos" data-en-paso="1" ${ab("datos", true)}><summary><span class="pl-t"><h2>Datos</h2><span class="suave" data-res-datos></span></span><span class="chev">${ico("chev", 16, 2.2)}</span></summary><div class="pl-cuerpo">
               <label class="f-campo">Trabajo<input data-c="titulo" value="${esc(c.titulo || "")}" autocomplete="off" placeholder="Por ejemplo: línea de media tensión y transformador 50 kVA"></label>
               <div class="f-fila"><label class="f-campo">Sitio<select data-c="sitio_id"><option value="">Sin sitio</option>${(cli ? cli.sitios : []).map(s => `<option value="${s.id}" ${c.sitio_id === s.id ? "selected" : ""}>${esc(s.nombre)}</option>`).join("")}</select></label>
               <label class="f-campo">Contacto<select data-c="contacto_id"><option value="">Sin contacto</option>${(cli ? cli.contactos : []).map(k => `<option value="${k.id}" ${c.contacto_id === k.id ? "selected" : ""}>${esc(k.nombre)}</option>`).join("")}</select></label></div>
@@ -143,16 +150,17 @@ window.EMT_COTIZACIONES = (() => {
               <label class="f-campo">Vigencia (días)<input inputmode="numeric" data-c="vigencia_dias" value="${esc(c.vigencia_dias)}" autocomplete="off"></label></div>
               <label class="f-campo">Notas para el cliente<textarea data-c="notas" rows="2" placeholder="Tiempo de entrega, forma de pago, lo que no incluye…">${esc(c.notas || "")}</textarea></label>
             </div></details>
-            <section class="caja">
+            <section class="caja" data-en-paso="2">
               <div class="caja-cab"><h2>Lo que se cotiza</h2><span class="suave" data-n-part></span>${puede ? `<button class="s-btn suave-b chico" type="button" data-opciones>${ico("layers", 14)}Opciones y extras</button>` : ""}</div>
               <div class="partidas" data-partidas></div>
               <div class="f-agregar"><label class="agregar-a" data-agregar-a-l hidden><span>Agregar a</span><select data-agregar-a></select></label><span class="f-busca">${ico("search", 15)}<input data-busca-est placeholder="Agregar: escriba estructura, kV o kVA" autocomplete="off" aria-label="Agregar estructura"></span><div class="f-res" data-res-est hidden></div></div>
             </section>
-            <details class="caja plegable" data-pl="cargos" ${ab("cargos", false)}><summary><span class="pl-t"><h2>Transporte y equipo</h2><span class="suave" data-res-cargos></span></span><span class="chev">${ico("chev", 16, 2.2)}</span></summary><div class="pl-cuerpo">
+            <details class="caja plegable" data-pl="cargos" data-en-paso="3" ${ab("cargos", true)}><summary><span class="pl-t"><h2>Transporte y equipo</h2><span class="suave" data-res-cargos></span></span><span class="chev">${ico("chev", 16, 2.2)}</span></summary><div class="pl-cuerpo">
               <div class="cargos" data-cargos></div>
               <button class="s-btn suave-b chico" type="button" data-nuevo-cargo>${ico("plus", 14)}Agregar transporte o equipo</button>
             </div></details>
-            <details class="caja plegable" data-pl="pdf" ${ab("pdf", false)}><summary><span class="pl-t"><h2>Propuesta en PDF</h2><span class="suave" data-res-pdf></span></span><span class="chev">${ico("chev", 16, 2.2)}</span></summary><div class="pl-cuerpo">
+            <p class="mas-t" data-en-paso="4">Más</p>
+            <details class="caja plegable" data-pl="pdf" data-en-paso="4" ${ab("pdf", false)}><summary><span class="pl-t"><h2>Lo que dice la propuesta</h2><span class="suave" data-res-pdf></span></span><span class="chev">${ico("chev", 16, 2.2)}</span></summary><div class="pl-cuerpo">
               <div class="f-campo"><span>Foto de la portada</span><div class="fotos-p" role="radiogroup" aria-label="Foto de la portada">${window.EMT_PDF.FOTOS.map(([id, n]) => `<label class="foto-p"><input type="radio" name="foto" value="${id}" data-foto ${(c.foto || "torre-luna-2") === id ? "checked" : ""}><img src="../img/${id}.jpg" alt="" loading="lazy"><span>${esc(n)}</span></label>`).join("")}</div></div>
               <div class="f-fila"><label class="f-campo">El trabajo incluye<textarea data-c="alcance_incluye" rows="4" placeholder="Uno por línea">${esc(c.alcance_incluye || "")}</textarea></label>
               <label class="f-campo">No incluye<textarea data-c="alcance_excluye" rows="4" placeholder="Uno por línea">${esc(c.alcance_excluye || "")}</textarea></label></div>
@@ -161,21 +169,23 @@ window.EMT_COTIZACIONES = (() => {
               <label class="f-campo">Garantía<textarea data-cond="garantia" rows="2">${esc((c.condiciones || {}).garantia || "")}</textarea></label></div>
             </div></details>
             </fieldset>
-            <details class="caja plegable" data-pl="expediente" ${ab("expediente", false)}><summary><span class="pl-t"><h2>Expediente</h2><span class="suave" data-res-exp>Todo en un solo PDF</span></span><span class="chev">${ico("chev", 16, 2.2)}</span></summary><div class="pl-cuerpo" data-exp></div></details>
-            <details class="caja plegable" data-pl="energuate" ${ab("energuate", false)}><summary><span class="pl-t"><h2>Datos para Energuate</h2><span class="suave" data-res-eg>DPI y terrenos del cliente</span></span><span class="chev">${ico("chev", 16, 2.2)}</span></summary><div class="pl-cuerpo" data-eg-cot></div></details>
-            <details class="caja plegable" data-pl="plano" ${ab("plano", false)}><summary><span class="pl-t"><h2>Plano</h2><span class="suave" data-res-plano>Simbología de Energuate</span></span><span class="chev">${ico("chev", 16, 2.2)}</span></summary><div class="pl-cuerpo"><div data-plano-mini></div><div class="cnt-cot" data-cnt-cot></div><div class="fila-b"><a class="s-btn suave-b" href="#/plano/cot/${c.id}">${ico("pen", 15)}Abrir el plano</a></div></div></details>
-            ${verAum ? `<details class="caja plegable" data-pp-caja data-pl="piezas" ${ab("piezas", false)}><summary><span class="pl-t"><h2>Precio por pieza</h2><span class="suave" data-res-piezas></span></span><span class="chev">${ico("chev", 16, 2.2)}</span></summary><div class="pl-cuerpo">
+            <details class="caja plegable" data-pl="expediente" data-en-paso="4" ${ab("expediente", false)}><summary><span class="pl-t"><h2>Expediente</h2><span class="suave" data-res-exp>Todo en un solo PDF</span></span><span class="chev">${ico("chev", 16, 2.2)}</span></summary><div class="pl-cuerpo" data-exp></div></details>
+            <p class="mas-t" data-en-paso="1">Más</p>
+            <details class="caja plegable" data-pl="energuate" data-en-paso="1" ${ab("energuate", false)}><summary><span class="pl-t"><h2>Datos para Energuate</h2><span class="suave" data-res-eg>DPI y terrenos del cliente</span></span><span class="chev">${ico("chev", 16, 2.2)}</span></summary><div class="pl-cuerpo" data-eg-cot></div></details>
+            <p class="mas-t" data-en-paso="2">Más</p>
+            <details class="caja plegable" data-pl="plano" data-en-paso="2" ${ab("plano", false)}><summary><span class="pl-t"><h2>Plano</h2><span class="suave" data-res-plano>Simbología de Energuate</span></span><span class="chev">${ico("chev", 16, 2.2)}</span></summary><div class="pl-cuerpo"><div data-plano-mini></div><div class="cnt-cot" data-cnt-cot></div><div class="fila-b"><a class="s-btn suave-b" href="#/plano/cot/${c.id}">${ico("pen", 15)}Abrir el plano</a></div></div></details>
+            ${verAum ? `<p class="mas-t" data-en-paso="3">Más</p><details class="caja plegable" data-pp-caja data-pl="piezas" data-en-paso="3" ${ab("piezas", false)}><summary><span class="pl-t"><h2>Precio por pieza</h2><span class="suave" data-res-piezas></span></span><span class="chev">${ico("chev", 16, 2.2)}</span></summary><div class="pl-cuerpo">
               <p class="suave" style="font-size:13.5px;margin:0">Lo que costó cada pieza, lo que se le dice al cliente y lo que se gana. Con el lápiz cambia el precio solo en esta cotización; el catálogo no cambia.</p>
               <label class="busca-v ancho-busca"><span class="sr">Buscar pieza</span>${ico("search", 16)}<input type="search" data-pp-busca placeholder="Buscar material o código" autocomplete="off"></label>
               <div data-pp></div>
             </div></details>` : ""}
-            <details class="caja mats-cot" data-mats>
+            <details class="caja mats-cot" data-mats data-en-paso="2">
               <summary><h2>Lista de materiales para comprar</h2><span class="suave" data-n-mats></span><span class="chev">${ico("chev", 16, 2.2)}</span></summary>
               <label class="busca-v ancho-busca"><span class="sr">Buscar en la lista</span>${ico("search", 16)}<input type="search" data-lm-busca placeholder="Buscar material o código" autocomplete="off"></label>
               <div data-lista-mats></div>
             </details>
           </div>
-          <aside class="cot-der">
+          <aside class="cot-der" data-en-paso="3">
             <section class="caja resumen-cot">
               <fieldset class="bloq" data-bloq2>
               ${verAum ? `<label class="f-campo aumento">Aumento sobre el costo<span class="f-pct grande"><input data-c="aumento_pct" inputmode="decimal" value="${esc(c.aumento_pct)}" autocomplete="off"><span>%</span></span><small>No lo ve el cliente. Se aplica al material; la mano de obra va aparte.</small></label>` : ""}
@@ -191,12 +201,12 @@ window.EMT_COTIZACIONES = (() => {
               <div class="tot" data-tot></div>
               ${verAum ? `<div class="interno" data-interno></div>` : ""}
               <div data-avisos-cot></div>
-              ${puede ? `<button class="s-btn lleno ancho-b" type="button" data-guardar-cot>${ico("check", 16)}Guardar</button><span class="guardado" data-estado-guardado>Todo guardado</span>` : ""}
-              <div class="fila-b pdf-b"><button class="e-btn e-btn-salida" type="button" data-pdf="ver">${ico("eye", 16)}Ver PDF</button><button class="e-btn e-btn-salida" type="button" data-pdf="bajar">${ico("download", 16)}Descargar PDF</button><button class="e-btn e-btn-salida" type="button" data-exp-bajar>${ico("layers", 16)}Expediente</button></div>
+              ${puede ? `<span class="guardado" data-estado-guardado>Todo guardado</span>` : ""}
+
             </section>
           </aside>
         </div>
-        <div class="barra-cot" data-barra-cot><span><small data-total-barra-t>Total</small><b data-total-barra></b></span>${puede ? `<button class="s-btn lleno" type="button" data-guardar-cot>Guardar</button>` : ""}</div>
+        <div class="barra-cot" data-barra-cot><span><small data-total-barra-t>Total</small><b data-total-barra></b></span><span class="barra-acc">${puede ? `<button class="s-btn suave-b" type="button" data-guardar-cot>Guardar</button>` : ""}<button class="s-btn lleno" type="button" data-sig></button></span></div>
       </div>`;
 
     const PASOS = ["borrador", "enviada", "aprobada"];
@@ -208,9 +218,9 @@ window.EMT_COTIZACIONES = (() => {
     };
     const pintarPasos = () => {
       const est = c.estado, i0 = est === "rechazada" ? 1 : PASOS.indexOf(est), dis = puede ? "" : "disabled";
-      $("[data-pasos]", v).innerHTML = `<div class="pasos-fila"><ol class="pasos-l" aria-label="Fase de la cotización">${PASOS.map((k, i) => { const cl = est !== "rechazada" && k === est ? "actual" : i <= i0 ? "hecho" : "pendiente"; return `<li class="paso ${cl}"><button type="button" data-estado="${k}" ${dis} ${k === est ? 'aria-current="step"' : ""} aria-label="${D.ESTADOS[k]}${cl === "hecho" ? ", hecha" : cl === "actual" ? ", fase actual" : ""}"><span class="paso-c">${cl === "hecho" ? ico("check", 14, 2.6) : i + 1}</span><span class="paso-t">${D.ESTADOS[k]}</span></button></li>`; }).join("")}</ol>
-        <button type="button" class="paso-x ${est === "rechazada" ? "actual" : ""}" data-estado="rechazada" ${dis} ${est === "rechazada" ? 'aria-current="step"' : ""}>${ico("x", 13, 2.4)}Rechazada</button></div>
-        <p class="paso-ayuda"><b>${esc(AYUDA[est][0])}</b> ${esc(est === "enviada" && enlO.hayEnlace ? "Si la aprueba desde su enlace, pasa sola a «Aprobada»." : AYUDA[est][1])}</p>`;
+      $("[data-pasos]", v).innerHTML = `<div class="estado-cot"><span class="estado-t">Estado</span><div class="seg chico estado-seg" role="group" aria-label="Estado de la cotización">${["borrador", "enviada", "aprobada", "rechazada"].map(k2 => `<button type="button" data-estado="${k2}" ${dis} aria-pressed="${k2 === est}">${D.ESTADOS[k2]}</button>`).join("")}</div></div>
+        <p class="paso-ayuda">${esc(est === "enviada" && enlO.hayEnlace ? "Si la aprueba desde su enlace, pasa sola a «Aprobada»." : AYUDA[est][1])}</p>`;
+      if ($("[data-pasos4]", v)) pintarPasos4();
     };
     const congelar = () => {
       const kb = D.calcularCotizacion({ ...c, estado: "borrador" }, cat, { todo: true });
@@ -219,10 +229,42 @@ window.EMT_COTIZACIONES = (() => {
     };
     const partBox = $("[data-partidas]", v), cargoBox = $("[data-cargos]", v), resEst = $("[data-res-est]", v), buscaEst = $("[data-busca-est]", v);
     let k = D.calcularCotizacion(c, cat);
+    const cuerpoCot = $(".cuerpo", v);
+    let paso = c.estado !== "borrador" ? 4 : pasoDe.get(c.id) || (!c.titulo && !c.partidas.length ? 1 : 2);
+    const hechos = () => ({ 1: !!String(c.titulo || "").trim(), 2: c.partidas.length > 0, 3: c.partidas.length > 0 && (pasoDe.get("v3:" + c.id) || c.estado !== "borrador"), 4: c.estado !== "borrador" });
+    const pintarPasos4 = () => {
+      const h = hechos();
+      $("[data-pasos4]", v).innerHTML = PASOS4.map(([n, t]) => `<button type="button" data-ir-paso="${n}" class="${Number(n) === paso ? "ahora" : h[n] ? "hecho" : ""}" ${Number(n) === paso ? 'aria-current="step"' : ""}><i>${h[n] && Number(n) !== paso ? ico("check", 12, 2.8) : n}</i><span>${t}</span></button>`).join("");
+      const sig = $("[data-sig]", v);
+      if (paso < 4) { sig.hidden = false; sig.textContent = "Siguiente: " + PASOS4[paso][1]; sig.dataset.accion = "siguiente"; }
+      else if (c.estado === "borrador" && puede && D.puede(p, "verEnlaces")) { sig.hidden = false; sig.textContent = "Mandar al cliente"; sig.dataset.accion = "mandar"; }
+      else { sig.hidden = false; sig.textContent = "Ver la propuesta"; sig.dataset.accion = "ver"; }
+      const pr = $("[data-prev-res]", v); if (pr) pr.textContent = `${k.partidas.length} ${k.partidas.length === 1 ? "partida" : "partidas"} · ${Q(k.total)}${c.iva ? " con IVA" : ""}`;
+      const pf = $("[data-prev-foto]", v); if (pf) pf.src = `../img/${c.foto || "torre-luna-2"}.jpg`;
+    };
+    const irPaso = n => {
+      paso = Math.max(1, Math.min(4, n)); pasoDe.set(c.id, paso); if (paso === 3) pasoDe.set("v3:" + c.id, true);
+      cuerpoCot.dataset.paso = String(paso);
+      pintarPasos4();
+      const nav = $("[data-pasos4]", v); if (nav) { const y = nav.getBoundingClientRect().top + scrollY - 90; if (scrollY > y) scrollTo({ top: Math.max(0, y), behavior: "instant" }); }
+    };
+    const guardarCot = async () => {
+      const bs = $$("[data-guardar-cot], [data-sig]", v); bs.forEach(b => { b.disabled = true; });
+      try {
+        if (c.estado === "borrador") congelar();
+        await D.guardarCotizacion(c, D.calcularCotizacion(c, cat));
+        if (verAum && c.estado === "borrador") await D.guardarAumentoDefecto(c.aumento_pct);
+        sucio = false; const s = $("[data-estado-guardado]", v); if (s) { s.textContent = "Todo guardado"; s.className = "guardado"; }
+        pintarSeg();
+        return true;
+      } catch (err) { aviso(err.message, "mal"); return false; }
+      finally { bs.forEach(b => { b.disabled = false; }); }
+    };
 
     const pintarTotales = () => {
       k = D.calcularCotizacion(c, cat, verEsc());
       pintarOpcRes();
+      pintarPasos4();
       k.partidas.forEach((pp, i) => { if (abiertas.has(i)) { const x = partBox.querySelector(`[data-pm-x="${i}"]`); if (x) x.textContent = "× " + cant(pp.cantidad); (pp.mats || []).forEach((r, j) => { const t2 = partBox.querySelector(`[data-pm-tot="${i}:${j}"]`); if (t2) t2.textContent = cant(r.cantidad * (Number(pp.cantidad) || 0)); }); } const el = partBox.querySelector(`[data-ptot="${i}"]`); if (el) el.textContent = Q(pp.total); const u = partBox.querySelector(`[data-punit="${i}"]`); if (u) u.textContent = Q(pp.precio_unitario); });
       const fila = (t, val, cl = "") => `<div class="${cl}"><span>${t}</span><b class="e-cifra">${esc(val)}</b></div>`;
       $("[data-tot]", v).innerHTML = fila("Subtotal", Q(k.subtotal))
@@ -380,7 +422,7 @@ window.EMT_COTIZACIONES = (() => {
       prepararEnvio: async () => { if (c.estado === "borrador") { congelar(); c.estado = "enviada"; } const kk = D.calcularCotizacion(c, cat); await D.guardarCotizacion(c, kk); sucio = false; return { c, k: kk }; },
       recargar: () => A().quieto(() => editor(v, id)),
       alAprobar: async () => { if (!sucio) await A().quieto(() => editor(v, id)); else { c.estado = "aprobada"; pintarPasos(); aplicarFijo(); await window.EMT_ENLACES.panel(enlO); } } };
-    pintarPasos(); pintarPartidas(); pintarCargos(); pintarTotales(); aplicarFijo();
+    pintarPasos(); pintarPartidas(); pintarCargos(); pintarTotales(); aplicarFijo(); irPaso(paso);
     if (D.puede(p, "verEnlaces")) window.EMT_ENLACES.panel(enlO).then(() => pintarPasos()).catch(() => {});
     const segCtx = { c, cli, puede, sucio: () => sucio, recargar: () => A().quieto(() => editor(v, id)), recargarSeg: () => pintarSeg(), marcarRechazada: () => { const b = $('[data-estado="rechazada"]', v); if (b) b.click(); } };
     const pintarSeg = () => window.EMT_SEGUIMIENTO ? window.EMT_SEGUIMIENTO.seccion($("[data-seg]", v), segCtx).catch(() => {}) : null;
@@ -405,7 +447,7 @@ window.EMT_COTIZACIONES = (() => {
             <label class="s-btn suave-b chico">${ico("plus", 14)}Agregar archivo<input type="file" accept="application/pdf,image/jpeg,image/png" multiple hidden data-exp-anexo></label></div>` : ""}
         </div>
         ${pz.sinFicha.length && pz.conFicha.length ? `<details class="exp-falta"><summary>${pz.sinFicha.length} ${pz.sinFicha.length === 1 ? "material sin ficha" : "materiales sin ficha"}</summary><p class="suave">${pz.sinFicha.slice(0, 12).map(m => esc(m.descripcion)).join(" · ")}${pz.sinFicha.length > 12 ? " …" : ""}</p></details>` : ""}
-        <button class="e-btn e-btn-salida" type="button" data-exp-bajar>${ico("download", 16)}Descargar el expediente</button>`;
+        <button class="e-btn e-btn-salida" type="button" data-exp-bajar>${ico("eye", 16)}Ver el expediente</button>`;
     };
     const exp = () => { c.expediente = window.EMT_EXPEDIENTE.config(c); return c.expediente; };
     pintarExp().catch(() => {});
@@ -658,16 +700,13 @@ window.EMT_COTIZACIONES = (() => {
         k = D.calcularCotizacion(c, cat); pintarPartidas(); aplicarFijo(); marcar(); pintarTotales();
         if (conMotivo) { const g = $("[data-guardar-cot]", v); if (g) g.click(); }
       }
-      if (e.target.closest("[data-guardar-cot]")) {
-        const bs = $$("[data-guardar-cot]", v); bs.forEach(b => { b.disabled = true; });
-        try {
-          if (c.estado === "borrador") congelar();
-          await D.guardarCotizacion(c, D.calcularCotizacion(c, cat));
-          if (verAum && c.estado === "borrador") await D.guardarAumentoDefecto(c.aumento_pct);
-          sucio = false; const s = $("[data-estado-guardado]", v); if (s) { s.textContent = "Todo guardado"; s.className = "guardado"; }
-          aviso("Cotización guardada."); pintarSeg();
-        } catch (err) { aviso(err.message, "mal"); }
-        finally { bs.forEach(b => { b.disabled = false; }); }
+      if (e.target.closest("[data-guardar-cot]")) { if (await guardarCot()) aviso("Cotización guardada."); return; }
+      const ip = e.target.closest("[data-ir-paso]"); if (ip) { irPaso(Number(ip.dataset.irPaso)); return; }
+      const sg = e.target.closest("[data-sig]");
+      if (sg) {
+        if (sg.dataset.accion === "siguiente") { if (sucio && puede && !fijo()) { if (!(await guardarCot())) return; } irPaso(paso + 1); return; }
+        if (sg.dataset.accion === "mandar") { if (sucio && !(await guardarCot())) return; window.EMT_ENLACES.mandar(enlO).catch(err => aviso(err.message, "mal")); return; }
+        const vb = $('[data-pdf="ver"]', v); if (vb) vb.click(); return;
       }
       if (e.target.closest("[data-bajar-mats]")) bajarLista(c, k, cli);
       const ppe = e.target.closest("[data-pp-ed]"); if (ppe && !fijo()) precioPieza(Number(ppe.dataset.ppEd));
@@ -694,7 +733,8 @@ window.EMT_COTIZACIONES = (() => {
         try {
           const emp = await D.empresa();
           const b = await window.EMT_EXPEDIENTE.armar({ c, k: D.calcularCotizacion(c, cat), cli, emp, contacto: cli && cli.contactos.find(x => x.id === c.contacto_id), sitio: cli && cli.sitios.find(x => x.id === c.sitio_id) });
-          window.EMT_PDF.descargar(b, window.EMT_EXPEDIENTE.nombreArchivo(c, cli));
+          if (window.EMT_PREVIA) window.EMT_PREVIA.abrir({ titulo: `Expediente ${c.numero}`, pdf: b, nombre: window.EMT_EXPEDIENTE.nombreArchivo(c, cli) });
+          else window.EMT_PDF.descargar(b, window.EMT_EXPEDIENTE.nombreArchivo(c, cli));
         } catch (err) { aviso(/[áéíóúñ]/i.test(err.message) ? err.message : "No se pudo armar el expediente. Intente otra vez.", "mal"); }
         finally { todos.forEach(b => { b.disabled = false; }); }
         return;
@@ -707,7 +747,9 @@ window.EMT_COTIZACIONES = (() => {
           const emp = await D.empresa();
           const kk = D.calcularCotizacion(c, cat);
           const b = await window.EMT_PDF.generar({ c, k: kk, cli, emp, contacto: cli && cli.contactos.find(x => x.id === c.contacto_id), sitio: cli && cli.sitios.find(x => x.id === c.sitio_id) });
-          if (bp.dataset.pdf === "ver") window.EMT_PDF.ver(b); else window.EMT_PDF.descargar(b, window.EMT_PDF.nombreArchivo(c, cli));
+          const nom = window.EMT_PDF.nombreArchivo(c, cli);
+          if (bp.dataset.pdf === "ver" && window.EMT_PREVIA) window.EMT_PREVIA.abrir({ titulo: `Propuesta ${c.numero}`, pdf: b, nombre: nom, acciones: c.estado === "borrador" && puede && D.puede(p, "verEnlaces") ? [{ texto: "Mandar al cliente", icono: "send", principal: true, alTocar: async () => { if (sucio && !(await guardarCot())) return; window.EMT_ENLACES.mandar(enlO).catch(err => aviso(err.message, "mal")); } }] : [] });
+          else if (bp.dataset.pdf === "ver") window.EMT_PDF.ver(b); else window.EMT_PDF.descargar(b, nom);
         } catch (err) { aviso(/[áéíóúñ]/i.test(err.message) ? err.message : "No se pudo armar el PDF. Intente otra vez.", "mal"); }
         finally { todos.forEach(b => { b.disabled = false; }); }
       }

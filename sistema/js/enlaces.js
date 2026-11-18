@@ -49,7 +49,7 @@ window.EMT_ENLACES = (() => {
     o.hayEnlace = !!en;
     const contacto = cli && cli.contactos.find(x => x.id === c.contacto_id);
     if (!en) {
-      box.innerHTML = o.puede && (c.estado === "borrador" || c.estado === "enviada") ? `<div class="enl enl-nuevo"><span class="icono laton">${ico("send", 18)}</span><span class="enl-t"><b>Mandar al cliente</b><small>Le llega un enlace para verla en el teléfono, descargarla y aprobarla con su firma.</small></span><button class="s-btn lleno" type="button" data-enl-mandar>${ico("send", 15)}Mandar</button></div>` : "";
+      box.innerHTML = o.puede && (c.estado === "borrador" || c.estado === "enviada") ? `<div class="enl enl-nuevo"><span class="icono laton">${ico("send", 18)}</span><span class="enl-t"><b>Mandar al cliente</b><small>Lo ve en su teléfono y la aprueba con su firma.</small></span><button class="s-btn suave-b" type="button" data-enl-mandar>${ico("send", 15)}Mandar</button></div>` : "";
       return;
     }
     const hoy = D.hoyGT();
