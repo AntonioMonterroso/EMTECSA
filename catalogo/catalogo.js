@@ -274,11 +274,11 @@
 
   let paso = 1, pasoAntes = 1, pedido = null, modoCotizar = false, lectura = null, archivoComp = null;
   const JUNTOS = {
-    transformadores: ["ai-corta", "ai-fusible", "cr-soporte", "he-perno"],
-    postes: ["cr-metal", "ai-poste", "he-ojo", "he-pica"],
-    cruceros: ["ai-poste", "he-perno", "he-grillete", "ai-suspension"],
-    herrajes: ["he-cuna", "he-grapa", "he-pica", "ai-carrete"],
-    aislamiento: ["ai-fusible", "he-grillete", "he-ojo", "he-cuna"]
+    transformadores: ["ai-corta", "ai-tubo", "cr-soporte", "co-pica"],
+    cruceros: ["ai-poste", "he-perno", "he-tornillo", "he-arandela"],
+    herrajes: ["he-tuerca", "he-arandela", "ai-suspension", "he-retencion"],
+    aislamiento: ["ai-tubo", "ai-fusible", "he-grillete", "he-grapa-susp"],
+    conexion: ["co-cuna", "co-ampact", "co-pica", "co-grapa-tierra"]
   };
   const giroUrl = {};
   function ponerGiro(el, tipo) {
@@ -420,7 +420,7 @@
   async function pasoCarrito(cuerpo, pie) {
     const enCurso = await pedidoEnCurso();
     const n = totales().n;
-    const nota = `<label class="e-campo nota-obra">${carrito.length ? "Algo más para su obra (opcional)" : "¿Qué necesita?"}<textarea id="nota-obra" placeholder="Ejemplo: acometida para bodega en Escuintla, transformador de 50 kVA y 6 postes de 35 pies">${esc(notaObra)}</textarea></label>`;
+    const nota = `<label class="e-campo nota-obra">${carrito.length ? "Algo más para su obra (opcional)" : "¿Qué necesita?"}<textarea id="nota-obra" placeholder="Ejemplo: acometida para bodega en Escuintla, transformador de 50 kVA y 12 aisladores tipo poste">${esc(notaObra)}</textarea></label>`;
     $("#carrito-t").innerHTML = `Su carrito${n ? ` <span class="cuenta-c">${n}</span>` : ""}`;
     cuerpo.innerHTML = enCurso + (carrito.length
       ? `<div class="lista-c">${carrito.map(filaItem).join("")}</div>${nota}${sugerencias()}`
@@ -963,7 +963,7 @@
       irA(destino);
     });
     $("#cinta-prueba").hidden = !D.modoPrueba;
-    $("#nota-iva").textContent = "Precios con IVA incluido. Lo que dice «A cotizar» se lo enviamos con su precio." + (D.modoPrueba ? " Precios de muestra mientras EMTECSA confirma los suyos." : "");
+    $("#nota-iva").textContent = "Elija lo que necesita y la cantidad. Le enviamos el precio de todo.";
     pintarLineas(); pintarChips(); pintarProductos(false); marquesina(); obras(); pie();
     guardarCarrito();
     window.EMT.iconos();
