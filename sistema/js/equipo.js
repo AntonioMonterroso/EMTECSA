@@ -3,7 +3,7 @@ window.EMT_EQUIPO = (() => {
   const D = window.EMT_DATOS;
   const A = () => window.EMT_APP;
   const PEST = [["personas", "Personas"], ["permisos", "Permisos"], ["historial", "Historial"]];
-  const TIPOS_H = { cotizacion: ["azul", "file"], obra: ["laton", "hammer"], dinero: ["verde", "wallet"], catalogo: ["gris", "box"], cliente: ["azul", "building"], usuario: ["laton", "users"], permisos: ["laton", "shield"], empresa: ["gris", "building"], otro: ["gris", "file"] };
+  const TIPOS_H = { cotizacion: ["azul", "file"], obra: ["laton", "hammer"], dinero: ["claro", "wallet"], catalogo: ["gris", "box"], cliente: ["azul", "building"], usuario: ["laton", "users"], permisos: ["laton", "shield"], empresa: ["gris", "building"], otro: ["gris", "file"] };
   let pest = "personas", rolSel = "ventas", buscaP = "", buscaH = "", quienH = "";
 
   const cuando = iso => { if (!iso) return ""; const f = new Date(iso); return f.toLocaleString("es-GT", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }); };

@@ -35,11 +35,11 @@ window.EMT_OBRAS = (() => {
       </div>`;
     const res = $("[data-res-o]", v);
     const pintar = () => {
-      if (!todas.length) { res.innerHTML = `<div class="vacio"><span class="icono verde">${ico("hammer", 24)}</span><h2>Todavía no hay obras</h2><p>Cuando una cotización quede aprobada, ábrala y toque «Crear obra». Para una emergencia se puede crear aquí a mano.</p>${puede ? `<button class="s-btn lleno" type="button" data-nueva-obra>${ico("plus", 16)}Nueva obra</button>` : ""}</div>`; return; }
+      if (!todas.length) { res.innerHTML = `<div class="vacio"><span class="icono mezcla">${ico("hammer", 24)}</span><h2>Todavía no hay obras</h2><p>Cuando una cotización quede aprobada, ábrala y toque «Crear obra». Para una emergencia se puede crear aquí a mano.</p>${puede ? `<button class="s-btn lleno" type="button" data-nueva-obra>${ico("plus", 16)}Nueva obra</button>` : ""}</div>`; return; }
       const q = buscaO.toLowerCase().trim();
       const l = todas.filter(o => (!estadoF || o.estado === estadoF) && (!q || [o.numero, o.titulo, o.cliente && o.cliente.nombre].join(" ").toLowerCase().includes(q)));
       res.innerHTML = l.length ? `<div class="grupo-t">${l.length} ${l.length === 1 ? "obra" : "obras"}</div><div class="lista">${l.map(o => `
-        <a class="fila" href="#/obras/${o.id}"><span class="icono verde">${ico("hammer", 18)}</span><span><b>${esc(o.cliente ? o.cliente.nombre : "Cliente no encontrado")}</b><small>${esc(o.numero)}${o.titulo ? " · " + esc(o.titulo) : ""}${o.etapa_actual ? " · ahora: " + esc(o.etapa_actual) : ""}</small><i class="mini-av"><span style="transform:scaleX(${o.avance / 100})"></span></i></span>
+        <a class="fila" href="#/obras/${o.id}"><span class="icono mezcla">${ico("hammer", 18)}</span><span><b>${esc(o.cliente ? o.cliente.nombre : "Cliente no encontrado")}</b><small>${esc(o.numero)}${o.titulo ? " · " + esc(o.titulo) : ""}${o.etapa_actual ? " · ahora: " + esc(o.etapa_actual) : ""}</small><i class="mini-av"><span style="transform:scaleX(${o.avance / 100})"></span></i></span>
         <span class="der"><b class="e-cifra">${o.avance} %</b><small><span class="chip ${CHIP[o.estado]}">${esc(D.ESTADOS_OBRA[o.estado])}</span></small></span><span class="chev">${ico("chev", 16, 2.2)}</span></a>`).join("")}</div>`
         : `<div class="vacio"><h2>Nada con ese filtro</h2><p>Pruebe con otro número, cliente o estado.</p></div>`;
     };
@@ -215,7 +215,7 @@ window.EMT_OBRAS = (() => {
       <div class="sub"><h2>Bitácora · ${dias.length}</h2>${ed ? `<button class="s-btn suave-b" type="button" data-nuevo-dia>${ico("plus", 15)}Agregar día</button>` : ""}</div>
       ${dias.length ? dias.map(b => `
         <section class="dia">
-          <div class="dia-cab"><span class="icono verde chico">${ico("clock", 15)}</span><b>${esc(fCorta(b.fecha))}</b>${b.pendiente ? '<span class="chip ambar chico-c">Por subir</span>' : ""}${ed && !(b.id < 0) ? `<div class="acc"><button class="s-ib" type="button" aria-label="Editar el día" data-ed-dia="${b.id}">${ico("pen", 15)}</button></div>` : ""}</div>
+          <div class="dia-cab"><span class="icono mezcla chico">${ico("clock", 15)}</span><b>${esc(fCorta(b.fecha))}</b>${b.pendiente ? '<span class="chip ambar chico-c">Por subir</span>' : ""}${ed && !(b.id < 0) ? `<div class="acc"><button class="s-ib" type="button" aria-label="Editar el día" data-ed-dia="${b.id}">${ico("pen", 15)}</button></div>` : ""}</div>
           <p>${esc(b.texto)}</p>
           ${b.personal ? `<p class="suave"><b>Personal:</b> ${esc(b.personal)}</p>` : ""}
           ${b.problemas ? `<p class="problema">${ico("alerta", 15)}<span>${esc(b.problemas)}</span></p>` : ""}

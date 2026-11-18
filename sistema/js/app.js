@@ -29,16 +29,16 @@
     { id: "hoy", n: "Hoy", i: "home", c: "marino" },
     { id: "clientes", n: "Clientes", i: "building", c: "azul" },
     { id: "cotizaciones", n: "Cotizaciones", i: "file", c: "laton" },
-    { id: "obras", n: "Obras", i: "hammer", c: "verde" },
+    { id: "obras", n: "Obras", i: "hammer", c: "mezcla" },
     { id: "catalogo", n: "Catálogo", i: "box", c: "gris" },
-    { id: "cobros", n: "Cobros", i: "wallet", c: "ambar" },
+    { id: "cobros", n: "Cobros", i: "wallet", c: "claro" },
     { id: "tienda", n: "Tienda", i: "cart", c: "laton" }
   ];
   const MENU = [
     { id: "hoy", n: "Hoy", i: "home", c: "marino" },
     { id: "ventas", n: "Ventas", i: "file", c: "laton", ir: "cotizaciones", grupo: ["cotizaciones", "clientes", "tienda"] },
-    { id: "obras", n: "Obras", i: "hammer", c: "verde" },
-    { id: "dinero", n: "Dinero", i: "wallet", c: "ambar", ir: "cobros", grupo: ["cobros"] },
+    { id: "obras", n: "Obras", i: "hammer", c: "mezcla" },
+    { id: "dinero", n: "Dinero", i: "wallet", c: "claro", ir: "cobros", grupo: ["cobros"] },
     { id: "catalogo", n: "Catálogo", i: "box", c: "gris" }
   ];
   const PESTANAS_GRUPO = { ventas: [["cotizaciones", "Cotizaciones"], ["clientes", "Clientes"], ["tienda", "Tienda", "verTienda"]] };
@@ -359,9 +359,9 @@
     const primeros = avisosC.slice(0, 5), resto = avisosC.slice(5);
     const pp = sesion.perfil;
     const accesos = [
-      D.puede(pp, "registrarPago") && verC ? { t: "Registrar pago", i: "wallet", c: "ambar", h: "#/cobros", p: "[data-reg-pago]" } : null,
+      D.puede(pp, "registrarPago") && verC ? { t: "Registrar pago", i: "wallet", c: "claro", h: "#/cobros", p: "[data-reg-pago]" } : null,
       D.puede(pp, "editarCliente") ? { t: "Agregar cliente", i: "building", c: "azul", h: "#/clientes", p: "[data-nuevo-cli]" } : null,
-      { t: "Obras", i: "hammer", c: "verde", h: "#/obras" },
+      { t: "Obras", i: "hammer", c: "mezcla", h: "#/obras" },
       { t: "Catálogo", i: "box", c: "gris", h: "#/catalogo" },
       D.puede(pp, "verTienda") ? { t: "Tienda", i: "cart", c: "laton", h: "#/tienda" } : null
     ].filter(Boolean).slice(0, 4);
@@ -390,12 +390,12 @@
               <div class="widgets hoy-w">
                 <a class="w" href="#/cotizaciones"><span class="w-cab"><span class="icono laton">${ico("file", 18)}</span><span class="chev">${ico("chev", 16, 2.2)}</span></span><span class="l">Cotizado</span><b>${Q(cotizado)}</b><small>${delMes.length} ${delMes.length === 1 ? "cotización" : "cotizaciones"} · ${aprobadas} ${aprobadas === 1 ? "aprobada" : "aprobadas"}</small></a>
                 <a class="w" href="#/obras"><span class="w-cab"><span class="icono azul">${ico("hammer", 18)}</span><span class="chev">${ico("chev", 16, 2.2)}</span></span><span class="l">Obras en curso</span><b>${enCurso.length}</b><small>${enCurso.filter(x => x.estado === "programada").length} por empezar${pausadas ? ` · ${pausadas} en pausa` : ""}</small></a>
-                <a class="w" href="#/catalogo/materiales"><span class="w-cab"><span class="icono verde">${ico("box", 18)}</span><span class="chev">${ico("chev", 16, 2.2)}</span></span><span class="l">Materiales</span><b>${c.materiales.length}</b><small>${sinPrecio ? `${sinPrecio} sin costo` : "Todos con costo"}</small></a>
+                <a class="w" href="#/catalogo/materiales"><span class="w-cab"><span class="icono mezcla">${ico("box", 18)}</span><span class="chev">${ico("chev", 16, 2.2)}</span></span><span class="l">Materiales</span><b>${c.materiales.length}</b><small>${sinPrecio ? `${sinPrecio} sin costo` : "Todos con costo"}</small></a>
               </div>
             </section>
             <section class="hoy-obras">
               <div class="sub"><h2>Obras en curso</h2>${enCurso.length ? `<a href="#/obras">Ver todas</a>` : ""}</div>
-              ${enCurso.length ? `<div class="lista">${enCurso.slice().sort((a, b) => (a.estado === "en_curso" ? 0 : 1) - (b.estado === "en_curso" ? 0 : 1) || b.avance - a.avance).slice(0, 4).map(o => `<a class="fila obra-av" href="#/obras/${o.id}"><span class="icono verde">${ico("hammer", 18)}</span><span><b>${esc(o.cliente ? o.cliente.nombre : "Cliente no encontrado")}</b><small>${esc(o.numero)}${o.etapa_actual ? " · ahora: " + esc(o.etapa_actual) : o.estado === "programada" ? " · por empezar" : ""}</small><i class="mini-av"><span style="transform:scaleX(${o.avance / 100})"></span></i></span><span class="der"><b class="e-cifra">${o.avance} %</b></span></a>`).join("")}</div>`
+              ${enCurso.length ? `<div class="lista">${enCurso.slice().sort((a, b) => (a.estado === "en_curso" ? 0 : 1) - (b.estado === "en_curso" ? 0 : 1) || b.avance - a.avance).slice(0, 4).map(o => `<a class="fila obra-av" href="#/obras/${o.id}"><span class="icono mezcla">${ico("hammer", 18)}</span><span><b>${esc(o.cliente ? o.cliente.nombre : "Cliente no encontrado")}</b><small>${esc(o.numero)}${o.etapa_actual ? " · ahora: " + esc(o.etapa_actual) : o.estado === "programada" ? " · por empezar" : ""}</small><i class="mini-av"><span style="transform:scaleX(${o.avance / 100})"></span></i></span><span class="der"><b class="e-cifra">${o.avance} %</b></span></a>`).join("")}</div>`
                 : `<div class="hoy-nada">${ico("hammer", 18)}<span>No hay obras en curso.</span></div>`}
             </section>
           </div>

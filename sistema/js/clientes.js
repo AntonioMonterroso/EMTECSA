@@ -3,7 +3,7 @@ window.EMT_CLIENTES = (() => {
   let cliTab = "cotizaciones", cliTabDe = 0;
   const D = window.EMT_DATOS;
   const A = () => window.EMT_APP;
-  const ICONO = { industria: ["building", "marino"], comercio: ["cart", "azul"], gobierno: ["shield", "gris"], residencial: ["home", "verde"], distribuidora: ["zap", "laton"] };
+  const ICONO = { industria: ["building", "marino"], comercio: ["cart", "azul"], gobierno: ["shield", "gris"], residencial: ["home", "mezcla"], distribuidora: ["zap", "laton"] };
   const VOLT_P = ["13.2 kV", "34.5 kV", "69 kV"];
   const VOLT_S = ["120/240 V", "240/120 V", "208/120 V", "480/277 V"];
   const telLimpio = t => String(t || "").replace(/[^\d+]/g, "");

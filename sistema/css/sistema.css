@@ -154,11 +154,13 @@ a.w:active { transform: scale(0.99); }
 .w small.aviso-t { color: var(--aviso); font-weight: 600; }
 .icono { width: 38px; height: 38px; border-radius: 12px; display: grid; place-items: center; color: #fff; box-shadow: inset 0 1px 0 rgba(255, 255, 255, .25); flex: none; }
 .icono.laton { background: linear-gradient(145deg, var(--laton-claro), var(--laton-oscuro)); color: var(--laton-tinta); }
-.icono.azul { background: linear-gradient(145deg, #3A6596, #1A3558); }
+.icono.azul { background: linear-gradient(145deg, var(--marino-500), var(--marino-700)); }
 .icono.verde { background: linear-gradient(145deg, #3E9B74, #22604A); }
 .icono.ambar { background: linear-gradient(145deg, #E0B04F, #B07E1E); color: #2A1C04; }
-.icono.gris { background: linear-gradient(145deg, #6B7785, #3A4552); }
-.icono.marino { background: linear-gradient(145deg, #24497A, #102440); }
+.icono.gris { background: linear-gradient(145deg, color-mix(in srgb, var(--marino-400) 35%, #6B7785), color-mix(in srgb, var(--marino-700) 35%, #3A4552)); }
+.icono.marino { background: linear-gradient(145deg, var(--marino-600), var(--marino-800)); }
+.icono.mezcla { background: linear-gradient(145deg, var(--laton-oscuro), color-mix(in srgb, var(--laton-oscuro) 55%, var(--marino-900))); }
+.icono.claro { background: linear-gradient(145deg, color-mix(in srgb, var(--laton-claro) 60%, #fff), var(--laton-claro)); color: var(--laton-tinta); }
 
 .sub { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; padding: 8px 4px 0; }
 .sub h2 { font-size: 24px; font-weight: 800; letter-spacing: -0.035em; }
