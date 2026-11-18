@@ -54,6 +54,33 @@ window.EMT_PERFIL = (() => {
     };
   }
 
+  const VAPID = "BI9GRkGDq08uB6Z-NFRad_PIyBAD_M6rK2xOViF7ZIDnX-XEEX5lvfzImY2NhI8Wota57ytJRH4tgJcluIulaio";
+  const b64 = s => { const p = "=".repeat((4 - s.length % 4) % 4), r = atob((s + p).replace(/-/g, "+").replace(/_/g, "/")); return Uint8Array.from([...r].map(c => c.charCodeAt(0))); };
+  const esIphone = () => /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  const instalada = () => matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+  const clienteSb = () => D.sb || D.sbErrores;
+  async function estadoAvisos() {
+    if (!clienteSb() || !("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) return esIphone() && !instalada() ? "instalar" : "no";
+    if (Notification.permission === "denied") return "bloqueado";
+    const reg = await navigator.serviceWorker.getRegistration(); const sub = reg && await reg.pushManager.getSubscription();
+    return sub ? "activo" : "apagado";
+  }
+  async function activarAvisos() {
+    const sb = clienteSb(); if (!sb) throw new Error("Los avisos funcionan con la base de EMTECSA conectada.");
+    const per = await Notification.requestPermission(); if (per !== "granted") throw new Error("El teléfono no dio permiso para avisos. Actívelo en los ajustes del navegador.");
+    const reg = await navigator.serviceWorker.register("sw.js").then(() => navigator.serviceWorker.ready);
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64(VAPID) });
+    const j = sub.toJSON();
+    const r = await sb.from("push_suscripciones").upsert({ endpoint: j.endpoint, p256dh: j.keys.p256dh, auth: j.keys.auth, navegador: navigator.userAgent.slice(0, 200) }, { onConflict: "endpoint" });
+    if (r.error) throw new Error("No se pudo guardar este teléfono para avisos.");
+    await sb.rpc("probar_aviso");
+  }
+  async function apagarAvisos() {
+    const reg = await navigator.serviceWorker.getRegistration(); const sub = reg && await reg.pushManager.getSubscription();
+    if (sub) { const sb = clienteSb(); if (sb) await sb.from("push_suscripciones").delete().eq("endpoint", sub.endpoint); await sub.unsubscribe(); }
+  }
+
   async function vista(v) {
     const { esc, ico, aviso, modal, cerrarCapas, guardia } = A();
     const s = A().sesion(), p = s.perfil;
@@ -78,6 +105,7 @@ window.EMT_PERFIL = (() => {
           <div class="fila-b"><button class="s-btn lleno" type="button" data-pf-guardar>${ico("check", 16)}Guardar</button><span class="guardado" data-pf-est>Todo guardado</span></div>
         </section>
         <details class="caja plegable"><summary><span class="pl-t"><h2>Firma</h2><span class="suave" data-pf-res-firma>${firma ? "Ya tiene su firma" : "Todavía no tiene firma"}</span></span><span class="chev">${ico("chev", 16, 2.2)}</span></summary><div class="pl-cuerpo" data-pf-firma></div></details>
+        <details class="caja plegable" open><summary><span class="pl-t"><h2>Avisos en este teléfono</h2><span class="suave" data-av-res>Revisando…</span></span><span class="chev">${ico("chev", 16, 2.2)}</span></summary><div class="pl-cuerpo" data-avisos></div></details>
         ${D.nube ? `<details class="caja plegable"><summary><span class="pl-t"><h2>Contraseña</h2><span class="suave">Cambiarla</span></span><span class="chev">${ico("chev", 16, 2.2)}</span></summary><div class="pl-cuerpo">
           <label class="f-campo">Contraseña actual<input type="password" data-pf-clave="actual" autocomplete="current-password"></label>
           <div class="f-fila"><label class="f-campo">Nueva<input type="password" data-pf-clave="nueva" autocomplete="new-password"><small>Al menos 8, con letras y números.</small></label>
@@ -95,6 +123,25 @@ window.EMT_PERFIL = (() => {
       v.querySelector("[data-pf-res-firma]").textContent = firma ? "Ya tiene su firma" : "Todavía no tiene firma";
     };
     pintarFirma();
+    const pintarAvisos = async () => {
+      const box = v.querySelector("[data-avisos]"), res = v.querySelector("[data-av-res]"); if (!box) return;
+      const st = await estadoAvisos().catch(() => "no");
+      const T = { activo: ["Activados", "Le llegan avisos aunque el sistema esté cerrado."], apagado: ["Apagados", "Actívelos para enterarse al momento de pedidos, comprobantes y lo que el cliente haga en su enlace."], bloqueado: ["Bloqueados", "El navegador tiene bloqueados los avisos de esta página. Permítalos en sus ajustes y vuelva aquí."], instalar: ["Falta instalar", "En iPhone los avisos llegan solo con la app instalada: Compartir › Agregar a pantalla de inicio. Luego ábrala desde el ícono."], no: ["No disponibles", D.nube || D.sbErrores ? "Este navegador no recibe avisos. Pruebe con Chrome o Safari actualizados." : "Los avisos funcionan con la base de EMTECSA conectada."] }[st];
+      res.textContent = T[0];
+      box.innerHTML = `<p class="suave" style="margin:0;font-size:13.5px">${esc(T[1])}</p><div class="fila-b">${st === "apagado" ? `<button class="s-btn lleno" type="button" data-av-on>${ico("check", 15)}Activar avisos</button>` : st === "activo" ? `<button class="s-btn suave-b" type="button" data-av-prueba>Mandar un aviso de prueba</button><button class="s-btn suave-b" type="button" data-av-off>Apagar en este teléfono</button>` : st === "instalar" && D.pedirInstalar ? `<button class="s-btn suave-b" type="button" data-av-inst>Cómo instalar</button>` : ""}</div>`;
+    };
+    pintarAvisos();
+    v.addEventListener("click", async ev => {
+      const b = ev.target.closest("[data-av-on], [data-av-off], [data-av-prueba], [data-av-inst]"); if (!b) return;
+      b.disabled = true;
+      try {
+        if (b.matches("[data-av-on]")) { await activarAvisos(); aviso("Avisos activados. Le llegará uno de prueba."); }
+        else if (b.matches("[data-av-off]")) { await apagarAvisos(); aviso("Avisos apagados en este teléfono."); }
+        else if (b.matches("[data-av-prueba]")) { await clienteSb().rpc("probar_aviso"); aviso("Aviso de prueba enviado."); }
+        else if (b.matches("[data-av-inst]")) D.pedirInstalar();
+      } catch (err) { aviso(err.message || "No se pudo.", "mal"); }
+      finally { b.disabled = false; pintarAvisos(); }
+    });
     const quitarFoto = () => {
       const m = modal({ titulo: "¿Quitar su foto?", guardarTxt: "Quitar", cuerpo: `<p class="suave" style="font-size:15px">Vuelven a salir sus iniciales.</p>`,
         alGuardar: async () => { foto = null; await D.guardarMiPerfil(p, { nombre: p.nombre, telefono: p.telefono, puesto: p.puesto, foto: null }); cerrarCapas(); A().pintarAvatar(); v.querySelector("[data-pf-foto]").innerHTML = av() + `<i>${ico("pen", 14)}</i>`; aviso("Foto quitada."); } });

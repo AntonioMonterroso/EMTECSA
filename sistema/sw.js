@@ -1,5 +1,5 @@
 "use strict";
-const VERSION = "emtecsa-2026-11-18-5";
+const VERSION = "emtecsa-2026-11-18-6";
 const BASE = [
   "./", "./index.html", "./manifest.webmanifest", "./css/sistema.css",
   "./js/config.js", "./js/semilla.js", "./js/datos.js", "./js/datos-clientes.js", "./js/datos-cotizaciones.js", "./js/datos-obras.js", "./js/datos-cobros.js", "./js/simbolos.js", "./js/datos-compras.js", "./js/datos-planos.js", "./js/cola.js", "./js/rapido.js", "./js/planos.js", "./js/datos-tienda.js", "./js/tienda.js", "./js/datos-docs.js", "./js/expediente.js", "./js/datos-enlaces.js", "./js/datos-conteo.js", "./js/conteo.js", "./js/datos-energuate.js", "./js/energuate-docs.js", "./js/energuate.js", "./js/datos-equipo.js", "./js/equipo.js", "./js/datos-costos.js", "./js/costos.js", "./js/datos-seguimiento.js", "./js/seguimiento.js", "./js/perfil.js", "./js/dev.js", "./js/vista-previa.js", "./plantillas/dictamen-capacidad.xlsx", "./plantillas/dictamen-medida-centralizacion.xlsx", "./plantillas/derecho-de-paso.docx", "./plantillas/boleta-solicitante.pdf", "./plantillas/requisitos-licencia.pdf", "./js/constancia-pdf.js", "./js/enlaces.js", "./marcas/energuate.png", "./marcas/eegsa.png",
@@ -57,6 +57,12 @@ self.addEventListener("fetch", e => {
       return guardada || (await red) || Response.error();
     })());
   }
+});
+
+self.addEventListener("push", e => {
+  let d = {};
+  try { d = e.data ? e.data.json() : {}; } catch (x) { d = { titulo: "EMTECSA", cuerpo: e.data ? e.data.text() : "" }; }
+  e.waitUntil(self.registration.showNotification(d.titulo || "EMTECSA", { body: d.cuerpo || "", icon: "iconos/icono-192.png", badge: "iconos/icono-192.png", tag: d.etiqueta || "emtecsa", renotify: true, data: { url: d.url || "./#/hoy" } }));
 });
 
 self.addEventListener("notificationclick", e => {

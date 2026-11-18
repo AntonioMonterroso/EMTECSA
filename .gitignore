@@ -19,3 +19,4 @@
 /sistema/**/.DS_Store
 !/propuesta/
 /propuesta/**/.DS_Store
+/sistema/supabase/

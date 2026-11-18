@@ -38,6 +38,7 @@ window.EMT_EMPRESA = (() => {
             <div class="f-fila">${campo("nombre", "Nombre comercial")}${campo("razon_social", "Razón social")}</div>
             <div class="f-fila">${campo("nit", "NIT")}${campo("telefono", "Teléfono", "", 'inputmode="tel"')}</div>
             <div class="f-fila">${campo("correo", "Correo", "", 'type="email"')}${campo("web", "Sitio web")}</div>
+            ${campo("correo_pedidos", "Correo que recibe los pedidos del catálogo", "Si queda vacío, se usa el correo de arriba.", 'type="email"')}
             <div class="f-fila">${campo("direccion", "Dirección")}${campo("ciudad", "Ciudad", "Sale en la fecha de la carta.")}</div>
           </div></details>
           <details class="caja plegable"><summary><span class="pl-t"><h2>Seguimiento de cotizaciones</h2><span class="suave">Cuándo recordar al cliente</span></span><span class="chev">${ico("chev", 16, 2.2)}</span></summary><div class="pl-cuerpo">
