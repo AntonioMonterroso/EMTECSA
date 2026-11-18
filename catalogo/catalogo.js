@@ -383,7 +383,7 @@
     if (!mio) return "";
     const p = await A.leer(mio);
     if (!p) return "";
-    const txt = { "esperando-pago": "Falta subir el comprobante", "comprobante-recibido": "Revisando su depósito", "comprobante-rechazado": "Hay que subir otro comprobante", "en-marcha": "En marcha", "cotizacion": "Le enviaremos el precio" }[p.estado] || "";
+    const txt = { "esperando-pago": "Falta subir el comprobante", "comprobante-recibido": "Revisando su depósito", "comprobante-rechazado": "Hay que subir otro comprobante", "en-marcha": "En marcha", "cotizacion": "Le enviaremos el precio", "entregado": "Entregado" }[p.estado] || "";
     return `<button class="aviso-cotizar" type="button" data-ir-pedido style="width:100%;cursor:pointer;text-align:left;font:inherit">${ico("clock", 18)}<span><b style="color:var(--claro)">Pedido ${esc(p.id)}</b><br>${esc(txt)} · Ver</span></button>`;
   }
 
@@ -419,9 +419,8 @@
   }
 
   function pieCarrito() {
-    const { total, cot } = totales();
-    return `<div class="pie-total"><span>Total estimado</span><b data-pie-total data-v="${total}">${q(total)}</b></div>
-      <p class="pie-nota">IVA incluido. La entrega se coordina con usted.${cot ? ` Lo marcado «A cotizar» se lo enviamos con su precio.` : ""}</p>`;
+    const { total } = totales();
+    return `<div class="pie-total"><span>Total estimado</span><b data-pie-total data-v="${total}">${q(total)}</b></div>`;
   }
 
   async function pasoCarrito(cuerpo, pie) {
@@ -506,13 +505,21 @@
     aviso(`Agregado: ${p.nombre}`, "check");
   }
 
+  function codigoDe(it) {
+    const p = PROD[it.id], l = (p && p.codigos) || [];
+    if (!l.length) return null;
+    const k = (p.opciones || []).reduce((a, o) => a * o.valores.length + Math.max(0, o.valores.indexOf((it.opciones || {})[o.id])), 0);
+    return l[k] || null;
+  }
+
   function pintarResumen() {
     const caja = $("#carrito-resumen");
     if (!caja) return;
     const usarPedido = paso >= 3 && pedido;
     const items = usarPedido ? pedido.items.map(i => ({ nombre: i.nombre, cant: i.cant, precio: i.precio })) : carrito.map(it => ({ nombre: PROD[it.id].nombre, cant: it.cant, precio: precioDe(it) }));
     const total = usarPedido ? pedido.total : totales().total;
-    const conPrecio = items.filter(i => i.precio != null), cot = items.filter(i => i.precio == null);
+    const cotizado = usarPedido && total > 0 && !items.some(i => i.precio != null);
+    const conPrecio = cotizado ? items : items.filter(i => i.precio != null), cot = items.filter(i => i.precio == null);
     const piezas = conPrecio.reduce((a, i) => a + i.cant, 0);
     const iva = total - total / 1.12;
     if (!items.length && !usarPedido) { caja.innerHTML = `<div class="res-papel vacio"><span class="eti">Resumen</span><p>Aquí verá el total de su pedido.</p></div>`; return; }
@@ -520,7 +527,7 @@
     caja.innerHTML = `<div class="res-papel${abierto}">
       <div class="res-cab"><img src="../logo/emtecsa-logo.svg" alt="EMTECSA"><span>${usarPedido ? esc(pedido.id) : "Resumen"}</span></div>
       <div class="res-detalle">
-        <div class="res-lineas">${conPrecio.map(i => `<div><span>${i.cant} × ${esc(i.nombre)}</span><span>${q(i.precio * i.cant)}</span></div>`).join("") || '<div><span>Sin productos con precio</span><span></span></div>'}</div>
+        <div class="res-lineas">${conPrecio.map(i => `<div><span>${i.cant} × ${esc(i.nombre)}</span><span>${i.precio == null ? "Cotizado" : q(i.precio * i.cant)}</span></div>`).join("") || '<div><span>Sin productos con precio</span><span></span></div>'}</div>
         <div class="res-filas">
           <div><span>Piezas</span><b>${piezas}</b></div>
           <div><span>IVA incluido (12 %)</span><b>${q(iva)}</b></div>
@@ -582,7 +589,7 @@
     const id = await A.siguienteNumero();
     const p = {
       id, creado: new Date().toISOString(), cliente, nota: notaObra.trim(),
-      items: carrito.map(it => ({ id: it.id, nombre: PROD[it.id].nombre, opciones: it.opciones, cant: it.cant, precio: precioDe(it), unidad: PROD[it.id].unidad || null })),
+      items: carrito.map(it => ({ id: it.id, codigo: codigoDe(it), nombre: PROD[it.id].nombre, opciones: it.opciones, cant: it.cant, precio: precioDe(it), unidad: PROD[it.id].unidad || null })),
       total, cotizar: cot + (carrito.length ? 0 : 1),
       estado: total > 0 ? "esperando-pago" : "cotizacion",
       historia: [{ estado: total > 0 ? "esperando-pago" : "cotizacion", fecha: new Date().toISOString() }]
@@ -615,7 +622,7 @@
         ${filaBanco("A nombre de", b.nombre)}
         ${filaBanco("Moneda", b.moneda)}
         <div class="t-nota">Escriba <b>${esc(pedido.id)}</b> en la descripción de la transferencia.${pend ? " Los datos de la cuenta se confirman pronto." : ""}</div>
-        <div class="t-items">${pedido.items.filter(i => i.precio != null).map(i => `<div><span>${i.cant} × ${esc(i.nombre)}</span><span>${q(i.precio * i.cant)}</span></div>`).join("")}${pedido.cotizar ? `<div><span>${pedido.cotizar} por cotizar</span><span>Le escribimos</span></div>` : ""}<div><span>${esc(fecha)}</span><span></span></div></div>
+        <div class="t-items">${pedido.items.filter(i => i.precio != null || (pedido.historia || []).some(h => h.estado === "cotizacion")).map(i => `<div><span>${i.cant} × ${esc(i.nombre)}</span><span>${i.precio == null ? "Cotizado" : q(i.precio * i.cant)}</span></div>`).join("")}${pedido.cotizar && !(pedido.historia || []).some(h => h.estado === "cotizacion") ? `<div><span>${pedido.cotizar} por cotizar</span><span>Le escribimos</span></div>` : ""}<div><span>${esc(fecha)}</span><span></span></div></div>
         <div class="t-barras" aria-hidden="true"></div>
       </div></div>`;
     pie.innerHTML = `<button class="e-btn e-btn-p" type="button" data-ir="4" data-i="download">Ya transferí: subir comprobante</button>
@@ -707,14 +714,17 @@
     pedido = await A.leer(pedido ? pedido.id : leerLS("emtecsa.miPedido", null));
     if (!pedido) { paso = 1; return pintarPaso(); }
     const e = pedido.estado;
-    const nivel = { "esperando-pago": 0, "comprobante-recibido": 1, "comprobante-rechazado": 1, "en-marcha": 3 }[e] ?? 0;
+    const nivel = { "esperando-pago": 0, "comprobante-recibido": 1, "comprobante-rechazado": 1, "en-marcha": 3, "entregado": 4 }[e] ?? 0;
     const etapas = [
       ["Pedido recibido", new Date(pedido.creado).toLocaleString("es-GT", { dateStyle: "medium", timeStyle: "short" }), "check"],
       ["Comprobante recibido", pedido.comprobante ? `${q(pedido.comprobante.leido.monto)}${pedido.comprobante.leido.banco ? " · " + pedido.comprobante.leido.banco : ""}` : "Pendiente", "file"],
-      ["Pago confirmado", e === "en-marcha" ? "EMTECSA confirmó el depósito" : e === "comprobante-rechazado" ? "Hay que subir otro comprobante" : "EMTECSA lo está revisando", "wallet"],
-      ["Trabajo en marcha", e === "en-marcha" ? "Ya estamos preparando su pedido" : "Arrancamos al confirmar", "zap"]
+      ["Pago confirmado", e === "en-marcha" || e === "entregado" ? "EMTECSA confirmó el depósito" : e === "comprobante-rechazado" ? "Hay que subir otro comprobante" : "EMTECSA lo está revisando", "wallet"],
+      ["Trabajo en marcha", e === "en-marcha" ? "Ya estamos preparando su pedido" : e === "entregado" ? "Listo" : "Arrancamos al confirmar", "zap"],
+      ["Entregado", e === "entregado" ? "Su pedido ya fue entregado" : "Le avisamos al entregar", "box"]
     ];
-    const cab = e === "en-marcha"
+    const cab = e === "entregado"
+      ? `<div class="listo-grande"><span class="check-grande">${ico("check", 30)}</span><h3>Entregado</h3><p>Gracias por su compra. Si necesita algo más, aquí está el catálogo.</p></div>`
+      : e === "en-marcha"
       ? `<div class="listo-grande"><span class="check-grande">${ico("check", 30)}</span><h3>¡Arrancamos!</h3><p>Su pago está confirmado. Le escribimos al ${esc(pedido.cliente.telefono)} para coordinar la entrega.</p></div>`
       : e === "comprobante-rechazado"
         ? `<div class="veredicto ojo">${ico("bell", 18)}<span>EMTECSA pide otro comprobante${pedido.notaEmtecsa ? ": " + esc(pedido.notaEmtecsa) : "."}</span></div>`
@@ -887,6 +897,8 @@
     const p = await A.leer(mio);
     if (!p) return;
     if (p.estado === "en-marcha") aviso(`EMTECSA confirmó su pago de ${p.id}. Arrancamos.`, "zap");
+    if (p.estado === "entregado") aviso(`Su pedido ${p.id} quedó entregado.`, "check");
+    if (p.estado === "esperando-pago" && p.total > 0 && (p.historia || []).some(h => h.estado === "cotizacion")) { aviso(`EMTECSA le envió el precio de ${p.id}: ${q(p.total)}.`, "check"); if (!$("#carrito").hidden && pedido && pedido.id === p.id) { pedido = p; paso = 3; pintarPaso(); return; } }
     if (p.estado === "comprobante-rechazado") aviso(`EMTECSA pide otro comprobante para ${p.id}.`, "bell");
     if (!$("#carrito").hidden && paso >= 5 && pedido && pedido.id === p.id) { pedido = p; pintarPaso(); }
   }

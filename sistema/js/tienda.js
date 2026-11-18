@@ -2,11 +2,18 @@
 window.EMT_TIENDA = (() => {
   const D = window.EMT_DATOS;
   const A = () => window.EMT_APP;
-  const FILTROS = [["", "Todos"], ["comprobante-recibido", "Por revisar"], ["esperando-pago", "Esperando pago"], ["en-marcha", "En marcha"], ["cotizacion", "A cotizar"], ["comprobante-rechazado", "Otro comprobante"]];
+  const FILTROS = [["", "Todos"], ["comprobante-recibido", "Por revisar"], ["esperando-pago", "Esperando pago"], ["en-marcha", "En marcha"], ["cotizacion", "A cotizar"], ["comprobante-rechazado", "Otro comprobante"], ["entregado", "Entregado"]];
   let filtro = "", busca = "", urlFoto = null;
   const hace = iso => { const s = (Date.now() - new Date(iso)) / 1000; if (s < 60) return "hace un momento"; if (s < 3600) return `hace ${Math.round(s / 60)} min`; if (s < 86400) return `hace ${Math.round(s / 3600)} h`; return new Date(iso).toLocaleDateString("es-GT", { day: "numeric", month: "short" }); };
   const est = p => D.ESTADOS_TIENDA[p.estado] || D.ESTADOS_TIENDA["esperando-pago"];
   const telWa = t => { const n = String(t || "").replace(/\D/g, ""); return n ? (n.length === 8 ? "502" + n : n) : ""; };
+  const opcionesDe = i => Object.values(i.opciones || {}).join(" · ");
+  const porComprar = p => p.porComprar ? (p.items || []).map((it, i) => ({ it, i, p })).filter(x => !p.porComprar[x.i]) : [];
+  const filaComprar = (x, conPedido) => { const { esc, ico } = A(); return `<div class="fila comprar-f" style="cursor:default"><button class="chk" type="button" aria-pressed="false" aria-label="Ya lo compré: ${esc(x.it.nombre)}" data-comprado="${esc(x.p.id)}:${x.i}"></button><span class="cant-t">${esc(x.it.cant)}</span><span><b>${esc(x.it.nombre)}</b><small>${esc([opcionesDe(x.it), conPedido ? `${x.p.id} · ${x.p.cliente ? x.p.cliente.nombre : ""}` : ""].filter(Boolean).join(" · "))}</small></span>${conPedido ? `<a class="s-ib" href="#/tienda/${encodeURIComponent(x.p.id)}" aria-label="Ver el pedido ${esc(x.p.id)}">${ico("chev", 15, 2.2)}</a>` : "<span></span>"}</div>`; };
+  async function marcarComprado(id, i) {
+    const p = await D.pedidoTienda(id); if (!p) return;
+    await D.actualizarPedido(id, { porComprar: { ...(p.porComprar || {}), [i]: true } });
+  }
 
   async function vista(v, sub) {
     const p = A().sesion().perfil;
@@ -21,6 +28,7 @@ window.EMT_TIENDA = (() => {
     try { todos = await D.pedidosTienda(); } catch (err) { todos = []; }
     const de = e => todos.filter(x => x.estado === e), suma = l => l.reduce((a, x) => a + (x.total || 0), 0);
     const rev = de("comprobante-recibido"), esp = de("esperando-pago"), mar = de("en-marcha");
+    const comprar = todos.flatMap(porComprar);
     v.innerHTML = `
       <div class="cuerpo">
         <div class="cab-v"><div><h1 class="t">Tienda</h1><p class="desc">Los pedidos, comprobantes de pago y cotizaciones que llegan del catálogo en línea.</p></div>${botonAvisos()}</div>
@@ -30,6 +38,7 @@ window.EMT_TIENDA = (() => {
           <a class="w" href="#/tienda" data-ir-f="esperando-pago"><span class="w-cab"><span class="icono ambar">${ico("clock", 18)}</span></span><span class="l">Esperando pago</span><b>${esp.length}</b><small>${esc(Q(suma(esp)))}</small></a>
           <a class="w" href="#/tienda" data-ir-f="en-marcha"><span class="w-cab"><span class="icono verde">${ico("zap", 18)}</span></span><span class="l">En marcha</span><b>${mar.length}</b><small>${esc(Q(suma(mar)))}</small></a>
         </div>
+        ${comprar.length ? `<section class="caja"><div class="caja-cab"><h2>Por comprar</h2><span class="suave">${comprar.length} ${comprar.length === 1 ? "cosa vendida" : "cosas vendidas"}</span></div><div class="lista">${comprar.map(x => filaComprar(x, true)).join("")}</div></section>` : ""}
         <div class="herr">
           <div class="chips-f" role="group" aria-label="Estado del pedido">${FILTROS.map(([k, n]) => `<button type="button" data-f="${k}" aria-pressed="${filtro === k}">${n} · ${k ? de(k).length : todos.length}</button>`).join("")}</div>
           <label class="busca-v"><span class="sr">Buscar pedido</span>${ico("search", 16)}<input type="search" data-busca-t placeholder="Buscar pedido, cliente o teléfono" value="${esc(busca)}" autocomplete="off"></label>
@@ -49,6 +58,7 @@ window.EMT_TIENDA = (() => {
       const f = e.target.closest("[data-f]"); if (f) { filtro = f.dataset.f; v.querySelectorAll("[data-f]").forEach(b => b.setAttribute("aria-pressed", String(b === f))); pintar(); return; }
       const w = e.target.closest("[data-ir-f]"); if (w) { e.preventDefault(); filtro = filtro === w.dataset.irF ? "" : w.dataset.irF; v.querySelectorAll("[data-f]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.f === filtro))); const s = v.querySelector(".chips-sel select"); if (s) s.value = String(FILTROS.findIndex(([k]) => k === filtro)); pintar(); return; }
       if (e.target.closest("[data-avisos-t]")) activarAvisos();
+      const cp = e.target.closest("[data-comprado]"); if (cp) { const [id, i] = cp.dataset.comprado.split(":"); cp.disabled = true; try { await marcarComprado(id, Number(i)); A().aviso("Marcado como comprado."); await A().quieto(() => lista(v)); A().chipsASelect && A().chipsASelect(v); } catch (err) { cp.disabled = false; A().aviso(err.message, "mal"); } }
     };
   }
 
@@ -74,12 +84,16 @@ window.EMT_TIENDA = (() => {
     const { $, esc, ico, Q, aviso, modal, cerrarCapas } = A();
     const p = await D.pedidoTienda(id);
     if (!p) { v.innerHTML = `<div class="vacio"><h2>No se encontró ese pedido</h2><a class="s-btn suave-b" href="#/tienda">Ver la tienda</a></div>`; return; }
-    const perfil = A().sesion().perfil, puede = D.puede(perfil, "editarTienda"), cotizar = D.puede(perfil, "editarCotizacion");
+    const perfil = A().sesion().perfil, puede = D.puede(perfil, "editarTienda"), cotizar = D.puede(perfil, "editarCotizacion"), cobrar = D.puede(perfil, "registrarPago");
     const e = est(p), c = p.cliente || {}, wa = telWa(c.telefono);
     const l = (p.comprobante && p.comprobante.leido) || {};
     const accion = [];
+    if (puede && p.estado === "cotizacion" && p.cotizacion_id) accion.push(`<button class="s-btn lleno" type="button" data-precio>${ico("send", 16)}Enviar el precio al cliente</button>`);
+    if (puede && p.estado === "en-marcha") accion.push(`<button class="s-btn lleno" type="button" data-entregado>${ico("check", 16)}Marcar entregado</button>`);
+    if (p.pagoId && D.puede(perfil, "verCobros")) accion.push(`<button class="s-btn suave-b" type="button" data-recibo>${ico("eye", 15)}Ver el recibo</button>`);
     if (puede && p.estado === "comprobante-recibido") accion.push(`<button class="s-btn lleno" type="button" data-confirmar>${ico("check", 16)}Confirmar pago y arrancar</button>`, `<button class="s-btn suave-b" type="button" data-rechazar>${ico("bell", 15)}Pedir otro comprobante</button>`);
-    if (cotizar && (p.estado === "cotizacion" || p.items.some(i => i.precio == null))) accion.push(p.cotizacion_id ? `<a class="s-btn suave-b" href="#/cotizaciones/${p.cotizacion_id}">${ico("file", 15)}Ver la cotización</a>` : `<button class="s-btn ${p.estado === "cotizacion" ? "lleno" : "suave-b"}" type="button" data-cotizar>${ico("file", 15)}Hacer la cotización</button>`);
+    if (cotizar && (p.estado === "cotizacion" || p.items.some(i => i.precio == null) || p.cotizacion_id)) accion.push(p.cotizacion_id ? `<a class="s-btn suave-b" href="#/cotizaciones/${p.cotizacion_id}">${ico("file", 15)}Ver la cotización</a>` : `<button class="s-btn ${p.estado === "cotizacion" ? "lleno" : "suave-b"}" type="button" data-cotizar>${ico("file", 15)}Hacer la cotización</button>`);
+    const faltaComprar = porComprar(p);
     if (wa) accion.push(`<a class="s-btn suave-b" href="https://wa.me/${wa}?text=${encodeURIComponent(`Hola, le escribimos de EMTECSA por su pedido ${p.id}.`)}" target="_blank" rel="noopener">${ico("send", 15)}WhatsApp</a>`);
     v.innerHTML = `
       <div class="cuerpo">
@@ -91,8 +105,9 @@ window.EMT_TIENDA = (() => {
           <div class="comp-t"><button class="comp-foto-t" type="button" data-ver-comp aria-label="Ver el comprobante completo"><span data-foto-comp>${ico("file", 28)}</span></button>
           <div class="datos-cli"><div><small>Monto leído</small><span class="e-cifra"><b>${l.monto != null ? esc(Q(l.monto)) : "—"}</b></span></div><div><small>Banco</small><span>${esc(l.banco || "—")}</span></div><div><small>Fecha</small><span>${esc(l.fecha || "—")}</span></div><div><small>Referencia</small><span>${esc(l.referencia || "—")}</span></div>${l.pedido ? `<div class="ancho2"><small>Pedido escrito en el comprobante</small><span>${esc(l.pedido)}</span></div>` : ""}</div></div>
           ${!p.comprobante.cuadra && p.total ? `<p class="aviso-cot">${ico("alerta", 15)}<span>El pedido es de ${esc(Q(p.total))}. Revise el monto antes de confirmar.</span></p>` : ""}</section>` : ""}
+        ${p.porComprar ? `<section class="caja"><div class="caja-cab"><h2>Por comprar</h2><span class="chip ${faltaComprar.length ? "laton" : "verde"}">${faltaComprar.length ? `Faltan ${faltaComprar.length}` : "Todo comprado"}</span></div>${faltaComprar.length ? `<div class="lista">${faltaComprar.map(x => filaComprar(x, false)).join("")}</div>` : ""}</section>` : ""}
         <section class="caja"><h2>Lo que pidió</h2>
-          <div class="lista items-t">${(p.items || []).map(i => `<div class="fila" style="cursor:default"><span class="cant-t">${esc(i.cant)}</span><span><b>${esc(i.nombre)}</b>${Object.values(i.opciones || {}).length ? `<small>${esc(Object.values(i.opciones).join(" · "))}</small>` : ""}</span><span class="der"><span class="e-cifra">${i.precio == null ? "A cotizar" : esc(Q(i.precio * i.cant))}</span></span><span></span></div>`).join("") || `<p class="suave" style="padding:14px 16px;margin:0">Solo dejó una nota.</p>`}</div>
+          <div class="lista items-t">${(p.items || []).map(i => `<div class="fila" style="cursor:default"><span class="cant-t">${esc(i.cant)}</span><span><b>${esc(i.nombre)}</b>${Object.values(i.opciones || {}).length ? `<small>${esc(Object.values(i.opciones).join(" · "))}</small>` : ""}</span><span class="der"><span class="e-cifra">${i.precio == null ? (p.total ? "Cotizado" : "A cotizar") : esc(Q(i.precio * i.cant))}</span></span><span></span></div>`).join("") || `<p class="suave" style="padding:14px 16px;margin:0">Solo dejó una nota.</p>`}</div>
           <div class="tot-t"><span>Total con IVA</span><b class="e-cifra">${p.total ? esc(Q(p.total)) : "A cotizar"}</b></div>
           ${p.nota ? `<p class="nota-t">${ico("pen", 15)}<span>${esc(p.nota)}</span></p>` : ""}</section>
         <section class="caja"><h2>Cliente</h2><div class="datos-cli"><div><small>Nombre o empresa</small><span>${esc(c.nombre || "—")}</span></div><div><small>Teléfono</small><span>${c.telefono ? `<a href="tel:${esc(String(c.telefono).replace(/[^\d+]/g, ""))}">${esc(c.telefono)}</a>` : "—"}</span></div><div><small>Correo</small><span>${esc(c.correo || "—")}</span></div><div><small>NIT</small><span>${esc(c.nit || "CF")}</span></div><div class="ancho2"><small>Entrega</small><span>${esc([c.direccion, c.municipio, c.depto].filter(Boolean).join(", ") || "—")}</span></div></div></section>
@@ -102,13 +117,35 @@ window.EMT_TIENDA = (() => {
       const b = await D.comprobanteTienda(p.id).catch(() => null);
       if (b) { if (urlFoto) URL.revokeObjectURL(urlFoto); urlFoto = URL.createObjectURL(b); if (!/pdf/.test(b.type)) $("[data-foto-comp]", v).innerHTML = `<img src="${urlFoto}" alt="Comprobante de ${esc(p.id)}">`; }
     }
-    const cambiar = async (estado, nota, txt) => { await D.cambiarEstadoPedido(p.id, estado, nota); cerrarCapas(); aviso(txt); await A().quieto(() => detalle(v, id)); insignia(); };
+    const cambiar = async (estado, nota, txt, extra) => { await D.cambiarEstadoPedido(p.id, estado, nota, extra); cerrarCapas(); aviso(txt); await A().quieto(() => detalle(v, id)); insignia(); };
     v.onclick = async ev => {
       if (ev.target.closest("[data-ver-comp]") && urlFoto) { const m = modal({ titulo: `Comprobante de ${p.id}`, guardarTxt: "Cerrar", cuerpo: /pdf/.test((await D.comprobanteTienda(p.id)).type) ? `<p><a class="s-btn suave-b" href="${urlFoto}" target="_blank" rel="noopener">${ico("eye", 15)}Abrir el PDF</a></p>` : `<img class="foto-grande" src="${urlFoto}" alt="Comprobante de ${esc(p.id)}">`, alGuardar: async () => cerrarCapas() }); m.classList.add("modal-foto"); return; }
       if (ev.target.closest("[data-confirmar]")) {
-        modal({ titulo: `¿Confirmar el pago de ${p.id}?`, guardarTxt: "Confirmar y arrancar", cuerpo: `<p class="suave" style="font-size:15px">${esc(Q(l.monto != null ? l.monto : p.total))} de ${esc(c.nombre || "")}. El cliente verá «Arrancamos» en su pedido al momento.</p>`, alGuardar: async () => cambiar("en-marcha", null, `${p.id} quedó en marcha.`) });
+        const monto = l.monto != null && l.monto > 0 ? Number(l.monto) : Number(p.total || 0);
+        modal({ titulo: `¿Confirmar el pago de ${p.id}?`, guardarTxt: "Confirmar y arrancar", cuerpo: `<p class="suave" style="font-size:15px">${esc(Q(monto))} de ${esc(c.nombre || "")}.</p><ul class="lista-simple suave" style="font-size:14px;margin:8px 0 0;padding-left:18px"><li>El cliente queda en Clientes.</li>${cobrar ? "<li>El pago queda en Dinero con su recibo.</li>" : ""}<li>Lo vendido pasa a «Por comprar».</li><li>El cliente ve «Arrancamos» en su pedido.</li></ul>`,
+          alGuardar: async () => {
+            const clienteId = p.clienteId || await clienteDe(p);
+            let pagoId = p.pagoId || null, numero = null;
+            if (!pagoId && cobrar && monto > 0) { const r = await D.registrarPago({ cliente_id: clienteId, monto, forma: "transferencia", banco: l.banco || null, referencia: l.referencia || null, fecha: null, notas: `Pedido ${p.id} de la tienda en línea` }); pagoId = r.id; numero = r.numero; }
+            await cambiar("en-marcha", null, numero ? `${p.id} quedó en marcha. Recibo ${numero}.` : `${p.id} quedó en marcha.`, { clienteId, pagoId, porComprar: p.porComprar || {} });
+          } });
         return;
       }
+      if (ev.target.closest("[data-precio]")) {
+        const cot = await D.cotizacion(p.cotizacion_id).catch(() => null);
+        const total = cot ? Number(cot.total || 0) : 0;
+        if (!(total > 0)) { aviso("La cotización todavía no tiene precio. Termínela y vuelva aquí.", "mal"); return; }
+        modal({ titulo: `¿Enviar el precio de ${p.id}?`, guardarTxt: "Enviar el precio", cuerpo: `<p class="suave" style="font-size:15px">${esc(c.nombre || "El cliente")} verá en su pedido el total de <b>${esc(Q(total))}</b> (cotización ${esc(cot.numero || "")}) y la cuenta para transferir. Cuando suba su comprobante le llega el aviso.</p>`,
+          alGuardar: async () => cambiar("esperando-pago", null, `Precio enviado: ${Q(total)}.`, { total }) });
+        return;
+      }
+      if (ev.target.closest("[data-entregado]")) {
+        modal({ titulo: `¿Marcar ${p.id} como entregado?`, guardarTxt: "Marcar entregado", cuerpo: `<p class="suave" style="font-size:15px">El cliente lo verá como entregado en su pedido.${faltaComprar.length ? ` Todavía hay ${faltaComprar.length} ${faltaComprar.length === 1 ? "cosa" : "cosas"} en «Por comprar».` : ""}</p>`,
+          alGuardar: async () => cambiar("entregado", null, `${p.id} quedó entregado.`) });
+        return;
+      }
+      if (ev.target.closest("[data-recibo]")) { if (window.EMT_COBROS && window.EMT_COBROS.abrirRecibo) window.EMT_COBROS.abrirRecibo(p.pagoId, "ver"); return; }
+      const cp = ev.target.closest("[data-comprado]"); if (cp) { const [pid, i] = cp.dataset.comprado.split(":"); cp.disabled = true; try { await marcarComprado(pid, Number(i)); aviso("Marcado como comprado."); await A().quieto(() => detalle(v, id)); } catch (err) { cp.disabled = false; aviso(err.message, "mal"); } return; }
       if (ev.target.closest("[data-rechazar]")) {
         const m = modal({ titulo: "Pedir otro comprobante", guardarTxt: "Enviar al cliente", cuerpo: `<p class="suave" style="font-size:14.5px">El cliente lo verá en su pedido y podrá subir otro.</p><label class="f-campo">Qué le decimos<textarea name="nota" rows="3">El monto o la cuenta no coinciden. Por favor suba el comprobante correcto.</textarea></label>`,
           alGuardar: async f => cambiar("comprobante-rechazado", f.nota.value.trim() || "Suba otro comprobante, por favor.", "Se le pidió otro comprobante.") });
@@ -116,26 +153,40 @@ window.EMT_TIENDA = (() => {
         return;
       }
       if (ev.target.closest("[data-cotizar]")) {
-        modal({ titulo: "Hacer la cotización", guardarTxt: "Crear cotización", cuerpo: `<p class="suave" style="font-size:14.5px">Se crea ${esc(c.nombre || "el cliente")} en Clientes (si todavía no está) y una cotización en borrador con lo que pidió escrito en las notas. Ahí se agregan las estructuras y los precios.</p>`,
+        modal({ titulo: "Hacer la cotización", guardarTxt: "Crear cotización", cuerpo: `<p class="suave" style="font-size:14.5px">Se crea ${esc(c.nombre || "el cliente")} en Clientes (si todavía no está) y una cotización en borrador con lo que pidió ya puesto. Solo revise cantidades y precios, y luego use «Enviar el precio al cliente».</p>`,
           alGuardar: async () => { const cid = await aCotizacion(p); cerrarCapas(); aviso("Cotización creada."); A().ir("cotizaciones", cid); } });
       }
     };
   }
 
-  async function aCotizacion(p) {
+  async function clienteDe(p, conSitio) {
     const c = p.cliente || {};
     const lista = await D.clientes();
     const nit = D.normalNit ? D.normalNit(c.nit || "") : String(c.nit || "").toUpperCase();
-    let cli = lista.find(x => nit && nit !== "CF" && D.normalNit && D.normalNit(x.nit || "") === nit) || lista.find(x => A().normal(x.nombre) === A().normal(c.nombre));
+    const tel = String(c.telefono || "").replace(/\D/g, "").slice(-8);
+    const cli = lista.find(x => nit && nit !== "CF" && D.normalNit && D.normalNit(x.nit || "") === nit) || lista.find(x => tel.length === 8 && String(x.telefono || "").replace(/\D/g, "").slice(-8) === tel) || lista.find(x => A().normal(x.nombre) === A().normal(c.nombre));
     let clienteId = cli ? cli.id : null, sitioId = null;
     if (!clienteId) {
       clienteId = await D.guardarCliente({ codigo: await D.codigoNuevo(), nombre: c.nombre || "Cliente de la tienda", razon_social: c.nombre || "", nit: c.nit || "CF", tipo: "comercio", telefono: c.telefono || "", correo: c.correo || "", direccion: c.direccion || "", dias_credito: 0, limite_credito: null, notas: `Llegó por la tienda en línea (${p.id}).` });
-      if (c.direccion) { try { sitioId = await D.guardarSitio({ cliente_id: clienteId, nombre: c.direccion, direccion: c.direccion, municipio: (window.EMT_GEO && window.EMT_GEO.municipio(c.depto, c.municipio)) || "", departamento: (window.EMT_GEO && window.EMT_GEO.depto(c.depto)) || "", mapa: "" }); } catch (e) { sitioId = null; } }
+      if (c.direccion && conSitio !== false) { try { sitioId = await D.guardarSitio({ cliente_id: clienteId, nombre: c.direccion, direccion: c.direccion, municipio: (window.EMT_GEO && window.EMT_GEO.municipio(c.depto, c.municipio)) || "", departamento: (window.EMT_GEO && window.EMT_GEO.depto(c.depto)) || "", mapa: "" }); } catch (e) { sitioId = null; } }
     }
+    if (!p.clienteId) { try { await D.actualizarPedido(p.id, { clienteId }); } catch (e) {} }
+    return conSitio ? { clienteId, sitioId } : clienteId;
+  }
+
+  async function aCotizacion(p) {
+    const { clienteId, sitioId } = await clienteDe(p, true);
     const cid = await D.crearCotizacion({ cliente_id: clienteId, sitio_id: sitioId, titulo: `Pedido ${p.id} de la tienda` });
     const cot = await D.cotizacion(cid);
+    const cat = await D.catalogo();
+    (p.items || []).forEach(i => {
+      const m = i.codigo && cat.materiales.find(x => x.codigo === i.codigo);
+      if (!m) return;
+      const ya = cot.partidas.find(x => x.material_id === m.id);
+      if (ya) ya.cantidad += Number(i.cant) || 1; else cot.partidas.push({ grupo: null, estructura_id: null, material_id: m.id, materiales: null, descripcion: "", cantidad: Number(i.cant) || 1, costo_materiales: 0, mano_obra: 0, precio_unitario: 0, del_plano: false });
+    });
     cot.notas = [`Pedido ${p.id} de la tienda en línea:`, ...(p.items || []).map(i => `• ${i.cant} × ${i.nombre}${Object.values(i.opciones || {}).length ? " (" + Object.values(i.opciones).join(", ") + ")" : ""}`), p.nota ? `Nota del cliente: ${p.nota}` : ""].filter(Boolean).join("\n");
-    await D.guardarCotizacion(cot, D.calcularCotizacion(cot, await D.catalogo()));
+    await D.guardarCotizacion(cot, D.calcularCotizacion(cot, cat));
     await D.ligarCotizacion(p.id, cid);
     return cid;
   }

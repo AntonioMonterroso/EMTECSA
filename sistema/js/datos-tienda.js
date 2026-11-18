@@ -7,8 +7,11 @@
     "esperando-pago": { n: "Esperando pago", chip: "ambar", icono: "clock" },
     "comprobante-rechazado": { n: "Otro comprobante", chip: "ambar", icono: "bell" },
     "en-marcha": { n: "En marcha", chip: "verde", icono: "zap" },
-    "cotizacion": { n: "A cotizar", chip: "azul", icono: "send" }
+    "cotizacion": { n: "A cotizar", chip: "azul", icono: "send" },
+    "entregado": { n: "Entregado", chip: "verde", icono: "check" }
   };
+  const EXTRA = { total: "total", clienteId: "cliente_id", pagoId: "pago_id", porComprar: "por_comprar" };
+  const limpiaExtra = x => Object.fromEntries(Object.entries(x || {}).filter(([k]) => k in EXTRA));
   let abierta = null;
   function db() {
     if (abierta) return abierta;
@@ -32,12 +35,21 @@
   const pedido = id => op("pedidos", "readonly", s => s.get(id));
   const comprobante = id => op("archivos", "readonly", s => s.get(id + "-comprobante"));
 
-  async function cambiarEstadoPedido(id, estado, nota) {
+  async function actualizarPedido(id, extra) {
+    const p = await pedido(id);
+    if (!p) throw new Error("Ese pedido ya no existe.");
+    Object.assign(p, limpiaExtra(extra), { actualizado: new Date().toISOString() });
+    await op("pedidos", "readwrite", s => s.put(p));
+    if (canal) canal.postMessage({ tipo: "pedido", id, estado: p.estado });
+    return p;
+  }
+
+  async function cambiarEstadoPedido(id, estado, nota, extra) {
     if (!ESTADOS_TIENDA[estado]) throw new Error("Estado no válido.");
     const p = await pedido(id);
     if (!p) throw new Error("Ese pedido ya no existe.");
     const ahora = new Date().toISOString();
-    p.estado = estado; p.notaEmtecsa = nota || null; p.actualizado = ahora;
+    p.estado = estado; p.notaEmtecsa = nota || null; p.actualizado = ahora; Object.assign(p, limpiaExtra(extra));
     p.historia = [...(p.historia || []), { estado, fecha: ahora, nota: nota || null, por: (window.EMT_APP && window.EMT_APP.sesion() && window.EMT_APP.sesion().perfil.nombre) || null }];
     await op("pedidos", "readwrite", s => s.put(p));
     if (canal) canal.postMessage({ tipo: "pedido", id, estado });
@@ -51,8 +63,9 @@
   }
 
   const { nube, sb } = D;
-  const COLS = "id, estado, datos, total, comprobante, nota_emtecsa, historia, cotizacion_id, creado, actualizado";
-  const deFila = f => ({ ...(f.datos || {}), id: f.id, estado: f.estado, total: Number(f.total), comprobante: f.comprobante, notaEmtecsa: f.nota_emtecsa, historia: f.historia || [], cotizacion_id: f.cotizacion_id, creado: f.creado, actualizado: f.actualizado });
+  const COLS = "id, estado, datos, total, comprobante, nota_emtecsa, historia, cotizacion_id, cliente_id, pago_id, por_comprar, creado, actualizado";
+  const deFila = f => ({ ...(f.datos || {}), id: f.id, estado: f.estado, total: Number(f.total), comprobante: f.comprobante, notaEmtecsa: f.nota_emtecsa, historia: f.historia || [], cotizacion_id: f.cotizacion_id, clienteId: f.cliente_id, pagoId: f.pago_id, porComprar: f.por_comprar, creado: f.creado, actualizado: f.actualizado });
+  const aColumnas = x => Object.fromEntries(Object.entries(limpiaExtra(x)).map(([k, v]) => [EXTRA[k], v]));
   async function okN(r, msg) { if (r.error) throw new Error(msg); return r.data; }
   const N = {
     pedidos: async () => { const se = await sb.auth.getSession(); if (!se.data || !se.data.session) return []; return (await okN(await sb.from("tienda_pedidos").select(COLS).order("actualizado", { ascending: false }), "No se pudieron leer los pedidos de la tienda.")).map(deFila); },
@@ -64,14 +77,19 @@
       for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i);
       return new Blob([u], { type: f.tipo });
     },
-    cambiarEstado: async (id, estado, nota) => {
+    actualizar: async (id, extra) => {
+      const ahora = new Date().toISOString();
+      await okN(await sb.from("tienda_pedidos").update({ ...aColumnas(extra), actualizado: ahora }).eq("id", id), "No se pudo guardar el pedido.");
+      return N.pedido(id);
+    },
+    cambiarEstado: async (id, estado, nota, extra) => {
       if (!ESTADOS_TIENDA[estado]) throw new Error("Estado no válido.");
       const p = await N.pedido(id);
       if (!p) throw new Error("Ese pedido ya no existe.");
       const ahora = new Date().toISOString();
       const historia = [...(p.historia || []), { estado, fecha: ahora, nota: nota || null, por: (window.EMT_APP && window.EMT_APP.sesion() && window.EMT_APP.sesion().perfil.nombre) || null }];
-      await okN(await sb.from("tienda_pedidos").update({ estado, nota_emtecsa: nota || null, historia, actualizado: ahora }).eq("id", id), "No se pudo cambiar el pedido.");
-      return { ...p, estado, notaEmtecsa: nota || null, historia, actualizado: ahora };
+      await okN(await sb.from("tienda_pedidos").update({ ...aColumnas(extra), estado, nota_emtecsa: nota || null, historia, actualizado: ahora }).eq("id", id), "No se pudo cambiar el pedido.");
+      return { ...p, ...limpiaExtra(extra), estado, notaEmtecsa: nota || null, historia, actualizado: ahora };
     },
     ligar: async (id, cotId) => { await okN(await sb.from("tienda_pedidos").update({ cotizacion_id: cotId, actualizado: new Date().toISOString() }).eq("id", id), "No se pudo ligar el pedido."); }
   };
@@ -79,5 +97,5 @@
     try { sb.channel("tienda-pedidos").on("postgres_changes", { event: "*", schema: "public", table: "tienda_pedidos" }, p => { const f = p.new && p.new.id ? p.new : p.old; if (f) oyentes.forEach(fn => { try { fn({ tipo: "pedido", id: f.id, estado: f.estado }); } catch (x) {} }); }).subscribe(); } catch (e) {}
   }
 
-  Object.assign(D, { ESTADOS_TIENDA, pedidosTienda: nube ? N.pedidos : pedidos, pedidoTienda: nube ? N.pedido : pedido, comprobanteTienda: nube ? N.comprobante : comprobante, cambiarEstadoPedido: nube ? N.cambiarEstado : cambiarEstadoPedido, ligarCotizacion: nube ? N.ligar : ligarCotizacion, alPedido: f => oyentes.add(f), quitarOyentePedido: f => oyentes.delete(f) });
+  Object.assign(D, { ESTADOS_TIENDA, pedidosTienda: nube ? N.pedidos : pedidos, pedidoTienda: nube ? N.pedido : pedido, comprobanteTienda: nube ? N.comprobante : comprobante, cambiarEstadoPedido: nube ? N.cambiarEstado : cambiarEstadoPedido, actualizarPedido: nube ? N.actualizar : actualizarPedido, ligarCotizacion: nube ? N.ligar : ligarCotizacion, alPedido: f => oyentes.add(f), quitarOyentePedido: f => oyentes.delete(f) });
 })();

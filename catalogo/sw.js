@@ -1,4 +1,4 @@
-const CACHE = "emtecsa-catalogo-v5";
+const CACHE = "emtecsa-catalogo-v7";
 const BASE = ["./", "index.html", "catalogo.css", "catalogo.js", "almacen.js", "../sistema/js/config.js", "../emtecsa-geo.js", "../emtecsa-errores.js", "datos.js", "comprobante.js", "escena.js", "modelos.js", "vendor/three.module.min.js", "vendor/RoomEnvironment.js", "iconos/icono-192.png", "../emtecsa-tokens.css", "../emtecsa-base.css", "../emtecsa-ui.js", "../logo/emtecsa-logo-blanco.svg", "../logo/emtecsa-icono.svg"];
 
 self.addEventListener("install", e => {
