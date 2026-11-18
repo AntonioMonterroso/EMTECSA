@@ -139,7 +139,7 @@ window.EMT_PERFIL = (() => {
         else if (b.matches("[data-av-off]")) { await apagarAvisos(); aviso("Avisos apagados en este teléfono."); }
         else if (b.matches("[data-av-prueba]")) { await clienteSb().rpc("probar_aviso"); aviso("Aviso de prueba enviado."); }
         else if (b.matches("[data-av-inst]")) D.pedirInstalar();
-      } catch (err) { aviso(err.message || "No se pudo.", "mal"); }
+      } catch (err) { aviso(err.message || "No se pudo.", "mal"); if (window.EMT_ERRORES) window.EMT_ERRORES.anotar({ tipo: "avisos", mensaje: "Activar avisos: " + ((err && err.message) || String(err)), pila: err && err.stack, paso: "Mi perfil · " + (Notification && Notification.permission) }); }
       finally { b.disabled = false; pintarAvisos(); }
     });
     const quitarFoto = () => {
