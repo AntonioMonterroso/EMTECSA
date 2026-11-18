@@ -6,7 +6,7 @@ window.EMT_DEV = (() => {
   const ORIGEN = { sistema: "Sistema", catalogo: "Catálogo", propuesta: "Página del cliente" };
   const TIPO = { error: ["Error de código", "alerta"], promesa: ["Error de código", "alerta"], pantalla: ["No abrió una pantalla", "file"], base: ["La base respondió con error", "shield"], red: ["Sin conexión con la base", "send"], carga: ["No cargó un archivo", "download"] };
   let filtro = "pendientes", busca = "", ultimos = [], oyendo = false;
-  const puedeVer = () => { const s = A() && A().sesion(); return !!(sb && s && (s.perfil.dev || (D.nube && s.perfil.rol === "gerencia"))); };
+  const puedeVer = () => { const s = A() && A().sesion(); return !!(sb && s && s.perfil.dev); };
   const cuando = f => { const d = new Date(f), m = Math.round((Date.now() - d) / 60000); return m < 1 ? "ahora" : m < 60 ? `hace ${m} min` : m < 1440 ? `hace ${Math.round(m / 60)} h` : d.toLocaleDateString("es-GT", { day: "numeric", month: "short" }); };
 
   async function leer() {
@@ -101,7 +101,7 @@ window.EMT_DEV = (() => {
 
   async function vista(v) {
     const { esc, ico } = A();
-    if (!puedeVer()) { v.innerHTML = `<div class="vacio"><h2>Sin acceso</h2><p>${sb ? "Esta parte la ven Desarrollo y gerencia." : "Los errores se ven cuando la base de EMTECSA está conectada."}</p><a class="s-btn suave-b" href="#/hoy">Regresar a Hoy</a></div>`; return; }
+    if (!puedeVer()) { v.innerHTML = `<div class="vacio"><h2>Sin acceso</h2><p>${sb ? "Esta parte la ve solo Desarrollo." : "Los errores se ven cuando la base de EMTECSA está conectada."}</p><a class="s-btn suave-b" href="#/hoy">Regresar a Hoy</a></div>`; return; }
     v.innerHTML = `<div class="cuerpo"><div class="cab-v"><div><h1 class="t">Errores del sistema</h1><p class="desc">Lo que falló a cualquier usuario en el sistema, el catálogo o la página del cliente. Sin montos ni datos de clientes.</p></div></div><p class="suave" style="font-size:13.5px">Cargando…</p></div>`;
     ultimos = await leer();
     const recargar = () => A().quieto(() => vista(v));
