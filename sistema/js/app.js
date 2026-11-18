@@ -34,6 +34,48 @@
     { id: "cobros", n: "Cobros", i: "wallet", c: "ambar" },
     { id: "tienda", n: "Tienda", i: "cart", c: "laton" }
   ];
+  const MENU = [
+    { id: "hoy", n: "Hoy", i: "home", c: "marino" },
+    { id: "ventas", n: "Ventas", i: "file", c: "laton", ir: "cotizaciones", grupo: ["cotizaciones", "clientes", "tienda"] },
+    { id: "obras", n: "Obras", i: "hammer", c: "verde" },
+    { id: "dinero", n: "Dinero", i: "wallet", c: "ambar", ir: "cobros", grupo: ["cobros"] },
+    { id: "catalogo", n: "Catálogo", i: "box", c: "gris" }
+  ];
+  const PESTANAS_GRUPO = { ventas: [["cotizaciones", "Cotizaciones"], ["clientes", "Clientes"], ["tienda", "Tienda", "verTienda"]] };
+  const menuDe = s => MENU.find(m => m.id === s || (m.grupo || []).includes(s));
+  const menuVisible = () => MENU.filter(m => m.id !== "dinero" || !sesion || D.puede(sesion.perfil, "verCobros") || D.puede(sesion.perfil, "verCosto"));
+  const conteos = {};
+  const ponerInsignia = (a, n, txt) => { let b = a.querySelector(".insignia"); if (!n) { if (b) b.parentNode.removeChild(b); return; } if (!b) { b = document.createElement("span"); b.className = "insignia"; a.appendChild(b); } b.textContent = n; b.setAttribute("aria-label", `${n} ${txt || "por atender"}`); };
+  function pintarInsignias() {
+    MENU.forEach(m => { const a = document.querySelector(`.barra [data-sec="${m.id}"]`); if (a) ponerInsignia(a, (m.grupo || [m.id]).reduce((t, k) => t + (conteos[k] || 0), 0)); });
+    document.querySelectorAll("[data-tab-sec]").forEach(a => ponerInsignia(a, conteos[a.dataset.tabSec] || 0));
+  }
+  function marcarInsignia(clave, n) { conteos[clave] = Number(n) || 0; pintarInsignias(); }
+  function pestanasGrupo(v, s, sub) {
+    const m = menuDe(s); const l = m && PESTANAS_GRUPO[m.id]; if (!l || sub) return;
+    const vis = l.filter(([, , perm]) => !perm || D.puede(sesion.perfil, perm)); if (vis.length < 2) return;
+    const cu = v.querySelector(".cuerpo"); if (!cu || cu.querySelector(".pest-grupo")) return;
+    const n = document.createElement("nav"); n.className = "seg pest-o pest-grupo"; n.setAttribute("aria-label", m.n);
+    n.innerHTML = vis.map(([k, t]) => `<a href="#/${k}" data-tab-sec="${k}" ${k === s ? 'aria-current="page"' : ""}>${t}</a>`).join("");
+    cu.prepend(n); pintarInsignias();
+  }
+  function infoEnTitulos(v) {
+    $$(".cab-v p.desc", v).forEach(p => {
+      const h = p.parentElement.querySelector("h1"); const t = p.textContent.trim(); if (!h || !t || h.querySelector("[data-info]")) return;
+      const b = document.createElement("button"); b.type = "button"; b.className = "info-b"; b.dataset.info = t; b.setAttribute("aria-label", "Qué es esto"); b.textContent = "i";
+      h.appendChild(b); p.parentNode.removeChild(p);
+    });
+  }
+  function quitarInfo() { const p = document.querySelector(".info-pop"); if (p) p.parentNode.removeChild(p); return p; }
+  function abrirInfo(b) {
+    const ya = quitarInfo(); if (ya && ya.dataset.de === b.dataset.info) return;
+    const p = document.createElement("div"); p.className = "info-pop"; p.dataset.de = b.dataset.info; p.setAttribute("role", "tooltip"); p.textContent = b.dataset.info;
+    document.body.appendChild(p);
+    const r = b.getBoundingClientRect(), w = Math.min(320, innerWidth - 24);
+    p.style.width = w + "px"; p.style.left = Math.max(12, Math.min(innerWidth - w - 12, r.left + r.width / 2 - w / 2)) + "px"; p.style.top = (r.bottom + scrollY + 8) + "px";
+  }
+  document.addEventListener("click", e => { const b = e.target.closest("[data-info]"); if (b) { e.preventDefault(); abrirInfo(b); return; } if (!e.target.closest(".info-pop")) quitarInfo(); }, true);
+  document.addEventListener("keydown", e => { if (e.key === "Escape") quitarInfo(); });
   const PENDIENTE = {
     clientes: ["La empresa cliente con su NIT, sus plantas y sus contactos.", ["Ficha de cada empresa con razón social, NIT y condiciones de crédito", "Varias plantas o sitios, cada uno con su ubicación", "Contactos por área: gerencia, mantenimiento y compras", "Equipos instalados en cada sitio"]],
     cotizaciones: ["Se escoge lo que se vende y la lista de materiales sale sola.", ["Escoger estructuras y transformadores con su cantidad", "Lista de todo el material que hay que comprar, sumada", "Mano de obra, condiciones y propuesta en PDF", "Enlace para que el cliente la revise y la apruebe"]],
@@ -143,13 +185,14 @@
     app.innerHTML = `
       <header class="barra"><div class="ancho">
         <a class="marca" href="#/hoy" aria-label="EMTECSA, ir a Hoy">${LOGO}</a>
-        <nav class="seg" aria-label="Secciones">${SECCIONES.map(s => `<a href="#/${s.id}" data-sec="${s.id}">${s.n}</a>`).join("")}</nav>
+        <nav class="seg" aria-label="Secciones">${menuVisible().map(s => `<a href="#/${s.ir || s.id}" data-sec="${s.id}">${s.n}</a>`).join("")}</nav>
         <div class="der">
           <label class="buscar"><span class="sr">Buscar en el catálogo</span>${ico("search", 15)}<input type="search" placeholder="Buscar" data-buscar></label>
           <button class="s-ib solo-angosto" type="button" aria-label="Abrir el menú" data-menu>${ico("menu", 18)}</button>
           <button class="av" type="button" aria-label="Su cuenta" aria-haspopup="true" data-cuenta>${avatar(sesion.perfil)}</button>
         </div>
       </div></header>
+      ${sesion.perfil.dev ? `<div class="probando dev-banda"><span>${ico("wrench", 15)}<span><b>Modo desarrollo:</b> datos de muestra. Nada de lo que haga toca la base real.</span></span><a class="s-btn suave-b chico" href="#/errores">Errores<b class="dev-n" data-dev-n></b></a></div>` : ""}
       ${sesion.perfil.probando ? `<div class="probando"><span>${ico("shield", 15)}Está viendo el sistema como <b>${esc(D.ROLES[sesion.perfil.rol])}</b></span><button class="s-btn suave-b chico" type="button" data-volver-rol-b>Volver a gerencia</button></div>` : ""}
       <main class="vista ancho" id="vista" tabindex="-1"></main>`;
     const vr = app.querySelector("[data-volver-rol-b]"); if (vr) vr.addEventListener("click", () => window.EMT_EQUIPO.verComo(sesion.perfil.rolReal || "gerencia"));
@@ -212,8 +255,9 @@
     if (guardiaAct && location.hash !== rutaActual && !guardiaAct.limpio()) { const destino = location.hash; ignorarHash = true; location.hash = rutaActual; preguntarSalida(destino); return; }
     guardiaAct = null;
     const [sec = "hoy", sub = "", sub2 = ""] = location.hash.replace(/^#\/?/, "").split("/");
-    const s = SECCIONES.find(x => x.id === sec) || sec === "empresa" || sec === "plano" || sec === "equipo" || sec === "perfil" ? sec : "hoy";
-    $$("[data-sec]").forEach(a => { if (a.dataset.sec === s) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current"); });
+    const s = SECCIONES.find(x => x.id === sec) || sec === "empresa" || sec === "plano" || sec === "equipo" || sec === "perfil" || sec === "errores" ? sec : "hoy";
+    const mActual = menuDe(s);
+    $$("[data-sec]").forEach(a => { if (mActual && a.dataset.sec === mActual.id) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current"); });
     const v = $("#vista");
     const clave = pantallaDe(s, sub, sub2);
     if (vistaActual !== clave) { v.style.minHeight = ""; scrollTo({ top: 0, behavior: "instant" }); if (!mantener) busqueda = ""; }
@@ -235,10 +279,13 @@
       else if (s === "tienda") await window.EMT_TIENDA.vista(v, sub);
       else if (s === "equipo") await window.EMT_EQUIPO.vista(v, sub);
       else if (s === "perfil") await window.EMT_PERFIL.vista(v);
+      else if (s === "errores") await window.EMT_DEV.vista(v);
       else vPendiente(v, s);
-    } catch (err) { v.innerHTML = `<div class="vacio"><span class="icono ambar">${ico("alerta", 22)}</span><h2>No se pudo cargar</h2><p>${esc(/[áéíóúñ¿]/i.test(err.message) ? err.message : "Algo falló al abrir esta pantalla. Intente otra vez.")}</p><button class="s-btn lleno" type="button" data-reintentar>Intentar otra vez</button></div>`; }
+    } catch (err) { if (window.EMT_ERRORES) window.EMT_ERRORES.anotar({ tipo: "pantalla", mensaje: err && err.message, pila: err && err.stack, paso: "abrir " + s }); v.innerHTML = `<div class="vacio"><span class="icono ambar">${ico("alerta", 22)}</span><h2>No se pudo cargar</h2><p>${esc(/[áéíóúñ¿]/i.test(err.message) ? err.message : "Algo falló al abrir esta pantalla. Intente otra vez.")}</p><button class="s-btn lleno" type="button" data-reintentar>Intentar otra vez</button></div>`; }
     clearTimeout(barra); document.body.classList.remove("cargando-r");
     rutaActual = location.hash;
+    pestanasGrupo(v, s, sub);
+    infoEnTitulos(v);
     chipsASelect(v);
     if (window.EMT_TIENDA) window.EMT_TIENDA.insignia();
     if (window.EMT_ENLACES) window.EMT_ENLACES.insignia();
@@ -266,7 +313,7 @@
     const enlL = window.EMT_ENLACES ? await window.EMT_ENLACES.porAtender() : [];
     avisosC.unshift(...tiendaL.filter(x => x.estado === "comprobante-recibido" || (x.estado === "cotizacion" && !x.cotizacion_id)).map(x => ({ c: x.estado === "cotizacion" ? "azul" : "laton", i: x.estado === "cotizacion" ? "send" : "file", t: `${x.estado === "cotizacion" ? "Cotizar" : "Revisar comprobante"}: ${x.cliente ? x.cliente.nombre : ""}`, d: `Tienda · ${x.id}${x.total ? " · " + Q(x.total) : ""}`, chip: x.estado === "cotizacion" ? "A cotizar" : "Por revisar", h: `#/tienda/${encodeURIComponent(x.id)}` })));
     avisosC.unshift(...enlL.filter(x => x.tipo === "aprobo" || x.tipo === "mensaje" || x.tipo === "datos"));
-    avisosC.push(...enlL.filter(x => x.tipo === "abrio" || x.tipo === "volvio"));
+    const vistos = enlL.filter(x => x.tipo === "abrio" || x.tipo === "volvio");
     if (window.EMT_COSTOS) avisosC.unshift(...await window.EMT_COSTOS.avisos());
     if (window.EMT_SEGUIMIENTO) avisosC.unshift(...await window.EMT_SEGUIMIENTO.avisos());
     const pend = [];
@@ -279,31 +326,32 @@
     avisosC.unshift(...porAprobar.map(u => ({ c: "laton", i: "users", t: `Aprobar a ${u.nombre}`, d: `${u.correo || ""} · pidió entrar al sistema`, chip: "Esperando", h: "#/equipo" })));
     if (sesion.perfil.rol === "gerencia" && !D.nube) espera.push({ i: "users", t: "Que su equipo cree sus cuentas", d: "Se hace después de conectar la base; usted las aprueba en Equipo." });
     else if (sesion.perfil.rol === "gerencia" && (await D.usuarios().catch(() => [])).filter(u => u.activo).length < 2) pend.push({ c: "gris", i: "users", t: "Que su equipo cree sus cuentas", d: "Cada uno toca «Crear mi cuenta» en la entrada y usted lo aprueba.", h: "#/equipo" });
-    const verTienda = tiendaL.some(x => x.estado === "comprobante-recibido" || x.estado === "cotizacion");
-    const hayMes = cotizado || enCurso.length;
+    const VERBO = { wallet: "Cobrar", send: "Cotizar", file: "Revisar", users: "Aprobar", phone: "Llamar", alerta: "Revisar", shield: "Ver", chat: "Responder", mail: "Responder", check: "Ver", eye: "Ver" };
+    const verbo = x => x.accion || (x.chip === "Responder" ? "Responder" : VERBO[x.i]) || "Abrir";
+    const toca = x => `<a class="fila toca-f" href="${x.h}"><span class="icono ${x.c}">${ico(x.i, 18)}</span><span><b>${esc(x.t)}</b><small>${esc(x.d)}${x.chip && x.chip !== verbo(x) ? " · " + esc(x.chip) : ""}</small></span><span class="der"><span class="toca-b">${esc(verbo(x))}</span></span></a>`;
     const fila = x => `<a class="fila" href="${x.h}"><span class="icono ${x.c}">${ico(x.i, 18)}</span><span><b>${esc(x.t)}</b><small>${esc(x.d)}</small></span><span class="chev">${ico("chev", 16, 2.2)}</span></a>`;
-    const frase = avisosC.length ? `Hay ${avisosC.length} ${avisosC.length === 1 ? "cosa por atender" : "cosas por atender"} hoy.` : pend.length ? `Faltan ${pend.length} ${pend.length === 1 ? "paso" : "pasos"} para dejar el sistema listo para cotizar.` : "Todo al día.";
+    const abierto = k => { try { return localStorage.getItem("emtecsa.sistema.hoy." + k) === "1"; } catch (e) { return false; } };
+    const pl = (k, titulo, res, cuerpo) => `<details class="caja plegable" data-hoy-pl="${k}" ${abierto(k) ? "open" : ""}><summary><span class="pl-t"><h2>${titulo}</h2><span class="suave">${res}</span></span><span class="chev">${ico("chev", 16, 2.2)}</span></summary><div class="pl-cuerpo">${cuerpo}</div></details>`;
+    const esperando = vistos.map(x => ({ ...x, h: x.h })).concat(espera.map(x => ({ c: "gris", i: x.i, t: x.t, d: x.d, h: "" })));
+    const primeros = avisosC.slice(0, 5), resto = avisosC.slice(5);
     v.innerHTML = `
       <div class="cuerpo hoy">
-        <section class="hero">
-          <img src="../img/sistema-noche.jpg" alt="">
-          <span class="eti">${esc(fechaLarga())}</span>
-          <h1 class="t">${saludo()}, ${esc(sesion.perfil.nombre)}.</h1>
-          <p>${esc(frase)}</p>
-          <div class="fila-b"><a class="s-btn lleno" href="#/cotizaciones">${ico("plus", 16)}Nueva cotización</a><a class="s-btn vidrio" href="#/obras">Ver obras</a></div>
+        <section class="hoy-cab">
+          <div><span class="eti">${esc(fechaLarga())}</span><h1 class="t">${saludo()}, ${esc(sesion.perfil.nombre.split(" ")[0])}.</h1></div>
+          <a class="s-btn lleno" href="#/cotizaciones">${ico("plus", 16)}Nueva cotización</a>
         </section>
-        ${avisosC.length ? `<div class="sub"><h2>Por atender</h2>${(([h, t]) => `<a class="s-link" href="${h}">${t}</a>`)(verTienda ? ["#/tienda", "Ver la tienda"] : enlL.length ? ["#/cotizaciones", "Ver cotizaciones"] : ["#/cobros", "Ver cobros"])}</div>
-        <div class="lista">${avisosC.map(x => `<a class="fila" href="${x.h}"><span class="icono ${x.c}">${ico(x.i, 18)}</span><span><b>${esc(x.t)}</b><small>${esc(x.d)}</small></span><span class="der"><span class="chip ${x.c}">${esc(x.chip)}</span></span><span class="chev">${ico("chev", 16, 2.2)}</span></a>`).join("")}</div>` : ""}
-        ${pend.length ? `<div class="sub"><h2>Para dejarlo listo</h2><span class="suave">${pend.length} ${pend.length === 1 ? "paso" : "pasos"}</span></div>
-        <div class="lista sin-chip">${pend.map(fila).join("")}</div>` : ""}
-        <div class="sub"><h2>${hayMes ? "Este mes" : "Resumen"}</h2></div>
-        <div class="widgets">
-          <a class="w" href="#/cotizaciones"><span class="w-cab"><span class="icono laton">${ico("file", 18)}</span><span class="chev">${ico("chev", 16, 2.2)}</span></span><span class="l">Cotizado en el mes</span><b>${Q(cotizado)}</b><small>${delMes.length} ${delMes.length === 1 ? "cotización" : "cotizaciones"} · ${aprobadas} ${aprobadas === 1 ? "aprobada" : "aprobadas"}</small></a>
+        <div class="sub"><h2>Lo que toca hoy</h2>${avisosC.length ? `<span class="suave">${avisosC.length}</span>` : ""}</div>
+        ${avisosC.length ? `<div class="lista toca">${primeros.map(toca).join("")}</div>${resto.length ? `<details class="mas-toca"><summary>Ver ${resto.length} más</summary><div class="lista toca">${resto.map(toca).join("")}</div></details>` : ""}`
+          : `<div class="toca-vacio">${ico("check", 18)}<span>Todo al día.</span></div>`}
+        ${pend.length ? pl("listo", "Para dejarlo listo", `${pend.length} ${pend.length === 1 ? "paso" : "pasos"}`, `<div class="lista sin-chip">${pend.map(fila).join("")}</div>`) : ""}
+        ${esperando.length ? pl("espera", "Esperando a otros", `${esperando.length}`, `<div class="lista sin-chip">${esperando.map(x => x.h ? fila(x) : `<div class="fila" style="cursor:default"><span class="icono gris">${ico(x.i, 18)}</span><span><b>${esc(x.t)}</b><small>${esc(x.d)}</small></span><span></span></div>`).join("")}</div>`) : ""}
+        ${pl("mes", "Este mes", `${esc(Q(cotizado))} cotizado · ${enCurso.length} ${enCurso.length === 1 ? "obra" : "obras"}`, `<div class="widgets">
+          <a class="w" href="#/cotizaciones"><span class="w-cab"><span class="icono laton">${ico("file", 18)}</span><span class="chev">${ico("chev", 16, 2.2)}</span></span><span class="l">Cotizado</span><b>${Q(cotizado)}</b><small>${delMes.length} ${delMes.length === 1 ? "cotización" : "cotizaciones"} · ${aprobadas} ${aprobadas === 1 ? "aprobada" : "aprobadas"}</small></a>
           <a class="w" href="#/obras"><span class="w-cab"><span class="icono azul">${ico("hammer", 18)}</span><span class="chev">${ico("chev", 16, 2.2)}</span></span><span class="l">Obras en curso</span><b>${enCurso.length}</b><small>${enCurso.filter(x => x.estado === "programada").length} por empezar${pausadas ? ` · ${pausadas} en pausa` : ""}</small></a>
           <a class="w" href="#/catalogo/materiales"><span class="w-cab"><span class="icono verde">${ico("box", 18)}</span><span class="chev">${ico("chev", 16, 2.2)}</span></span><span class="l">Materiales</span><b>${c.materiales.length}</b><small>${sinPrecio ? `${sinPrecio} sin costo` : "Todos con costo"}</small></a>
-        </div>
-        ${espera.length ? `<div class="espera"><span class="suave">Esperando a EMTECSA</span>${espera.map(x => `<div class="esp-f">${ico(x.i, 16)}<span><b>${esc(x.t)}</b><small>${esc(x.d)}</small></span></div>`).join("")}</div>` : ""}
+        </div>`)}
       </div>`;
+    v.querySelectorAll("[data-hoy-pl]").forEach(d => d.addEventListener("toggle", () => { try { localStorage.setItem("emtecsa.sistema.hoy." + d.dataset.hoyPl, d.open ? "1" : "0"); } catch (e) {} }));
   }
 
   const UNIDADES = ["unidad", "metro", "pie", "juego", "pieza", "kilogramo", "rollo", "galón", "servicio"];
@@ -722,7 +770,7 @@
     pop.innerHTML = `
       <div class="pop-cab"><span class="av" style="cursor:default">${avatar(p)}</span><span><b>${esc(p.nombre)}</b><small>${esc(D.ROLES[p.rol] || p.rol)} · ${esc(sesion.correo)}</small></span></div>
       <div class="pop-sec"><small class="suave" style="font-size:12.5px;font-weight:600">Modo</small><div class="seg" role="group" aria-label="Modo de la pantalla">${[["oscuro", "Oscuro"], ["claro", "Claro"], ["auto", "Automático"]].map(([k, n]) => `<button type="button" data-modo="${k}" aria-pressed="${modo === k}">${n}</button>`).join("")}</div></div>
-      <div style="padding:6px 0 0"><a class="pop-item" href="#/perfil" data-a-empresa>${ico("pen", 18)}Mi perfil</a>${p.probando ? `<button class="pop-item" type="button" data-volver-rol>${ico("shield", 18)}Volver a gerencia</button>` : ""}${p.rol === "gerencia" ? `<a class="pop-item" href="#/equipo" data-a-empresa>${ico("users", 18)}Equipo y permisos</a>` : ""}${D.puede(p, "editarEmpresa") ? `<a class="pop-item" href="#/empresa" data-a-empresa>${ico("building", 18)}Datos de la empresa</a>` : ""}${D.nube ? "" : `<button class="pop-item" type="button" data-borrar-prueba>${ico("trash", 18)}Borrar los datos de prueba</button>`}${D.appInstalada && !D.appInstalada() ? `<button class="pop-item" type="button" data-instalar>${ico("phone", 18)}Instalar en el teléfono</button>` : ""}<button class="pop-item peligro" type="button" data-salir>${ico("salir", 18)}Cerrar sesión</button></div>`;
+      <div style="padding:6px 0 0"><a class="pop-item" href="#/perfil" data-a-empresa>${ico("pen", 18)}Mi perfil</a>${p.dev || (D.nube && p.rol === "gerencia") ? `<a class="pop-item" href="#/errores" data-a-empresa>${ico("alerta", 18)}Errores del sistema</a>` : ""}${p.probando ? `<button class="pop-item" type="button" data-volver-rol>${ico("shield", 18)}Volver a gerencia</button>` : ""}${p.rol === "gerencia" ? `<a class="pop-item" href="#/equipo" data-a-empresa>${ico("users", 18)}Equipo y permisos</a>` : ""}${D.puede(p, "editarEmpresa") ? `<a class="pop-item" href="#/empresa" data-a-empresa>${ico("building", 18)}Datos de la empresa</a>` : ""}${D.nube ? "" : `<button class="pop-item" type="button" data-borrar-prueba>${ico("trash", 18)}Borrar los datos de prueba</button>`}${D.appInstalada && !D.appInstalada() ? `<button class="pop-item" type="button" data-instalar>${ico("phone", 18)}Instalar en el teléfono</button>` : ""}<button class="pop-item peligro" type="button" data-salir>${ico("salir", 18)}Cerrar sesión</button></div>`;
     document.body.appendChild(pop);
     const velo = document.createElement("div"); velo.className = "velo"; velo.style.background = "transparent"; velo.addEventListener("click", cerrarCapas);
     document.body.insertBefore(velo, pop);
@@ -750,10 +798,10 @@
     cerrarCapas();
     const velo = document.createElement("div"); velo.className = "velo"; velo.addEventListener("click", cerrarCapas);
     const h = document.createElement("div"); h.className = "hoja-m"; h.setAttribute("role", "dialog"); h.setAttribute("aria-label", "Menú");
-    const actual = (location.hash.replace(/^#\/?/, "").split("/")[0]) || "hoy";
+    const mA = menuDe((location.hash.replace(/^#\/?/, "").split("/")[0]) || "hoy"), actual = mA ? mA.id : "";
     h.innerHTML = `<div class="tirador"></div>
       <label class="buscar-m"><span class="sr">Buscar en el catálogo</span><input type="search" placeholder="Buscar en el catálogo" data-buscar-m></label>
-      ${SECCIONES.map(s => `<a href="#/${s.id}" ${s.id === actual ? 'aria-current="page"' : ""}><span class="ic icono ${s.c}">${ico(s.i, 17)}</span>${s.n}${document.querySelector(`.barra [data-sec="${s.id}"] .insignia`) ? `<span class="insignia-m">${document.querySelector(`.barra [data-sec="${s.id}"] .insignia`).textContent}</span>` : ""}</a>`).join("")}`;
+      ${menuVisible().map(s => `<a href="#/${s.ir || s.id}" ${s.id === actual ? 'aria-current="page"' : ""}><span class="ic icono ${s.c}">${ico(s.i, 17)}</span>${s.n}${document.querySelector(`.barra [data-sec="${s.id}"] .insignia`) ? `<span class="insignia-m">${document.querySelector(`.barra [data-sec="${s.id}"] .insignia`).textContent}</span>` : ""}</a>`).join("")}`;
     document.body.append(velo, h);
     h.addEventListener("click", e => { if (e.target.closest("a")) setTimeout(cerrarCapas, 0); });
     $("[data-buscar-m]", h).addEventListener("keydown", e => { if (e.key === "Enter") { busqueda = e.target.value.trim(); mantener = true; ir("catalogo"); } });
@@ -773,6 +821,6 @@
     D.alCambiarSesion(ev => { if (ev === "SIGNED_OUT") { sesion = null; pintarEntrada(); } });
     if (sesion) arrancarApp(); else pintarEntrada();
   }
-  window.EMT_APP = { pintarAvatar, iniciales, $, $$, esc, ico, Q, cant, aviso, modal, cerrarCapas, numero, montoTxt, campoMonto, formatoAlSalir, ir, guardia, quieto, sostener, filtrar, normal, chipsASelect, sesion: () => sesion, recargarHoy: () => { const v = document.getElementById("vista"); return v && /^#\/hoy$|^#?\/?$/.test(location.hash) ? quieto(() => vHoy(v)) : null; } };
+  window.EMT_APP = { marcarInsignia, pintarAvatar, iniciales, $, $$, esc, ico, Q, cant, aviso, modal, cerrarCapas, numero, montoTxt, campoMonto, formatoAlSalir, ir, guardia, quieto, sostener, filtrar, normal, chipsASelect, sesion: () => sesion, recargarHoy: () => { const v = document.getElementById("vista"); return v && /^#\/hoy$|^#?\/?$/.test(location.hash) ? quieto(() => vHoy(v)) : null; } };
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", arrancar); else arrancar();
 })();

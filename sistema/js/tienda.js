@@ -141,15 +141,12 @@ window.EMT_TIENDA = (() => {
   }
 
   async function insignia() {
-    const a = document.querySelector('.barra [data-sec="tienda"]'); if (!a) return;
+    if (!document.querySelector(".barra")) return;
     cargar();
     let n = 0;
     try { n = (await D.pedidosTienda()).filter(x => x.estado === "comprobante-recibido").length; } catch (e) {}
     const m = document.querySelector(".barra [data-menu]"); if (m) { m.dataset.pTienda = n; m.classList.toggle("con-punto", Number(m.dataset.pCot || 0) + Number(m.dataset.pEq || 0) + n > 0); m.setAttribute("aria-label", n ? `Abrir el menú, ${n} ${n === 1 ? "comprobante" : "comprobantes"} por revisar` : "Abrir el menú"); }
-    let b = a.querySelector(".insignia");
-    if (!n) { b && b.remove(); return; }
-    if (!b) { b = document.createElement("span"); b.className = "insignia"; a.appendChild(b); }
-    b.textContent = n; b.setAttribute("aria-label", `${n} por revisar`);
+    if (A().marcarInsignia) A().marcarInsignia("tienda", n);
   }
 
   const conocidos = new Map();

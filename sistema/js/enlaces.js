@@ -158,14 +158,10 @@ window.EMT_ENLACES = (() => {
   }
 
   async function insignia() {
-    const a = document.querySelector('.barra [data-sec="cotizaciones"]'); if (!a) return;
     let n = 0;
     try { if (D.puede(A().sesion().perfil, "verEnlaces")) n = (await D.pendientesEnlace()).filter(x => x.tipo === "aprobo" || x.tipo === "mensaje").length; } catch (e) {}
     const m = document.querySelector(".barra [data-menu]"); if (m) { m.dataset.pCot = n; m.classList.toggle("con-punto", Number(m.dataset.pCot || 0) + Number(m.dataset.pTienda || 0) + Number(m.dataset.pEq || 0) > 0); }
-    let b = a.querySelector(".insignia");
-    if (!n) { b && b.remove(); return; }
-    if (!b) { b = document.createElement("span"); b.className = "insignia"; a.appendChild(b); }
-    b.textContent = n; b.setAttribute("aria-label", `${n} por atender`);
+    if (A().marcarInsignia) A().marcarInsignia("cotizaciones", n);
   }
 
   async function notificar(titulo, cuerpo, id) {

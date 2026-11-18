@@ -223,7 +223,7 @@ window.EMT_COTIZACIONES = (() => {
     const pintarTotales = () => {
       k = D.calcularCotizacion(c, cat, verEsc());
       pintarOpcRes();
-      k.partidas.forEach((pp, i) => { const el = partBox.querySelector(`[data-ptot="${i}"]`); if (el) el.textContent = Q(pp.total); const u = partBox.querySelector(`[data-punit="${i}"]`); if (u) u.textContent = Q(pp.precio_unitario); });
+      k.partidas.forEach((pp, i) => { if (abiertas.has(i)) { const x = partBox.querySelector(`[data-pm-x="${i}"]`); if (x) x.textContent = "× " + cant(pp.cantidad); (pp.mats || []).forEach((r, j) => { const t2 = partBox.querySelector(`[data-pm-tot="${i}:${j}"]`); if (t2) t2.textContent = cant(r.cantidad * (Number(pp.cantidad) || 0)); }); } const el = partBox.querySelector(`[data-ptot="${i}"]`); if (el) el.textContent = Q(pp.total); const u = partBox.querySelector(`[data-punit="${i}"]`); if (u) u.textContent = Q(pp.precio_unitario); });
       const fila = (t, val, cl = "") => `<div class="${cl}"><span>${t}</span><b class="e-cifra">${esc(val)}</b></div>`;
       $("[data-tot]", v).innerHTML = fila("Subtotal", Q(k.subtotal))
         + (k.cargos ? fila("Transporte y equipo", Q(k.cargos)) : "")
@@ -255,14 +255,30 @@ window.EMT_COTIZACIONES = (() => {
     const hayOp = () => { const o = c.opciones || {}; return (o.lista || []).length >= 2 || (o.extras || []).length > 0; };
     const gruposOp = () => { const o = c.opciones || {}; return [null, ...(o.lista || []).map(x => "o:" + x.id), ...(o.extras || []).map(x => "x:" + x.id)]; };
     let verOp = null, verX = null, destino = null;
+    const abiertas = new Set();
+    const panelMats = (pp, i) => {
+      const q = Number(pp.cantidad) || 0;
+      const filas = pp.mats || [];
+      return `<div class="p-mats" data-pmats="${i}">
+        <div class="pm-cab"><span>Material</span><span>Por unidad</span><span data-pm-x="${i}">× ${esc(cant(q))}</span><span></span></div>
+        ${filas.map((r, j) => `<div class="pm-f"><span><b>${esc(r.material.descripcion)}</b><small>${esc(r.material.codigo)}${r.material.costo == null && r.material.pv == null ? ' · <span class="falta">sin costo</span>' : ""}</small></span>
+          <label class="f-cant"><span class="sr">Cantidad por unidad de ${esc(r.material.descripcion)}</span><input inputmode="decimal" value="${esc(cant(r.cantidad))}" data-pm-cant="${i}:${j}" autocomplete="off"></label>
+          <b class="pm-tot" data-pm-tot="${i}:${j}">${esc(cant(r.cantidad * q))}</b>
+          <button class="s-ib" type="button" aria-label="Opciones de ${esc(r.material.descripcion)}" data-pm-ed="${i}:${j}">${ico("pen", 14)}</button></div>`).join("") || `<p class="suave" style="margin:0;padding:10px 0;font-size:13.5px">Sin materiales.</p>`}
+        <div class="f-agregar"><span class="f-busca">${ico("search", 15)}<input data-pm-busca="${i}" placeholder="Agregar material a esta partida" autocomplete="off" aria-label="Agregar material a esta partida"></span><div class="f-res" data-pm-res="${i}" hidden></div></div>
+        <div class="pm-pie"><span class="suave">${pp.ajustada ? "Cambiado solo en esta cotización" : "Como en el catálogo"}</span>${pp.ajustada ? `<button class="s-btn suave-b chico" type="button" data-pm-rest="${i}">${ico("layers", 14)}Volver al catálogo</button>` : ""}</div>
+      </div>`;
+    };
+    const matsDe = i => { const part = c.partidas[i]; if (!part.materiales) part.materiales = (k.partidas[i].mats || []).map(r => ({ material_id: r.material.id, cantidad: Number(r.cantidad) })); return part.materiales; };
+    const repintarPartidas = () => { k = D.calcularCotizacion(c, cat, verEsc()); pintarPartidas(); marcar(); pintarTotales(); };
     const verEsc = () => hayOp() ? { opcion: verOp || (c.eleccion && c.eleccion.opcion) || ((c.opciones.lista || [])[0] || {}).id || null, extras: verX || (c.eleccion && c.eleccion.extras) || [] } : null;
     const filaP = (pp, i) => `
         <div class="partida"><span class="icono ${pp.material_id ? "gris" : pp.estructura && pp.estructura.clase === "transformador" ? "laton" : "azul"} chico">${ico(pp.material_id ? "box" : pp.estructura && pp.estructura.clase === "transformador" ? "zap" : "torre", 15)}</span>
-          <span class="p-nom"><b>${esc(pp.descripcion)}${pp.ajustada ? ' <span class="chip azul chico-c">Ajustada</span>' : ""}${pp.del_plano ? ' <span class="chip gris chico-c">Del plano</span>' : ""}${hayOp() && puede && !fijo() ? ` <button type="button" class="chip-g" data-pgrupo="${i}">Mover</button>` : ""}</b><small>${pp.material_id ? (pp.material ? esc(pp.material.codigo) + " · material suelto" : "Ya no está en el catálogo") : pp.estructura ? esc(pp.estructura.codigo + " · " + cant(pp.estructura.voltaje_kv) + " kV") : "Ya no está en el catálogo"} · <span data-punit="${i}">${esc(Q(pp.precio_unitario))}</span> c/u${pp.faltCosto ? ` · <span class="falta">${pp.faltCosto} sin costo</span>` : ""}</small></span>
+          <span class="p-nom" ${pp.estructura ? `data-pver="${i}" role="button" tabindex="0" aria-expanded="${abiertas.has(i)}" title="Ver sus materiales"` : ""}><b>${pp.estructura ? `<span class="p-chev ${abiertas.has(i) ? "abierta" : ""}">${ico("chev", 13, 2.4)}</span>` : ""}${esc(pp.descripcion)}${pp.ajustada ? ' <span class="chip azul chico-c">Ajustada</span>' : ""}${pp.del_plano ? ' <span class="chip gris chico-c">Del plano</span>' : ""}${hayOp() && puede && !fijo() ? ` <button type="button" class="chip-g" data-pgrupo="${i}">Mover</button>` : ""}</b><small>${pp.material_id ? (pp.material ? esc(pp.material.codigo) + " · material suelto" : "Ya no está en el catálogo") : pp.estructura ? esc(pp.estructura.codigo + " · " + cant(pp.estructura.voltaje_kv) + " kV") : "Ya no está en el catálogo"} · <span data-punit="${i}">${esc(Q(pp.precio_unitario))}</span> c/u${pp.faltCosto ? ` · <span class="falta">${pp.faltCosto} sin costo</span>` : ""}</small></span>
           <label class="f-cant"><span class="sr">Cantidad</span><input inputmode="decimal" value="${esc(cant(pp.cantidad))}" data-pcant="${i}" autocomplete="off"></label>
           <b class="e-cifra p-tot" data-ptot="${i}">${esc(Q(pp.total))}</b>
           ${pp.estructura ? `<button class="s-ib p-aj" type="button" aria-label="Ajustar materiales de ${esc(pp.descripcion)} en esta cotización" title="Ajustar materiales solo en esta cotización" data-pajustar="${i}">${ico("pen", 15)}</button>` : '<span class="p-aj"></span>'}
-          <button class="s-ib p-qu" type="button" aria-label="Quitar ${esc(pp.descripcion)}" data-pquitar="${i}">${ico("x", 15)}</button></div>`;
+          <button class="s-ib p-qu" type="button" aria-label="Quitar ${esc(pp.descripcion)}" data-pquitar="${i}">${ico("x", 15)}</button></div>${pp.estructura && abiertas.has(i) ? panelMats(pp, i) : ""}`;
     const pintarPartidas = () => {
       const sel = $("[data-agregar-a]", v), lab = $("[data-agregar-a-l]", v);
       if (lab) { lab.hidden = !hayOp(); if (hayOp()) { if (!gruposOp().includes(destino)) destino = null; sel.innerHTML = gruposOp().map(g => `<option value="${esc(g || "")}" ${g === destino ? "selected" : ""}>${esc(D.nombreGrupo(c, g))}</option>`).join(""); } }
@@ -488,12 +504,31 @@ window.EMT_COTIZACIONES = (() => {
         marcar(); pintarTotales();
       }
       if (t.dataset.cond) { c.condiciones = { ...(c.condiciones || {}), [t.dataset.cond]: t.value }; marcar(); }
+      if (t.dataset.pmCant != null) { const [i, j] = t.dataset.pmCant.split(":").map(Number); const n = Number(String(t.value).replace(/,/g, "")); matsDe(i)[j].cantidad = isFinite(n) && n > 0 ? n : 0; marcar(); pintarTotales(); return; }
+      if (t.dataset.pmBusca != null) {
+        const i = Number(t.dataset.pmBusca), res = partBox.querySelector(`[data-pm-res="${i}"]`), q = t.value.toLowerCase().trim();
+        if (!q) { res.hidden = true; return; }
+        const ya = new Set((k.partidas[i].mats || []).map(r => r.material.id));
+        const l = cat.materiales.filter(x => !ya.has(x.id) && (x.descripcion + " " + x.codigo).toLowerCase().includes(q)).slice(0, 8);
+        res.hidden = false;
+        res.innerHTML = l.length ? l.map(x => `<button type="button" data-pm-add="${i}:${x.id}"><b>${esc(x.descripcion)}</b><small>${esc(x.codigo)}</small></button>`).join("") : `<p class="suave">No hay más materiales con «${esc(t.value)}».</p>`;
+        return;
+      }
       if (t.dataset.pcant != null) { const n = Number(String(t.value).replace(/,/g, "")); c.partidas[Number(t.dataset.pcant)].cantidad = isFinite(n) ? n : 0; marcar(); pintarTotales(); }
       if (t.dataset.gdesc != null) { c.cargos[Number(t.dataset.gdesc)].descripcion = t.value; marcar(); }
       if (t.dataset.gmonto != null) { c.cargos[Number(t.dataset.gmonto)].monto = leerNum(t.value, 0); marcar(); pintarTotales(); }
     };
     v.onchange = async e => {
       const t = e.target;
+      if (t.dataset.pmCant != null) {
+        const [i, j] = t.dataset.pmCant.split(":").map(Number);
+        const l = matsDe(i);
+        if (!(l[j] && l[j].cantidad > 0)) { const nom = k.partidas[i].mats[j] ? k.partidas[i].mats[j].material.descripcion : "el material"; l.splice(j, 1); aviso(`Se quitó ${nom} de esta partida.`); }
+        const pp = k.partidas[i], base = pp.estructura ? pp.estructura.materiales : [];
+        if (l.length === base.length && l.every(x => { const b = base.find(y => y.material.id === x.material_id); return b && Number(b.cantidad) === Number(x.cantidad); })) c.partidas[i].materiales = null;
+        await A().quieto(repintarPartidas);
+        return;
+      }
       if (t.matches("[data-agregar-a]")) { destino = t.value || null; return; }
       if (t.name === "verop" && t.closest("[data-opc-res]")) { verOp = t.value; await A().quieto(pintarTotales); return; }
       if (t.dataset.verx) { const ve = verEsc(); verX = t.checked ? [...new Set([...ve.extras, t.dataset.verx])] : ve.extras.filter(x => x !== t.dataset.verx); await A().quieto(pintarTotales); return; }
@@ -582,6 +617,27 @@ window.EMT_COTIZACIONES = (() => {
       if (a) { const eid = Number(a.dataset.addEst); const ya = c.partidas.find(x => x.estructura_id === eid && (x.grupo || null) === (hayOp() ? destino : null)); if (ya) ya.cantidad += 1; else c.partidas.push({ grupo: hayOp() ? destino : null, estructura_id: eid, descripcion: "", cantidad: 1, costo_materiales: 0, mano_obra: 0, precio_unitario: 0 }); buscaEst.value = ""; resEst.hidden = true; k = D.calcularCotizacion(c, cat); pintarPartidas(); marcar(); pintarTotales(); const i = ya ? c.partidas.indexOf(ya) : c.partidas.length - 1; const inp = partBox.querySelector(`[data-pcant="${i}"]`); inp?.focus(); inp?.select(); }
       const am = e.target.closest("[data-add-mat]");
       if (am) { const mid = Number(am.dataset.addMat); const ya = c.partidas.find(x => x.material_id === mid && (x.grupo || null) === (hayOp() ? destino : null)); if (ya) ya.cantidad += 1; else c.partidas.push({ grupo: hayOp() ? destino : null, estructura_id: null, material_id: mid, descripcion: "", cantidad: 1, costo_materiales: 0, mano_obra: 0, precio_unitario: 0 }); buscaEst.value = ""; resEst.hidden = true; k = D.calcularCotizacion(c, cat); pintarPartidas(); marcar(); pintarTotales(); const i = ya ? c.partidas.indexOf(ya) : c.partidas.length - 1; const inp = partBox.querySelector(`[data-pcant="${i}"]`); inp?.focus(); inp?.select(); }
+      const pv = e.target.closest("[data-pver]");
+      if (pv && !e.target.closest("button, input, a")) { const i = Number(pv.dataset.pver); if (abiertas.has(i)) abiertas.delete(i); else abiertas.add(i); pintarPartidas(); const n = partBox.querySelector(`[data-pver="${i}"]`); if (n) n.focus({ preventScroll: true }); return; }
+      const pmAdd = e.target.closest("[data-pm-add]");
+      if (pmAdd) { if (fijo()) { aviso("Para cambiarla, pásela a Borrador.", "mal"); return; } const [i, mid] = pmAdd.dataset.pmAdd.split(":").map(Number); matsDe(i).push({ material_id: mid, cantidad: 1 }); repintarPartidas(); const u = partBox.querySelectorAll(`[data-pm-cant^="${i}:"]`); u[u.length - 1]?.focus(); u[u.length - 1]?.select(); return; }
+      const pmRest = e.target.closest("[data-pm-rest]");
+      if (pmRest) { if (fijo()) { aviso("Para cambiarla, pásela a Borrador.", "mal"); return; } c.partidas[Number(pmRest.dataset.pmRest)].materiales = null; repintarPartidas(); aviso("Quedó como en el catálogo."); return; }
+      const pmEd = e.target.closest("[data-pm-ed]");
+      if (pmEd) {
+        if (fijo()) { aviso("Para cambiarla, pásela a Borrador.", "mal"); return; }
+        const [i, j] = pmEd.dataset.pmEd.split(":").map(Number);
+        const r = k.partidas[i].mats[j], q = Number(k.partidas[i].cantidad) || 0;
+        A().modal({
+          titulo: r.material.descripcion, guardarTxt: "Guardar",
+          quitar: () => { matsDe(i).splice(j, 1); A().cerrarCapas(); repintarPartidas(); aviso(`Se quitó ${r.material.descripcion} de esta partida.`); }, quitarTxt: "Quitar de esta partida",
+          cuerpo: `<p class="suave" style="margin:0;font-size:13.5px">${esc(r.material.codigo)} · en «${esc(k.partidas[i].descripcion)}»</p>
+            <div class="f-fila"><label class="f-campo">Por unidad<input name="cu" inputmode="decimal" value="${esc(cant(r.cantidad))}" autocomplete="off"></label><div class="f-campo"><span>Total en la cotización</span><p class="pf-fijo" data-pm-prev>${esc(cant(r.cantidad * q))}</p></div></div>`,
+          alAbrir: f => f.cu.addEventListener("input", () => { const n = Number(String(f.cu.value).replace(/,/g, "")); f.querySelector("[data-pm-prev]").textContent = isFinite(n) ? cant(n * q) : "—"; }),
+          alGuardar: async f => { const n = Number(String(f.cu.value).replace(/,/g, "")); if (!(n > 0)) throw new Error("Escriba una cantidad mayor que cero, o use «Quitar de esta partida»."); matsDe(i)[j].cantidad = n; A().cerrarCapas(); repintarPartidas(); }
+        });
+        return;
+      }
       const pa = e.target.closest("[data-pajustar]"); if (pa && !pa.closest("fieldset:disabled")) ajustar(Number(pa.dataset.pajustar));
       const q = e.target.closest("[data-pquitar]"); if (q) { c.partidas.splice(Number(q.dataset.pquitar), 1); k = D.calcularCotizacion(c, cat); pintarPartidas(); marcar(); pintarTotales(); }
       if (e.target.closest("[data-nuevo-cargo]")) { c.cargos.push({ descripcion: "", monto: 0 }); pintarCargos(); marcar(); cargoBox.querySelector(`[data-gdesc="${c.cargos.length - 1}"]`)?.focus(); }

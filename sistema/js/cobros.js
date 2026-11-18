@@ -19,7 +19,7 @@ window.EMT_COBROS = (() => {
     const pest = pestL.some(([k]) => k === sub) ? sub : "";
     v.innerHTML = `
       <div class="cuerpo">
-        <div class="cab-v"><div><h1 class="t">Cobros</h1><p class="desc">Lo que falta cobrar de cada obra, los pagos con su recibo, el estado de cuenta de cada cliente y las fianzas.</p></div></div>
+        <div class="cab-v"><div><h1 class="t">Dinero</h1><p class="desc">Lo que falta cobrar de cada obra, los pagos con su recibo, el estado de cuenta de cada cliente y las fianzas.</p></div></div>
         ${D.nube ? "" : `<div class="nota-local">${ico("shield", 18)}<span>Modo de prueba: los cobros se guardan en esta computadora y se suben a la base de EMTECSA cuando se conecte.</span></div>`}
         <div class="widgets">
           <a class="w" href="#/cobros"><span class="w-cab"><span class="icono laton">${ico("wallet", 18)}</span></span><span class="l">Por cobrar</span><b>${esc(Q(r.porCobrar))}</b><small>${r.pendientes.length} ${r.pendientes.length === 1 ? "cobro pendiente" : "cobros pendientes"}</small></a>

@@ -1,12 +1,12 @@
 "use strict";
-const VERSION = "emtecsa-2026-11-17-13";
+const VERSION = "emtecsa-2026-11-18-2";
 const BASE = [
   "./", "./index.html", "./manifest.webmanifest", "./css/sistema.css",
-  "./js/config.js", "./js/semilla.js", "./js/datos.js", "./js/datos-clientes.js", "./js/datos-cotizaciones.js", "./js/datos-obras.js", "./js/datos-cobros.js", "./js/simbolos.js", "./js/datos-compras.js", "./js/datos-planos.js", "./js/cola.js", "./js/rapido.js", "./js/planos.js", "./js/datos-tienda.js", "./js/tienda.js", "./js/datos-docs.js", "./js/expediente.js", "./js/datos-enlaces.js", "./js/datos-conteo.js", "./js/conteo.js", "./js/datos-energuate.js", "./js/energuate-docs.js", "./js/energuate.js", "./js/datos-equipo.js", "./js/equipo.js", "./js/datos-costos.js", "./js/costos.js", "./js/datos-seguimiento.js", "./js/seguimiento.js", "./js/perfil.js", "./plantillas/dictamen-capacidad.xlsx", "./plantillas/dictamen-medida-centralizacion.xlsx", "./plantillas/derecho-de-paso.docx", "./plantillas/boleta-solicitante.pdf", "./plantillas/requisitos-licencia.pdf", "./js/constancia-pdf.js", "./js/enlaces.js", "./marcas/energuate.png", "./marcas/eegsa.png",
+  "./js/config.js", "./js/semilla.js", "./js/datos.js", "./js/datos-clientes.js", "./js/datos-cotizaciones.js", "./js/datos-obras.js", "./js/datos-cobros.js", "./js/simbolos.js", "./js/datos-compras.js", "./js/datos-planos.js", "./js/cola.js", "./js/rapido.js", "./js/planos.js", "./js/datos-tienda.js", "./js/tienda.js", "./js/datos-docs.js", "./js/expediente.js", "./js/datos-enlaces.js", "./js/datos-conteo.js", "./js/conteo.js", "./js/datos-energuate.js", "./js/energuate-docs.js", "./js/energuate.js", "./js/datos-equipo.js", "./js/equipo.js", "./js/datos-costos.js", "./js/costos.js", "./js/datos-seguimiento.js", "./js/seguimiento.js", "./js/perfil.js", "./js/dev.js", "./plantillas/dictamen-capacidad.xlsx", "./plantillas/dictamen-medida-centralizacion.xlsx", "./plantillas/derecho-de-paso.docx", "./plantillas/boleta-solicitante.pdf", "./plantillas/requisitos-licencia.pdf", "./js/constancia-pdf.js", "./js/enlaces.js", "./marcas/energuate.png", "./marcas/eegsa.png",
   "./js/app.js", "./js/clientes.js", "./js/cotizaciones.js", "./js/obras.js", "./js/cobros.js", "./js/compras.js", "./js/empresa.js", "./js/propuesta-pdf.js", "./js/cobros-pdf.js",
   "./fuentes/PlusJakartaSans-Regular.ttf", "./fuentes/PlusJakartaSans-SemiBold.ttf", "./fuentes/PlusJakartaSans-Bold.ttf", "./fuentes/PlusJakartaSans-ExtraBold.ttf",
   "./iconos/icono-192.png", "./iconos/icono-512.png", "./iconos/apple-touch-icon.png",
-  "../emtecsa-tokens.css", "../emtecsa-base.css", "../emtecsa-ui.js", "../emtecsa-geo.js",
+  "../emtecsa-tokens.css", "../emtecsa-base.css", "../emtecsa-ui.js", "../emtecsa-geo.js", "../emtecsa-errores.js",
   "../logo/emtecsa-icono.svg", "../logo/emtecsa-logo.svg", "../logo/emtecsa-logo-blanco.svg",
   "../img/sistema-noche.jpg", "../img/lineas-luna.jpg", "../img/torre-luna-2.jpg", "../img/aisladores.jpg", "../img/torre-luna.jpg", "../img/subestacion-luces.jpg", "../img/torre-hora-azul.jpg", "../img/poste-noche.jpg", "../img/cables-negros.jpg"
 ];

@@ -1,11 +1,16 @@
 "use strict";
 window.EMT_DATOS = (() => {
   const CFG = window.EMTECSA_CONFIG || {};
-  const nube = !!(CFG.url && CFG.llave && window.supabase);
-  const sb = nube ? window.supabase.createClient(CFG.url, CFG.llave, { auth: { persistSession: true, autoRefreshToken: true } }) : null;
+  const CLAVE_DEV = "emtecsa.sistema.dev";
+  const DEV = (() => { try { return JSON.parse(sessionStorage.getItem(CLAVE_DEV)); } catch (e) { return null; } })();
+  const conectado = !!(CFG.url && CFG.llave && window.supabase);
+  const nube = conectado && !DEV;
+  const cliente = () => window.supabase.createClient(CFG.url, CFG.llave, { auth: { persistSession: true, autoRefreshToken: true } });
+  const sb = nube ? cliente() : null;
+  const sbErrores = sb || (DEV && conectado ? cliente() : null);
   const CLAVE_PRUEBA = "emtecsa.sistema.prueba";
   const CLAVE_LOCAL = "emtecsa.sistema.catalogo";
-  const ROLES = { gerencia: "Gerencia", ventas: "Ventas", ingenieria: "Ingeniería", obra: "Obra", bodega: "Bodega", administracion: "Administración" };
+  const ROLES = { gerencia: "Gerencia", ventas: "Ventas", ingenieria: "Ingeniería", obra: "Obra", bodega: "Bodega", administracion: "Administración", desarrollo: "Desarrollo" };
   const PERMISOS = {
     verCosto: ["gerencia", "administracion", "bodega"],
     editarMaterial: ["gerencia", "bodega", "administracion"],
@@ -67,6 +72,12 @@ window.EMT_DATOS = (() => {
   }
 
   async function sesion() {
+    if (DEV) {
+      if (!sbErrores || !(await sbErrores.auth.getSession()).data.session) { try { sessionStorage.removeItem(CLAVE_DEV); } catch (e) {} location.reload(); return new Promise(() => {}); }
+      const m = mioPrueba();
+      await cargarPermisos();
+      return { correo: DEV.correo, perfil: { id: DEV.id, nombre: m.nombre || DEV.nombre, rol: "gerencia", modo: DEV.modo || "oscuro", activo: true, dev: true, telefono: m.telefono || null, puesto: m.puesto || null, foto: m.foto || null } };
+    }
     if (!nube) {
       let p = null; try { p = JSON.parse(sessionStorage.getItem(CLAVE_PRUEBA)); } catch (e) {}
       if (!p) return null;
@@ -81,6 +92,7 @@ window.EMT_DATOS = (() => {
     if (error && !navigator.onLine) { try { const g = JSON.parse(localStorage.getItem("emtecsa.sistema.perfil")); if (g && g.id === u.id) return { correo: u.email, perfil: g }; } catch (e) {} }
     if (!error && perfil && !perfil.activo && !perfil.aprobado) { await sb.auth.signOut(); throw new Error("Su cuenta está esperando que gerencia la apruebe. Le avisarán cuando ya pueda entrar."); }
     if (error || !perfil || !perfil.activo) { await sb.auth.signOut(); throw new Error("Su usuario no tiene acceso. Pídale a gerencia que lo active."); }
+    if (perfil.rol === "desarrollo") { try { sessionStorage.setItem(CLAVE_DEV, JSON.stringify({ id: perfil.id, nombre: perfil.nombre, correo: u.email, modo: perfil.modo })); } catch (e) {} location.reload(); return new Promise(() => {}); }
     await cargarPermisos();
     try { localStorage.setItem("emtecsa.sistema.perfil", JSON.stringify(perfil)); } catch (e) {}
     return { correo: u.email, perfil };
@@ -118,6 +130,7 @@ window.EMT_DATOS = (() => {
   }
 
   async function salir() {
+    if (DEV) { try { sessionStorage.removeItem(CLAVE_DEV); } catch (e) {} if (sbErrores) await sbErrores.auth.signOut().catch(() => {}); }
     if (nube) await sb.auth.signOut();
     try { sessionStorage.removeItem(CLAVE_PRUEBA); } catch (e) {}
   }
@@ -262,5 +275,5 @@ window.EMT_DATOS = (() => {
 
   function alCambiarSesion(fn) { if (nube) sb.auth.onAuthStateChange((ev) => { if (ev === "SIGNED_OUT" || ev === "PASSWORD_RECOVERY") fn(ev); }); }
 
-  return { nube, sb, ROLES, PERMISOS, CLAVE_EQUIPO, puede, cargarPermisos, registrarse, sesion, entrar, entrarPrueba, salir, recuperar, guardarModo, guardarMiPerfil, miFirma, guardarFirma, cambiarClave, catalogo, guardarMaterial, guardarEstructura, siguienteCodigo, cambiosLocales, alCambiarSesion };
+  return { nube, sb, sbErrores, DEV: !!DEV, conectado, ROLES, PERMISOS, CLAVE_EQUIPO, puede, cargarPermisos, registrarse, sesion, entrar, entrarPrueba, salir, recuperar, guardarModo, guardarMiPerfil, miFirma, guardarFirma, cambiarClave, catalogo, guardarMaterial, guardarEstructura, siguienteCodigo, cambiosLocales, alCambiarSesion };
 })();

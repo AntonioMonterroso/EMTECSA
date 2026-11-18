@@ -117,7 +117,7 @@ window.EMT_SEGUIMIENTO = (() => {
     if (!D.puede(p, "editarCotizacion")) return [];
     try {
       return (await D.pendientesSeguimiento()).map(({ c, s }) => s.vencida
-        ? { c: "ambar", i: "alerta", t: `Venció ${c.numero} · ${c.cliente ? c.cliente.nombre : ""}`, d: `Sin respuesta desde el ${fCorta(s.vence)}. Darle más días o marcarla rechazada.`, chip: "Venció", h: `#/cotizaciones/${c.id}` }
+        ? { c: "ambar", i: "alerta", t: `Venció ${c.numero} · ${c.cliente ? c.cliente.nombre : ""}`, d: `Sin respuesta desde el ${fCorta(s.vence)}`, chip: "", h: `#/cotizaciones/${c.id}` }
         : { c: s.atraso ? "ambar" : "azul", i: "phone", t: `Contactar a ${c.cliente ? c.cliente.nombre : ""} · ${c.numero}`, d: `${s.porque} · ${A().Q(c.total)}${s.ultimo ? ` · último contacto ${fCorta(s.ultimo.fecha)}` : ""}`, chip: s.atraso ? `Atrasado ${s.atraso} ${s.atraso === 1 ? "día" : "días"}` : "Hoy", h: `#/cotizaciones/${c.id}` });
     } catch (e) { return []; }
   }
