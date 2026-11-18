@@ -98,19 +98,27 @@
     setTimeout(() => { el.classList.add("sale"); setTimeout(() => el.remove(), 220); }, 3600);
   }
 
-  function ponerModo(m) {
+  const esPastel = t => (window.EMT_TEMAS || []).some(x => x.id === t && x.cl);
+  function aplicarModo() {
+    let m = null; try { m = localStorage.getItem("emtecsa.sistema.modo"); } catch (e) {}
+    if (esPastel(document.documentElement.dataset.tema)) m = "claro";
     if (m === "claro" || m === "oscuro") document.documentElement.dataset.modo = m; else delete document.documentElement.dataset.modo;
+  }
+  function ponerModo(m) {
     try { localStorage.setItem("emtecsa.sistema.modo", m); } catch (e) {}
+    aplicarModo();
   }
 
   function ponerTema(t) {
     const ok = t && t !== "emtecsa" && (window.EMT_TEMAS || []).some(x => x.id === t);
     if (ok) document.documentElement.dataset.tema = t; else delete document.documentElement.dataset.tema;
-    try { localStorage.setItem("emtecsa.sistema.tema", ok ? t : "emtecsa"); } catch (e) {}
+    try { localStorage.setItem("emtecsa.sistema.tema", ok ? t : "emtecsa"); localStorage.setItem("emtecsa.sistema.tema-claro", ok && esPastel(t) ? "1" : "0"); } catch (e) {}
+    aplicarModo();
     const m = document.querySelector('meta[name="theme-color"]'); const c = getComputedStyle(document.documentElement).getPropertyValue("--bg").trim(); if (m && /^#[0-9a-f]{6}$/i.test(c)) m.content = c;
   }
   const temaActual = () => document.documentElement.dataset.tema || "emtecsa";
-  const muestraTema = x => `<span class="tm" style="--tf:${x.f};--tc:${x.c};--tb:${x.b};--ta:${x.a}" aria-hidden="true"><i class="tm-b"></i><i class="tm-c"><i></i><i></i></i><i class="tm-p"></i></span>`;
+  const FAMILIAS_TEMA = [["clasicos", "Clásicos"], ["pastel", "Pastel"], ["joyas", "Joyas"], ["vivos", "Vivos"], ["naturales", "Naturales"]];
+  const muestraTema = x => `<span class="tm${x.cl ? " tm-claro" : ""}" style="--tf:${x.f};--tc:${x.c};--tb:${x.b};--ta:${x.a}" aria-hidden="true"><i class="tm-b"></i><i class="tm-c"><i></i><i></i></i><i class="tm-p"></i></span>`;
 
   function saludo() { const h = new Date().getHours(); return h < 12 ? "Buenos días" : h < 19 ? "Buenas tardes" : "Buenas noches"; }
   const fechaLarga = () => new Date().toLocaleDateString("es-GT", { weekday: "long", day: "numeric", month: "long" });
@@ -810,7 +818,7 @@
     const modo = (() => { try { return localStorage.getItem("emtecsa.sistema.modo") || p.modo; } catch (e) { return p.modo; } })();
     pop.innerHTML = `
       <div class="pop-cab"><span class="av" style="cursor:default">${avatar(p)}</span><span><b>${esc(p.nombre)}</b><small>${esc(D.ROLES[p.rol] || p.rol)} · ${esc(sesion.correo)}</small></span></div>
-      <div class="pop-sec"><small class="suave" style="font-size:12.5px;font-weight:600">Modo</small><div class="seg" role="group" aria-label="Modo de la pantalla">${[["oscuro", "Oscuro"], ["claro", "Claro"], ["auto", "Automático"]].map(([k, n]) => `<button type="button" data-modo="${k}" aria-pressed="${modo === k}">${n}</button>`).join("")}</div></div>
+      <div class="pop-sec"><small class="suave" style="font-size:12.5px;font-weight:600">Modo</small><div class="seg" role="group" aria-label="Modo de la pantalla">${[["oscuro", "Oscuro"], ["claro", "Claro"], ["auto", "Automático"]].map(([k, n]) => `<button type="button" data-modo="${k}" aria-pressed="${modo === k}">${n}</button>`).join("")}</div>${esPastel(temaActual()) ? `<small class="suave" style="font-size:12.5px">Su color es pastel: siempre va en claro.</small>` : ""}</div>
       <div style="padding:6px 0 0"><a class="pop-item" href="#/perfil" data-a-empresa>${ico("pen", 18)}Mi perfil</a>${p.dev || (D.nube && p.rol === "gerencia") ? `<a class="pop-item" href="#/errores" data-a-empresa>${ico("alerta", 18)}Errores del sistema</a>` : ""}${p.probando ? `<button class="pop-item" type="button" data-volver-rol>${ico("shield", 18)}Volver a gerencia</button>` : ""}${p.rol === "gerencia" ? `<a class="pop-item" href="#/equipo" data-a-empresa>${ico("users", 18)}Equipo y permisos</a>` : ""}${D.puede(p, "editarEmpresa") ? `<a class="pop-item" href="#/empresa" data-a-empresa>${ico("building", 18)}Datos de la empresa</a>` : ""}${D.nube ? "" : `<button class="pop-item" type="button" data-borrar-prueba>${ico("trash", 18)}Borrar los datos de prueba</button>`}${D.appInstalada && !D.appInstalada() ? `<button class="pop-item" type="button" data-instalar>${ico("phone", 18)}Instalar en el teléfono</button>` : ""}<button class="pop-item peligro" type="button" data-salir>${ico("salir", 18)}Cerrar sesión</button></div>`;
     document.body.appendChild(pop);
     const velo = document.createElement("div"); velo.className = "velo"; velo.style.background = "transparent"; velo.addEventListener("click", cerrarCapas);
@@ -862,6 +870,6 @@
     D.alCambiarSesion(ev => { if (ev === "SIGNED_OUT") { sesion = null; pintarEntrada(); } });
     if (sesion) arrancarApp(); else pintarEntrada();
   }
-  window.EMT_APP = { marcarInsignia, pintarAvatar, iniciales, $, $$, esc, ico, Q, cant, aviso, modal, cerrarCapas, numero, montoTxt, campoMonto, formatoAlSalir, ir, guardia, quieto, sostener, filtrar, normal, chipsASelect, ponerTema, temaActual, muestraTema, sesion: () => sesion, recargarHoy: () => { const v = document.getElementById("vista"); return v && /^#\/hoy$|^#?\/?$/.test(location.hash) ? quieto(() => vHoy(v)) : null; } };
+  window.EMT_APP = { marcarInsignia, pintarAvatar, iniciales, $, $$, esc, ico, Q, cant, aviso, modal, cerrarCapas, numero, montoTxt, campoMonto, formatoAlSalir, ir, guardia, quieto, sostener, filtrar, normal, chipsASelect, ponerTema, temaActual, muestraTema, FAMILIAS_TEMA, sesion: () => sesion, recargarHoy: () => { const v = document.getElementById("vista"); return v && /^#\/hoy$|^#?\/?$/.test(location.hash) ? quieto(() => vHoy(v)) : null; } };
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", arrancar); else arrancar();
 })();

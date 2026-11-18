@@ -106,8 +106,9 @@ window.EMT_PERFIL = (() => {
         </section>
         <section class="caja">
           <div class="sub" style="margin:0"><h2>Color del sistema</h2><span class="suave" data-tema-res></span></div>
+          <nav class="seg pest-o pest-temas" aria-label="Familias de colores" data-tema-fams></nav>
           <label class="busca-v ancho-busca"><span class="sr">Buscar color</span>${ico("search", 16)}<input type="search" data-tema-busca placeholder="Buscar color" autocomplete="off"></label>
-          <div class="temas" data-temas></div>
+          <div data-temas></div>
         </section>
         <details class="caja plegable"><summary><span class="pl-t"><h2>Firma</h2><span class="suave" data-pf-res-firma>${firma ? "Ya tiene su firma" : "Todavía no tiene firma"}</span></span><span class="chev">${ico("chev", 16, 2.2)}</span></summary><div class="pl-cuerpo" data-pf-firma></div></details>
         <details class="caja plegable" open><summary><span class="pl-t"><h2>Avisos en este teléfono</h2><span class="suave" data-av-res>Revisando…</span></span><span class="chev">${ico("chev", 16, 2.2)}</span></summary><div class="pl-cuerpo" data-avisos></div></details>
@@ -188,21 +189,27 @@ window.EMT_PERFIL = (() => {
     };
     const ocultosT = await D.temasOcultos().catch(() => []);
     const temasV = (window.EMT_TEMAS || []).filter(x => x.id === "emtecsa" || !ocultosT.includes(x.id));
+    const famsV = A().FAMILIAS_TEMA.filter(([k]) => temasV.some(x => x.g === k));
+    let famT = (() => { try { const g = localStorage.getItem("emtecsa.sistema.tema-fam"); return g && (g === "todos" || famsV.some(([k]) => k === g)) ? g : "todos"; } catch (e) { return "todos"; } })();
     const pintarTemas = () => {
       const act = A().temaActual();
       const x0 = temasV.find(x => x.id === act) || temasV[0];
       v.querySelector("[data-tema-res]").textContent = x0 ? x0.n : "";
-      v.querySelector("[data-temas]").innerHTML = temasV.map(x => `<button class="tema-b" type="button" data-tema-b="${x.id}" aria-pressed="${x.id === act}">${A().muestraTema(x)}<span class="tema-n"><span>${esc(x.n)}</span>${x.id === act ? ico("check", 16) : ""}</span></button>`).join("");
-      const q = v.querySelector("[data-tema-busca]").value; if (q) A().filtrar(v.querySelector("[data-temas]"), ".tema-b", q);
+      v.querySelector("[data-tema-fams]").innerHTML = [["todos", "Todos"], ...famsV].map(([k, t]) => `<button type="button" data-tema-fam="${k}" aria-pressed="${famT === k}">${t}</button>`).join("");
+      const q = A().normal(v.querySelector("[data-tema-busca]").value);
+      const boton = x => `<button class="tema-b" type="button" data-tema-b="${x.id}" aria-pressed="${x.id === act}">${A().muestraTema(x)}<span class="tema-n"><span>${esc(x.n)}</span>${x.id === act ? ico("check", 16) : ""}</span></button>`;
+      const grupos = famsV.filter(([k]) => famT === "todos" || famT === k).map(([k, t]) => [t, temasV.filter(x => x.g === k && (!q || A().normal(x.n).includes(q)))]).filter(([, l]) => l.length);
+      v.querySelector("[data-temas]").innerHTML = grupos.length ? grupos.map(([t, l]) => `<section class="temas-g">${famT === "todos" ? `<h3>${t}</h3>` : ""}<div class="temas">${l.map(boton).join("")}</div></section>`).join("") : `<p class="temas-vacio">No hay colores con ese nombre.</p>`;
     };
     pintarTemas();
     v.addEventListener("click", async ev => {
+      const tf = ev.target.closest("[data-tema-fam]"); if (tf) { famT = tf.dataset.temaFam; try { localStorage.setItem("emtecsa.sistema.tema-fam", famT); } catch (e) {} pintarTemas(); return; }
       const tb = ev.target.closest("[data-tema-b]"); if (!tb) return;
       const t = tb.dataset.temaB; if (t === A().temaActual()) return;
       A().ponerTema(t); pintarTemas();
       try { await D.guardarTema(p, t); } catch (err) { aviso(err.message, "mal"); }
     });
-    v.oninput = e => { if (e.target.matches("[data-tema-busca]")) { A().filtrar(v.querySelector("[data-temas]"), ".tema-b", e.target.value); return; } if (e.target.matches("[data-pf]")) marcar(); };
+    v.oninput = e => { if (e.target.matches("[data-tema-busca]")) { pintarTemas(); return; } if (e.target.matches("[data-pf]")) marcar(); };
     v.onclick = async e => {
       if (e.target.closest("[data-pf-foto]")) { elegirFoto(); return; }
       if (e.target.closest("[data-pf-dibujar]")) { dibujarFirma(); return; }

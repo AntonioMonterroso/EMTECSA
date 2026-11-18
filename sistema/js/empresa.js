@@ -74,7 +74,8 @@ window.EMT_EMPRESA = (() => {
           <details class="caja plegable"><summary><span class="pl-t"><h2>Logos de distribuidoras</h2><span class="suave">Para el machote de los planos</span></span><span class="chev">${ico("chev", 16, 2.2)}</span></summary><div class="pl-cuerpo"><div class="logos-d" data-logos-d></div></div></details>
           <details class="caja plegable"><summary><span class="pl-t"><h2>Colores del sistema</h2><span class="suave" data-temas-res></span></span><span class="chev">${ico("chev", 16, 2.2)}</span></summary><div class="pl-cuerpo">
             <div class="temas-herr"><label class="busca-v ancho-busca"><span class="sr">Buscar color</span>${ico("search", 16)}<input type="search" data-temas-busca placeholder="Buscar color" autocomplete="off"></label>${puede ? `<button class="s-btn suave-b chico" type="button" data-temas-todos>Marcar todos</button>` : ""}</div>
-            <div class="temas-op" data-temas-op></div>
+            <nav class="seg pest-o pest-temas" aria-label="Familias de colores" data-temas-fams></nav>
+            <div data-temas-op></div>
           </div></details>
           <details class="caja plegable"><summary><span class="pl-t"><h2>Checklists de cada obra</h2><span class="suave">Cada obra nueva los trae</span></span><span class="chev">${ico("chev", 16, 2.2)}</span></summary><div class="pl-cuerpo" data-ck-pl></div></details>
         </fieldset>
@@ -209,11 +210,16 @@ window.EMT_EMPRESA = (() => {
       $("[data-logos-d]", v).innerHTML = Object.entries(D.DISTRIBUIDORAS).map(([k, x]) => { const src = logosD[k] || x.logo; return `<div class="logo-d"><div class="logo-d-img">${src ? `<img src="${esc(src)}" alt="Logo de ${esc(x.n)}">` : `<span class="suave">Sin logo</span>`}</div><div><b>${esc(x.n)}</b><small class="suave">${logosD[k] ? "Logo subido" : x.logo ? "Logo de ejemplo" : "Falta el logo"}</small></div><div class="acc">${puede ? `<label class="s-btn suave-b chico">${ico("plus", 14)}${src ? "Cambiar" : "Subir"}<input type="file" accept="image/png,image/jpeg,image/svg+xml,image/webp" hidden data-logo-sub="${k}"></label>${logosD[k] ? `<button class="s-link" type="button" data-logo-q="${k}">Quitar</button>` : ""}` : ""}</div></div>`; }).join("");
     };
     let ocultosT = await D.temasOcultos().catch(() => []);
+    let famE = "todos";
     const pintarTemasE = () => {
       const l = window.EMT_TEMAS || [];
-      $("[data-temas-res]", v).textContent = `${l.length - ocultosT.length} de ${l.length} para escoger`;
-      $("[data-temas-op]", v).innerHTML = l.map(x => `<label class="tema-o">${x.id === "emtecsa" ? `<input type="checkbox" checked disabled>` : `<input type="checkbox" data-tema-o="${x.id}" ${ocultosT.includes(x.id) ? "" : "checked"} ${puede ? "" : "disabled"}>`}${A().muestraTema(x)}<span><b>${esc(x.n)}</b>${x.id === "emtecsa" ? `<small>El de EMTECSA, siempre queda</small>` : ""}</span></label>`).join("");
-      const q = $("[data-temas-busca]", v).value; if (q) A().filtrar($("[data-temas-op]", v), ".tema-o", q);
+      const fams = A().FAMILIAS_TEMA.filter(([k]) => l.some(x => x.g === k));
+      $("[data-temas-res]", v).textContent = `${l.length - ocultosT.filter(t => l.some(x => x.id === t)).length} de ${l.length} para escoger`;
+      $("[data-temas-fams]", v).innerHTML = [["todos", "Todos"], ...fams].map(([k, t]) => `<button type="button" data-temas-fam="${k}" aria-pressed="${famE === k}">${t}</button>`).join("");
+      const q = A().normal($("[data-temas-busca]", v).value);
+      const op = x => `<label class="tema-o">${x.id === "emtecsa" ? `<input type="checkbox" checked disabled>` : `<input type="checkbox" data-tema-o="${x.id}" ${ocultosT.includes(x.id) ? "" : "checked"} ${puede ? "" : "disabled"}>`}${A().muestraTema(x)}<span><b>${esc(x.n)}</b>${x.id === "emtecsa" ? `<small>El de EMTECSA, siempre queda</small>` : ""}</span></label>`;
+      const grupos = fams.filter(([k]) => famE === "todos" || famE === k).map(([k, t]) => [k, t, l.filter(x => x.g === k && (!q || A().normal(x.n).includes(q)))]).filter(g => g[2].length);
+      $("[data-temas-op]", v).innerHTML = grupos.length ? grupos.map(([k, t, g]) => `<section class="temas-g"><h3>${t} · ${g.filter(x => !ocultosT.includes(x.id)).length} de ${g.length}</h3>${puede ? `<div class="fila-b" style="margin:0"><button class="s-btn suave-b chico" type="button" data-temas-fam-si="${k}">Marcar la familia</button><button class="s-btn suave-b chico" type="button" data-temas-fam-no="${k}">Quitar la familia</button></div>` : ""}<div class="temas-op">${g.map(op).join("")}</div></section>`).join("") : `<p class="temas-vacio">No hay colores con ese nombre.</p>`;
     };
     pintarTemasE();
     const guardarTemasE = async () => {
@@ -221,13 +227,19 @@ window.EMT_EMPRESA = (() => {
       catch (err) { aviso(err.message, "mal"); ocultosT = await D.temasOcultos().catch(() => ocultosT); }
       pintarTemasE();
     };
-    v.addEventListener("input", ev => { if (ev.target.matches("[data-temas-busca]")) A().filtrar($("[data-temas-op]", v), ".tema-o", ev.target.value); });
+    v.addEventListener("input", ev => { if (ev.target.matches("[data-temas-busca]")) pintarTemasE(); });
     v.addEventListener("change", ev => {
       const t = ev.target.dataset && ev.target.dataset.temaO; if (!t) return;
       ocultosT = ev.target.checked ? ocultosT.filter(x => x !== t) : ocultosT.concat(t);
       guardarTemasE();
     });
-    v.addEventListener("click", ev => { if (!ev.target.closest("[data-temas-todos]")) return; ocultosT = []; guardarTemasE(); });
+    v.addEventListener("click", ev => {
+      const tf = ev.target.closest("[data-temas-fam]"); if (tf) { famE = tf.dataset.temasFam; pintarTemasE(); return; }
+      const ids = k => (window.EMT_TEMAS || []).filter(x => x.g === k && x.id !== "emtecsa").map(x => x.id);
+      const si = ev.target.closest("[data-temas-fam-si]"); if (si) { const l = ids(si.dataset.temasFamSi); ocultosT = ocultosT.filter(t => !l.includes(t)); guardarTemasE(); return; }
+      const no = ev.target.closest("[data-temas-fam-no]"); if (no) { ocultosT = [...new Set(ocultosT.concat(ids(no.dataset.temasFamNo)))]; guardarTemasE(); return; }
+      if (!ev.target.closest("[data-temas-todos]")) return; ocultosT = []; guardarTemasE();
+    });
     pintarLogos();
     v.onchange = async ev => {
       if (ev.target.matches("[data-pl-sel]")) { plSel = Number(ev.target.value); pintarPls(); return; }
