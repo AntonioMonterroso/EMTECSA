@@ -1,5 +1,6 @@
 "use strict";
 window.EMT_CLIENTES = (() => {
+  let cliTab = "cotizaciones", cliTabDe = 0;
   const D = window.EMT_DATOS;
   const A = () => window.EMT_APP;
   const ICONO = { industria: ["building", "marino"], comercio: ["cart", "azul"], gobierno: ["shield", "gris"], residencial: ["home", "verde"], distribuidora: ["zap", "laton"] };
@@ -57,6 +58,8 @@ window.EMT_CLIENTES = (() => {
     const { $, esc, ico, Q } = A();
     const c = await D.cliente(id);
     const cots = c ? await window.EMT_COTIZACIONES.delCliente(id) : [];
+    const obrasC = c ? (await D.obras().catch(() => [])).filter(o => o.cliente_id === id) : [];
+    if (cliTabDe !== id) { cliTabDe = id; cliTab = "cotizaciones"; }
     const p = A().sesion().perfil;
     const edC = D.puede(p, "editarCliente"), edQ = D.puede(p, "editarEquipo");
     if (!c) { v.innerHTML = `<div class="vacio"><h2>No se encontró ese cliente</h2><p>Puede que lo hayan quitado.</p><a class="s-btn suave-b" href="#/clientes">Ver clientes</a></div>`; return; }
@@ -82,6 +85,8 @@ window.EMT_CLIENTES = (() => {
           ${c.notas ? `<div class="ancho2"><small>Notas</small><span>${esc(c.notas)}</span></div>` : ""}
         </div>
 
+        <nav class="seg pest-o pest-cli" aria-label="Partes del cliente">${[["cotizaciones", "Cotizaciones", cots.length], ["obras", "Obras", obrasC.length], ["sitios", "Sitios", c.sitios.length], ["contactos", "Contactos", c.contactos.length]].map(([k, t, n]) => `<button type="button" data-cli-tab="${k}" aria-pressed="${cliTab === k}">${t}<span class="cuenta-t">${n}</span></button>`).join("")}</nav>
+        <div class="cli-sec" data-cli-sec="sitios" ${cliTab === "sitios" ? "" : "hidden"}>
         <div class="sub"><h2>Sitios · ${c.sitios.length}</h2>${edC ? `<button class="s-btn suave-b" type="button" data-nuevo-sitio>${ico("plus", 15)}Agregar sitio</button>` : ""}</div>
         ${c.sitios.length ? c.sitios.map(s => `
           <section class="sitio">
@@ -91,16 +96,23 @@ window.EMT_CLIENTES = (() => {
               ${edQ ? `<div class="acc"><button class="s-ib" type="button" aria-label="Editar equipo" data-ed-equipo="${q.id}">${ico("pen", 15)}</button></div>` : ""}</div>`).join("") : `<p class="suave sin">Sin equipos registrados.</p>`}
               ${edQ ? `<button class="s-btn suave-b chico" type="button" data-nuevo-equipo="${s.id}">${ico("plus", 14)}Agregar equipo</button>` : ""}</div>
           </section>`).join("") : `<div class="vacio chico"><p>Todavía no tiene sitios. Agregue la planta o el lugar donde se trabaja.</p></div>`}
-
+        </div>
+        <div class="cli-sec" data-cli-sec="contactos" ${cliTab === "contactos" ? "" : "hidden"}>
         <div class="sub"><h2>Contactos · ${c.contactos.length}</h2>${edC ? `<button class="s-btn suave-b" type="button" data-nuevo-contacto>${ico("plus", 15)}Agregar contacto</button>` : ""}</div>
         ${c.contactos.length ? `<div class="lista">${c.contactos.map(k => `
           <div class="fila contacto" style="cursor:default"><span class="av-k">${esc(iniciales(k.nombre))}</span><span><b>${esc(k.nombre)}${k.principal ? ' <span class="chip azul">Principal</span>' : ""}</b><small>${esc([k.puesto, sitioDe(k.sitio_id)].filter(Boolean).join(" · ") || "Sin puesto")}${k.telefono ? " · " + esc(k.telefono) : ""}</small></span>
             <span class="acc">${k.telefono ? `<a class="s-ib" href="tel:${esc(telLimpio(k.telefono))}" aria-label="Llamar a ${esc(k.nombre)}">${ico("phone", 15)}</a>` : ""}${k.correo ? `<a class="s-ib" href="mailto:${esc(k.correo)}" aria-label="Escribir a ${esc(k.nombre)}">${ico("send", 15)}</a>` : ""}${edC ? `<button class="s-ib" type="button" aria-label="Editar ${esc(k.nombre)}" data-ed-contacto="${k.id}">${ico("pen", 15)}</button>` : ""}</span></div>`).join("")}</div>` : `<div class="vacio chico"><p>Todavía no tiene contactos.</p></div>`}
-
-        <div class="sub"><h2>Cotizaciones · ${cots.length}</h2></div>
+        </div>
+        <div class="cli-sec" data-cli-sec="cotizaciones" ${cliTab === "cotizaciones" ? "" : "hidden"}>
         ${cots.length ? `<div class="lista">${cots.map(q => `<a class="fila" href="#/cotizaciones/${q.id}"><span class="icono laton">${ico("file", 18)}</span><span><b>${esc(q.numero)}${q.titulo ? " · " + esc(q.titulo) : ""}</b><small>${esc(window.EMT_COTIZACIONES.fechaCorta(q.fecha))}</small></span><span class="der"><span class="e-cifra">${esc(Q(q.total))}</span><small><span class="chip ${window.EMT_COTIZACIONES.CHIP[q.estado]}">${esc(D.ESTADOS[q.estado])}</span></small></span><span class="chev">${ico("chev", 16, 2.2)}</span></a>`).join("")}</div>` : `<div class="vacio chico"><p>Todavía no tiene cotizaciones.</p></div>`}
+        </div>
+        <div class="cli-sec" data-cli-sec="obras" ${cliTab === "obras" ? "" : "hidden"}>
+        ${obrasC.length ? `<div class="lista">${obrasC.map(o => `<a class="fila" href="#/obras/${o.id}"><span class="icono azul">${ico("hammer", 18)}</span><span><b>${esc(o.numero)}${o.titulo ? " · " + esc(o.titulo) : ""}</b><small>${esc(D.ESTADOS_OBRA[o.estado] || o.estado)}</small></span><span class="chev">${ico("chev", 16, 2.2)}</span></a>`).join("")}</div>` : `<div class="vacio chico"><p>Todavía no tiene obras.</p></div>`}
+        </div>
       </div>`;
     v.onclick = e => {
+      const tb = e.target.closest("[data-cli-tab]");
+      if (tb) { cliTab = tb.dataset.cliTab; v.querySelectorAll("[data-cli-tab]").forEach(b => b.setAttribute("aria-pressed", String(b === tb))); v.querySelectorAll("[data-cli-sec]").forEach(s => { s.hidden = s.dataset.cliSec !== cliTab; }); return; }
       if (e.target.closest("[data-ed-cli]")) editarCliente(c);
       if (e.target.closest("[data-nueva-cot]")) window.EMT_COTIZACIONES.nueva(c.id);
       if (e.target.closest("[data-nuevo-sitio]")) editarSitio(c, null);

@@ -15,11 +15,11 @@ window.EMT_COBROS = (() => {
     const p = A().sesion().perfil;
     if (!D.puede(p, "verCobros")) { v.innerHTML = `<div class="vacio"><h2>Sin acceso a cobros</h2><p>Esta parte la ven gerencia, administración y ventas.</p><a class="s-btn suave-b" href="#/hoy">Regresar a Hoy</a></div>`; return; }
     const r = await D.resumenCobros();
-    const pestL = PEST.concat(D.puede(p, "verCosto") ? [["costos", "Costos"]] : []);
+    const pestL = [["", "Por cobrar"], ["pagos", "Pagos"], ...(D.puede(p, "verCosto") ? [["costos", "Costos"]] : []), ["fianzas", "Fianzas"], ["clientes", "Estados de cuenta"]];
     const pest = pestL.some(([k]) => k === sub) ? sub : "";
     v.innerHTML = `
       <div class="cuerpo">
-        <div class="cab-v"><div><h1 class="t">Dinero</h1><p class="desc">Lo que falta cobrar de cada obra, los pagos con su recibo, el estado de cuenta de cada cliente y las fianzas.</p></div></div>
+        <div class="cab-v"><div><h1 class="t">Dinero</h1><p class="desc">Lo que falta cobrar de cada obra, los pagos con su recibo, el estado de cuenta de cada cliente y las fianzas.</p></div>${D.puede(p, "registrarPago") ? `<button class="s-btn lleno" type="button" data-reg-pago>${ico("plus", 16)}Registrar pago</button>` : ""}</div>
         ${D.nube ? "" : `<div class="nota-local">${ico("shield", 18)}<span>Modo de prueba: los cobros se guardan en esta computadora y se suben a la base de EMTECSA cuando se conecte.</span></div>`}
         <div class="widgets">
           <a class="w" href="#/cobros"><span class="w-cab"><span class="icono laton">${ico("wallet", 18)}</span></span><span class="l">Por cobrar</span><b>${esc(Q(r.porCobrar))}</b><small>${r.pendientes.length} ${r.pendientes.length === 1 ? "cobro pendiente" : "cobros pendientes"}</small></a>
@@ -40,7 +40,10 @@ window.EMT_COBROS = (() => {
     const filtrarC = () => A().filtrar(box, ".lista > .fila, .tm-fila", buscaC);
     filtrarC();
     v.oninput = e => { if (e.target.matches("[data-busca-cob]")) { buscaC = e.target.value; filtrarC(); } };
-    v.onclick = e => { if (box.onclic) box.onclic(e); };
+    v.onclick = e => {
+      if (e.target.closest("[data-reg-pago]")) { elegirCobro(r, recargar); return; }
+      if (box.onclic) box.onclic(e);
+    };
   }
 
   function pPorCobrar(box, r, recargar) {
@@ -53,6 +56,23 @@ window.EMT_COBROS = (() => {
         ${puede ? `<button class="s-btn suave-b chico" type="button" data-cobrar="${p.id}">Cobrar</button>` : "<span></span>"}</div>`).join("")}</div>`
       : `<div class="vacio"><span class="icono laton">${ico("wallet", 24)}</span><h2>No hay nada pendiente de cobrar</h2><p>Los cobros salen del plan de pagos de cada obra: abra la obra, pestaña «Cobros y gastos», y arme sus pagos (por ejemplo 60 % de anticipo y 40 % al entregar).</p><a class="s-btn suave-b" href="#/obras">Ver obras</a></div>`;
     box.onclic = e => { const b = e.target.closest("[data-cobrar]"); if (b) cobrar(r.pendientes.find(x => x.id === Number(b.dataset.cobrar)), recargar); };
+  }
+
+  function elegirCobro(r, recargar) {
+    const { esc, Q, modal, cerrarCapas } = A();
+    const l = r.pendientes.slice().sort((a, b) => (a.venc === "vencido" ? 0 : 1) - (b.venc === "vencido" ? 0 : 1));
+    if (!l.length) { A().aviso("No hay nada pendiente de cobrar."); return; }
+    modal({
+      titulo: "¿Qué se está pagando?", guardarTxt: "Cerrar", soloUno: true,
+      cuerpo: `<label class="busca-v ancho-busca"><span class="sr">Buscar</span>${A().ico("search", 16)}<input type="search" data-rp-busca placeholder="Cliente, obra o cobro" autocomplete="off"></label>
+        <div class="lista" data-rp-l>${l.map(x => `<button class="fila rp-f" type="button" data-rp="${x.id}" data-txt="${esc(((x.cliente ? x.cliente.nombre : "") + " " + (x.obra ? x.obra.numero : "") + " " + x.descripcion).toLowerCase())}"><span><b>${esc(x.cliente ? x.cliente.nombre : "")}</b><small>${x.obra ? esc(x.obra.numero) + " · " : ""}${esc(x.descripcion)}${x.venc === "vencido" ? " · vencido" : ""}</small></span><span class="der"><span class="e-cifra">${esc(Q(x.saldo))}</span></span></button>`).join("")}</div>`,
+      alAbrir: (f, m) => {
+        const lista = m.querySelector("[data-rp-l]");
+        m.querySelector("[data-rp-busca]").addEventListener("input", ev => A().filtrar(lista, ".fila", ev.target.value));
+        lista.addEventListener("click", ev => { const b = ev.target.closest("[data-rp]"); if (!b) return; const x = l.find(z => z.id === Number(b.dataset.rp)); cerrarCapas(); cobrar(x, recargar); });
+      },
+      alGuardar: async () => cerrarCapas()
+    });
   }
 
   async function cobrar(parte, recargar) {

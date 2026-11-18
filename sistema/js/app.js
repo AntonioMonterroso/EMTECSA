@@ -381,8 +381,8 @@
         <div class="cab-v"><div><h1 class="t">Catálogo</h1><p class="desc">Lo que vende EMTECSA y el material que lleva cada cosa. Aquí va el costo de compra de cada material y la mano de obra; el precio para el cliente se arma en cada cotización con el aumento.</p></div>${boton}</div>
         ${D.nube ? "" : `<div class="nota-local">${ico("shield", 18)}<span>Modo de prueba: lo que guarde se queda en esta computadora y se sube a la base de EMTECSA cuando se conecte.</span></div>`}
         <div class="herr">
-          <nav class="seg" aria-label="Ver"><a href="#/catalogo" ${pestana === "estructuras" ? 'aria-current="page"' : ""}>Lo que vende</a><a href="#/catalogo/materiales" ${pestana === "materiales" ? 'aria-current="page"' : ""}>Materiales</a>${verAum ? `<a href="#/catalogo/precios" ${pestana === "precios" ? 'aria-current="page"' : ""}>Precios</a>` : ""}<a href="#/catalogo/proveedores" ${pestana === "proveedores" ? 'aria-current="page"' : ""}>Proveedores</a></nav>
           <label class="busca-v"><span class="sr">Buscar</span>${ico("search", 16)}<input type="search" placeholder="${pestana === "estructuras" ? "Buscar estructura, kV o kVA" : "Buscar material o código"}" value="${esc(busqueda)}" data-filtro></label>
+          <nav class="seg" aria-label="Ver"><a href="#/catalogo" ${pestana === "estructuras" ? 'aria-current="page"' : ""}>Lo que vende</a><a href="#/catalogo/materiales" ${pestana === "materiales" ? 'aria-current="page"' : ""}>Materiales</a>${verAum ? `<a href="#/catalogo/precios" ${pestana === "precios" ? 'aria-current="page"' : ""}>Precios</a>` : ""}<a href="#/catalogo/proveedores" ${pestana === "proveedores" ? 'aria-current="page"' : ""}>Proveedores</a></nav>
         </div>
         <div data-res></div>
       </div>`;

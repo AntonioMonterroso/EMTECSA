@@ -1426,3 +1426,17 @@ html.con-previa, html.con-previa body { overflow: hidden; }
 .sub-o:empty { display: none; }
 .sub-o + .sub-o:not(:empty) { padding-top: 18px; border-top: 1px solid var(--linea-s); }
 @media (max-width: 560px) { .toca-obra .s-btn { width: 100%; justify-content: center; } }
+
+fieldset.empresa[data-grupo-act] > details[data-grupo-e] { display: none; }
+fieldset.empresa[data-grupo-act="empresa"] > details[data-grupo-e="empresa"],
+fieldset.empresa[data-grupo-act="firmas"] > details[data-grupo-e="firmas"],
+fieldset.empresa[data-grupo-act="cotizar"] > details[data-grupo-e="cotizar"],
+fieldset.empresa[data-grupo-act="obras"] > details[data-grupo-e="obras"] { display: block; }
+.pest-emp, .pest-cli { margin-bottom: 4px; }
+.pest-cli button, .pest-emp button { white-space: nowrap; }
+.cuenta-t { margin-left: 6px; font-size: 12px; font-weight: 700; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.cli-sec { display: grid; gap: 12px; }
+.cli-sec[hidden] { display: none; }
+.rp-f { grid-template-columns: minmax(0, 1fr) auto !important; }
+.rp-f .der { grid-column: auto !important; grid-row: auto !important; text-align: right !important; }
+@media (max-width: 560px) { .pest-cli button, .pest-emp button { flex: 1 1 0; min-width: 0; padding: 0 4px; font-size: 12.5px; white-space: normal; line-height: 1.15; text-align: center; } .pest-cli .cuenta-t { display: none; } }

@@ -1,5 +1,12 @@
 "use strict";
 window.EMT_EMPRESA = (() => {
+  const GRUPOS_E = [
+    ["empresa", "La empresa", ["Datos de la empresa", "Constructora e ingeniero", "Logos de distribuidoras"]],
+    ["firmas", "Firmas y documentos", ["Quién firma las propuestas", "Carta de presentación", "Documentos de la empresa"]],
+    ["cotizar", "Cómo se cotiza", ["Textos para cada cotización nueva", "Seguimiento de cotizaciones", "Del plano a la cotización"]],
+    ["obras", "Obras", ["Etapas por tipo de trabajo", "Checklists de cada obra", "Costos de obra"]]
+  ];
+  let grupoE = "empresa";
   const D = window.EMT_DATOS;
   const A = () => window.EMT_APP;
 
@@ -25,7 +32,8 @@ window.EMT_EMPRESA = (() => {
       <div class="cuerpo">
         <div class="cab-v"><div><h1 class="t">Empresa</h1><p class="desc">Los datos de EMTECSA que salen en cada propuesta en PDF y los textos que se ponen solos en cada cotización nueva.</p></div></div>
         ${D.nube ? "" : `<div class="nota-local">${ico("shield", 18)}<span>Modo de prueba: estos datos se guardan en esta computadora y se suben a la base de EMTECSA cuando se conecte.</span></div>`}
-        <fieldset class="bloq empresa" ${puede ? "" : "disabled"}>
+        <nav class="seg pest-o pest-emp" aria-label="Partes de Empresa">${GRUPOS_E.map(([k, t]) => `<button type="button" data-ge="${k}" aria-pressed="${grupoE === k}">${t}</button>`).join("")}</nav>
+        <fieldset class="bloq empresa" data-grupo-act="${grupoE}" ${puede ? "" : "disabled"}>
           <details class="caja plegable" open><summary><span class="pl-t"><h2>Datos de la empresa</h2></span><span class="chev">${ico("chev", 16, 2.2)}</span></summary><div class="pl-cuerpo">
             <div class="f-fila">${campo("nombre", "Nombre comercial")}${campo("razon_social", "Razón social")}</div>
             <div class="f-fila">${campo("nit", "NIT")}${campo("telefono", "Teléfono", "", 'inputmode="tel"')}</div>
@@ -67,6 +75,8 @@ window.EMT_EMPRESA = (() => {
         </fieldset>
         ${puede ? `<div class="fila-b"><button class="s-btn lleno" type="button" data-guardar-emp>${ico("check", 16)}Guardar</button><span class="guardado" data-est-emp style="margin:0;align-self:center">Todo guardado</span></div>` : ""}
       </div>`;
+    v.querySelectorAll("fieldset.empresa > details.plegable").forEach(d => { const h = d.querySelector("summary h2"); const t = h ? h.textContent.trim() : ""; const g = GRUPOS_E.find(([, , l]) => l.includes(t)); d.dataset.grupoE = g ? g[0] : "empresa"; });
+    v.addEventListener("click", ev => { const b = ev.target.closest("[data-ge]"); if (!b) return; grupoE = b.dataset.ge; v.querySelectorAll("[data-ge]").forEach(x => x.setAttribute("aria-pressed", String(x === b))); const fs = v.querySelector("fieldset.empresa"); if (fs) fs.dataset.grupoAct = grupoE; });
     const filaNum = (t, i, n, pre) => `<div class="fila ck-pl-f" style="cursor:default">${puede ? `<button class="ck-asa" type="button" aria-label="Arrastrar para mover: ${esc(t)}" data-asa="${pre}:${i}">${ico("asa", 16)}</button>` : "<span></span>"}<span class="num-l">${i + 1}</span><span class="ck-t">${esc(t)}</span>
       <span class="acc">${puede ? `<button class="s-ib" type="button" aria-label="Subir: ${esc(t)}" data-${pre}-sube="${i}" ${i === 0 ? "disabled" : ""}>${ico("arriba", 15)}</button><button class="s-ib" type="button" aria-label="Bajar: ${esc(t)}" data-${pre}-baja="${i}" ${i === n - 1 ? "disabled" : ""}>${ico("abajo", 15)}</button><button class="s-ib" type="button" aria-label="Editar: ${esc(t)}" data-${pre}-ed="${i}">${ico("pen", 15)}</button>` : ""}</span></div>`;
     const pintarPls = () => {
