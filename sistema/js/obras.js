@@ -5,7 +5,9 @@ window.EMT_OBRAS = (() => {
   const CHIP = { programada: "gris", en_curso: "azul", pausada: "ambar", terminada: "verde", cancelada: "gris" };
   const CHIP_T = { pendiente: "gris", en_tramite: "azul", aprobado: "verde", rechazado: "ambar", no_aplica: "gris" };
   const DISTRIBUIDORAS = ["EEGSA", "Energuate", "Empresa municipal"];
-  const PESTANAS = [["etapas", "Etapas"], ["bitacora", "Bitácora"], ["materiales", "Materiales"], ["checklist", "Checklist"], ["plano", "Plano"], ["tramites", "Trámites"]];
+  const GRUPOS_O = [["avance", "Avance"], ["material", "Material"], ["tramites", "Trámites"], ["dinero", "Dinero"]];
+  const VIEJA_O = { etapas: "avance", bitacora: "avance", materiales: "material", checklist: "material", plano: "tramites", tramites: "tramites", cobros: "dinero", costos: "dinero" };
+  const ANCLA_O = { bitacora: "b", checklist: "b", plano: "b", costos: "b" };
   let estadoF = "", buscaO = "", buscaP = "", obraP = 0;
   const fCorta = f => { if (!f) return ""; const [y, m, d] = String(f).slice(0, 10).split("-").map(Number); return new Date(y, m - 1, d).toLocaleDateString("es-GT", { day: "numeric", month: "short", year: "numeric" }); };
   const hoyISO = () => new Date().toISOString().slice(0, 10);
@@ -114,6 +116,15 @@ window.EMT_OBRAS = (() => {
     const sitio = cli && cli.sitios.find(s => s.id === o.sitio_id);
     const cot = o.cotizacion_id ? (await D.cotizaciones()).find(x => x.id === o.cotizacion_id) : null;
     const av = o.etapas.length ? Math.round(o.etapas.filter(e => e.hecha).length / o.etapas.length * 100) : 0;
+    const verDinero = D.puede(p, "verCobros") || D.puede(p, "verGastos") || D.puede(p, "verCosto");
+    const gruposVis = GRUPOS_O.filter(([k]) => k !== "dinero" || verDinero);
+    const grupo = gruposVis.some(([k]) => k === pest) ? pest : (VIEJA_O[pest] && gruposVis.some(([k]) => k === VIEJA_O[pest]) ? VIEJA_O[pest] : "avance");
+    const ancla = ANCLA_O[pest] || null;
+    const etOrd = o.etapas.slice().sort((a, b) => a.orden - b.orden), sigE = etOrd.find(e => !e.hecha);
+    const cerrada = o.estado === "terminada" || o.estado === "cancelada";
+    const tocaHTML = cerrada ? "" : !etOrd.length ? (ed ? `<section class="caja toca-obra"><span><small>Lo que toca ahora</small><b>Ponerle etapas a la obra</b></span><a class="s-btn lleno" href="#/obras/${o.id}/avance">${ico("plus", 15)}Agregar etapas</a></section>` : "")
+      : sigE ? `<section class="caja toca-obra"><span><small>Lo que toca ahora</small><b>${esc(sigE.nombre)}</b><small>${[sigE.inicio || sigE.fin ? `${esc(fCorta(sigE.inicio) || "…")} → ${esc(fCorta(sigE.fin) || "…")}` : "", sigE.responsable ? esc(sigE.responsable) : ""].filter(Boolean).join(" · ") || "Etapa " + (etOrd.indexOf(sigE) + 1) + " de " + etOrd.length}</small></span>${ed ? `<button class="s-btn lleno" type="button" data-toca-hecha="${sigE.id}">${ico("check", 15)}Marcar hecha</button>` : ""}</section>`
+      : ed ? `<section class="caja toca-obra"><span><small>Lo que toca ahora</small><b>Todas las etapas están hechas</b></span><button class="s-btn lleno" type="button" data-toca-fin>${ico("check", 15)}Dar la obra por terminada</button></section>` : "";
     v.innerHTML = `
       <div class="cuerpo">
         <a class="volver" href="#/obras">${ico("chev", 16, 2.2)}Obras</a>
@@ -122,21 +133,29 @@ window.EMT_OBRAS = (() => {
           <div class="fila-b">${ed ? `<label class="estado-sel"><span class="sr">Estado de la obra</span><select data-estado-obra>${Object.entries(D.ESTADOS_OBRA).map(([k, n]) => `<option value="${k}" ${o.estado === k ? "selected" : ""}>${esc(n)}</option>`).join("")}</select></label><button class="s-btn suave-b" type="button" data-ed-obra>${ico("pen", 15)}Editar</button>` : `<span class="chip ${CHIP[o.estado]}">${esc(D.ESTADOS_OBRA[o.estado])}</span>`}</div>
         </div>
         <div class="avance-o"><span><b>${av} %</b> de las etapas hechas</span><i><span style="transform:scaleX(${av / 100})"></span></i></div>
-        <div class="herr"><nav class="seg pest-o" aria-label="Partes de la obra">${PESTANAS.concat(D.puede(p, "verCobros") ? [["cobros", "Cobros"]] : D.puede(p, "verGastos") ? [["cobros", "Gastos"]] : [], D.puede(p, "verCosto") ? [["costos", "Costos"]] : D.puede(p, "verGastos") ? [["costos", "Mano de obra"]] : []).map(([k, n]) => `<a href="#/obras/${o.id}/${k}" ${pest === k ? 'aria-current="page"' : ""}>${n}</a>`).join("")}</nav>
+        ${tocaHTML}
+        <div class="herr"><nav class="seg pest-o pest-obra" aria-label="Partes de la obra">${gruposVis.map(([k, n]) => `<a href="#/obras/${o.id}/${k}" ${grupo === k ? 'aria-current="page"' : ""}>${n}</a>`).join("")}</nav>
         <label class="busca-v"><span class="sr">Buscar en esta pestaña</span>${ico("search", 16)}<input type="search" data-busca-pest placeholder="Buscar en esta pestaña" value="${esc(buscaP)}" autocomplete="off"></label></div>
         <div data-pest></div>
       </div>`;
     const box = $("[data-pest]", v);
-    const recargar = () => A().quieto(() => ficha(v, id, pest));
-    if (pest === "bitacora") await pBitacora(box, o, ed, recargar);
-    else if (pest === "materiales") pMateriales(box, o, cat, mover, recargar);
-    else if (pest === "tramites") pTramites(box, o, ed, recargar);
-    else if (pest === "checklist") await window.EMT_COMPRAS.tabObra(box, o, recargar);
-    else if (pest === "plano") { if (o.cotizacion_id) await D.copiarPlanoAObra(o.cotizacion_id, o.id); const mini = await window.EMT_PLANOS.miniatura("obra", o.id); box.innerHTML = `<div class="sub"><h2>Plano</h2><a class="s-btn lleno" href="#/plano/obra/${o.id}">${ico(mini ? "pen" : "plus", 15)}${mini ? "Abrir el plano" : "Dibujar el plano"}</a></div>${mini ? `<a class="caja mini-plano-c" href="#/plano/obra/${o.id}">${mini}</a>` : `<div class="vacio chico"><p>${o.cotizacion_id ? "La cotización no tiene plano." : "Todavía no hay plano."} Se dibuja con la simbología de Energuate y sale en PDF tabloide con el machote abajo.</p></div>`}`; }
-    else if (pest === "cobros" && (D.puede(p, "verCobros") || D.puede(p, "verGastos"))) await window.EMT_COBROS.tabObra(box, o, recargar);
-    else if (pest === "costos" && (D.puede(p, "verCosto") || D.puede(p, "verGastos"))) await window.EMT_COSTOS.tabObra(box, o, recargar);
-    else pEtapas(box, o, ed, recargar);
-    const filtrarP = () => { A().filtrar(box, ".lista > .fila, .tm-fila, section.dia", buscaP); box.trasFiltro && box.trasFiltro(); box.querySelectorAll("details.movs").forEach(d => { const q = buscaP.trim(); const vis = [...d.querySelectorAll(".lista > .fila")].some(f => !f.hidden); d.hidden = !!q && !vis; if (q && vis) d.open = true; }); };
+    const recargar = () => A().quieto(() => ficha(v, id, grupo));
+    box.innerHTML = `<div class="sub-o" data-sub="a"></div><div class="sub-o" data-sub="b"></div>`;
+    const sa = box.querySelector('[data-sub="a"]'), sb2 = box.querySelector('[data-sub="b"]');
+    if (grupo === "avance") { pEtapas(sa, o, ed, recargar); await pBitacora(sb2, o, ed, recargar); }
+    else if (grupo === "material") { pMateriales(sa, o, cat, mover, recargar); await window.EMT_COMPRAS.tabObra(sb2, o, recargar); }
+    else if (grupo === "tramites") {
+      pTramites(sa, o, ed, recargar);
+      if (o.cotizacion_id) await D.copiarPlanoAObra(o.cotizacion_id, o.id);
+      const mini = await window.EMT_PLANOS.miniatura("obra", o.id);
+      sb2.innerHTML = `<div class="sub"><h2>Plano</h2><a class="s-btn suave-b" href="#/plano/obra/${o.id}">${ico(mini ? "pen" : "plus", 15)}${mini ? "Abrir el plano" : "Dibujar el plano"}</a></div>${mini ? `<a class="caja mini-plano-c" href="#/plano/obra/${o.id}">${mini}</a>` : `<div class="vacio chico"><p>${o.cotizacion_id ? "La cotización no tiene plano." : "Todavía no hay plano."}</p></div>`}`;
+    }
+    else if (grupo === "dinero") {
+      if (D.puede(p, "verCobros") || D.puede(p, "verGastos")) await window.EMT_COBROS.tabObra(sa, o, recargar);
+      if (D.puede(p, "verCosto") || D.puede(p, "verGastos")) await window.EMT_COSTOS.tabObra(sb2, o, recargar);
+    }
+    if (ancla && sb2.innerHTML) setTimeout(() => { const y = sb2.getBoundingClientRect().top + scrollY - 90; scrollTo({ top: Math.max(0, y), behavior: "instant" }); }, 0);
+    const filtrarP = () => { A().filtrar(box, ".lista > .fila, .tm-fila, section.dia", buscaP); [sa, sb2].forEach(b => b.trasFiltro && b.trasFiltro()); box.querySelectorAll("details.movs").forEach(d => { const q = buscaP.trim(); const vis = [...d.querySelectorAll(".lista > .fila")].some(f => !f.hidden); d.hidden = !!q && !vis; if (q && vis) d.open = true; }); };
     filtrarP();
     v.oninput = e => { if (e.target.matches("[data-busca-pest]")) { buscaP = e.target.value; filtrarP(); } };
     v.onchange = async e => {
@@ -144,7 +163,10 @@ window.EMT_OBRAS = (() => {
     };
     v.onclick = async e => {
       if (e.target.closest("[data-ed-obra]")) editarObra(o, cli, recargar);
-      if (box.onclic) await box.onclic(e);
+      const th = e.target.closest("[data-toca-hecha]");
+      if (th) { th.disabled = true; try { const x = o.etapas.find(z => z.id === Number(th.dataset.tocaHecha)); await D.guardarEtapa(o.id, { ...x, hecha: true, fecha_hecha: null }); aviso(`«${x.nombre}» quedó hecha.`); await recargar(); } catch (err) { th.disabled = false; aviso(err.message, "mal"); } return; }
+      if (e.target.closest("[data-toca-fin]")) { try { await D.guardarObra({ ...o, estado: "terminada" }); aviso("La obra quedó terminada."); await recargar(); } catch (err) { aviso(err.message, "mal"); } return; }
+      for (const b of box.querySelectorAll("[data-sub]")) if (b.onclic && b.contains(e.target)) await b.onclic(e);
     };
   }
 

@@ -176,7 +176,7 @@ window.EMT_PLANOS = (() => {
     pg.drawImage(im, { x: 0, y: 0, width: W, height: H });
     return doc.save();
   }
-  async function pdf(d, mc, nombre) { window.EMT_PDF.descargar(await planoBytes(d, mc, nombre), nombre + ".pdf"); }
+  async function pdf(d, mc, nombre) { window.EMT_PDF.mostrar(await planoBytes(d, mc, nombre), nombre + ".pdf", nombre); }
 
   function machoteInicial(base) {
     const hoy = new Date();

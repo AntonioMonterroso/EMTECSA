@@ -96,7 +96,7 @@ window.EMT_COMPRAS = (() => {
           aviso("Armando el pedido…");
           const cli = await D.cliente(o.cliente_id);
           const b = await window.EMT_PDF.pedido({ prov, obra: o, cli, sitio: cli && cli.sitios.find(s => s.id === o.sitio_id), lineas: (grupos[k] || []).filter(x => x.estado !== "recibido"), emp: await D.empresa(), conPrecio: verCosto });
-          window.EMT_PDF.descargar(b, `Pedido ${o.numero} - ${prov.nombre.replace(/[\\/:*?"<>|]/g, "")}.pdf`);
+          window.EMT_PDF.mostrar(b, `Pedido ${o.numero} - ${prov.nombre.replace(/[\\/:*?"<>|]/g, "")}.pdf`);
         } catch (err) { aviso(/[áéíóúñ]/i.test(err.message) ? err.message : "No se pudo armar el pedido.", "mal"); }
       }
     };

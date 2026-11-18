@@ -266,12 +266,17 @@ window.EMT_PDF = (() => {
     const a = document.createElement("a"); a.href = url; a.download = nombre; document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 4000);
   }
-  function ver(b) {
+  function mostrar(b, nombre, titulo) {
+    if (window.EMT_PREVIA) { window.EMT_PREVIA.abrir({ titulo: titulo || String(nombre || "Documento").replace(/\.pdf$/i, ""), pdf: b, nombre: nombre || "documento.pdf" }); return; }
+    descargar(b, nombre || "documento.pdf");
+  }
+  function ver(b, nombre) {
+    if (window.EMT_PREVIA) { mostrar(b, nombre || "documento.pdf"); return; }
     const url = URL.createObjectURL(new Blob([b], { type: "application/pdf" }));
     const w = window.open(url, "_blank");
     if (w) w.opener = null; else descargar(b, "propuesta.pdf");
     setTimeout(() => URL.revokeObjectURL(url), 60000);
   }
 
-  return { FOTOS, generar, descargar, ver, nombreArchivo, base: { preparar, svgAPng, partir, COL, W, H, M, PIE, Q, cant } };
+  return { FOTOS, generar, descargar, ver, mostrar, nombreArchivo, base: { preparar, svgAPng, partir, COL, W, H, M, PIE, Q, cant } };
 })();

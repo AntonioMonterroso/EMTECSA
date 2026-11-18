@@ -351,7 +351,11 @@ window.EMT_EG_DOCS = (() => {
     materiales: { pdf: materiales }, gps: { pdf: gps }, plano: { pdf: plano }
   };
 
-  function descargar(r) { const b = new Blob([r.bytes], { type: r.tipo }); const u = URL.createObjectURL(b); const a = document.createElement("a"); a.href = u; a.download = r.nombre; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(u), 4000); }
+  function descargar(r) {
+    if (window.EMT_PREVIA && /pdf/i.test(r.tipo || "")) { window.EMT_PREVIA.abrir({ titulo: String(r.nombre || "Documento").replace(/\.pdf$/i, ""), pdf: r.bytes, nombre: r.nombre }); return; }
+    bajarDirecto(r);
+  }
+  function bajarDirecto(r) { const b = new Blob([r.bytes], { type: r.tipo }); const u = URL.createObjectURL(b); const a = document.createElement("a"); a.href = u; a.download = r.nombre; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(u), 4000); }
 
   async function expediente(x) {
     const b = await pdfBase();

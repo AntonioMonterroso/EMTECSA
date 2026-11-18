@@ -97,7 +97,7 @@ window.EMT_COBROS = (() => {
       aviso("Armando el recibo…");
       const d = await datosRecibo(pagoId);
       const b = await window.EMT_PDF.recibo(d);
-      if (modo === "ver") window.EMT_PDF.ver(b); else window.EMT_PDF.descargar(b, `Recibo ${d.pago.numero} - ${d.cli ? d.cli.nombre.replace(/[\\/:*?"<>|]/g, "") : ""}.pdf`);
+      if (modo === "ver") window.EMT_PDF.ver(b, `Recibo ${d.pago.numero}.pdf`); else window.EMT_PDF.descargar(b, `Recibo ${d.pago.numero} - ${d.cli ? d.cli.nombre.replace(/[\\/:*?"<>|]/g, "") : ""}.pdf`);
     } catch (err) { aviso(/[áéíóúñ]/i.test(err.message) ? err.message : "No se pudo armar el recibo. Intente otra vez.", "mal"); }
   }
 
@@ -137,7 +137,7 @@ window.EMT_COBROS = (() => {
         ${ec.mov.length ? `<div class="tabla-m ec"><div class="tm-cab"><span>Fecha y concepto</span><span>Cobro</span><span>Pago</span><span>Saldo</span></div>${ec.mov.map(m => `<div class="tm-fila"><span><b>${esc(m.texto)}</b><small>${esc(fCorta(m.fecha) || "Sin fecha")}${m.venc === "vencido" ? ' · <span class="falta">vencido</span>' : ""}</small></span><span data-l="Cobro">${m.cargo ? esc(Q(m.cargo)) : ""}</span><span data-l="Pago">${m.abono ? esc(Q(m.abono)) : ""}</span><span data-l="Saldo"><b>${esc(Q(m.saldo))}</b></span></div>`).join("")}</div>` : `<div class="vacio chico"><p>Sin movimientos.</p></div>`}`;
       box.onclic = async e => {
         if (!e.target.closest("[data-ec-pdf]")) return;
-        try { A().aviso("Armando el estado de cuenta…"); const b = await window.EMT_PDF.estadoCuenta({ cli, ec, emp: await D.empresa() }); window.EMT_PDF.descargar(b, `Estado de cuenta - ${cli.nombre.replace(/[\\/:*?"<>|]/g, "")}.pdf`); }
+        try { A().aviso("Armando el estado de cuenta…"); const b = await window.EMT_PDF.estadoCuenta({ cli, ec, emp: await D.empresa() }); window.EMT_PDF.mostrar(b, `Estado de cuenta - ${cli.nombre.replace(/[\\/:*?"<>|]/g, "")}.pdf`); }
         catch (err) { A().aviso("No se pudo armar el estado de cuenta.", "mal"); }
       };
       return;
