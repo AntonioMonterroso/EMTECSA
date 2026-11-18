@@ -162,6 +162,13 @@
     pintarProductos(true);
   }
 
+  function resumenOpcion(o) {
+    const v = o.valores;
+    const m = (x, i) => i && /^[A-ZÁÉÍÓÚ][a-záéíóúñ]/.test(x) ? x[0].toLowerCase() + x.slice(1) : x;
+    if (v.every(x => x.length <= 9)) return v.length > 2 ? `${v[0]} a ${v[v.length - 1]}` : v.map(m).join(" y ");
+    const w = o.nombre.toLowerCase();
+    return `${v.length} ${/[aeiou]$/.test(w) ? w + "s" : w.replace("ión", "ion") + "es"}`;
+  }
   function normal(s) { return String(s).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, ""); }
   function pintarProductos(animar) {
     const t = normal(filtro.texto.trim());
@@ -170,7 +177,7 @@
     $("#productos-lista").innerHTML = lista.map((p, i) => {
       const precio = p.modo === "precio"
         ? `<span class="precio">${q(p.precio)}<small>por ${esc(p.unidad)}</small></span>`
-        : `<span class="a-cotizar">A cotizar<small>${p.opciones ? esc(p.opciones.map(o => o.valores.length > 2 ? `${o.valores[0]} a ${o.valores[o.valores.length - 1]}` : o.valores.join(" y ")).join(" · ")) : "Según su obra"}</small></span>`;
+        : `<span class="a-cotizar">A cotizar<small>${p.opciones ? esc(p.opciones.map(resumenOpcion).join(" · ")) : "Según su obra"}</small></span>`;
       const boton = p.modo === "precio"
         ? `<button class="agregar" type="button" data-agregar="${p.id}" aria-label="Agregar ${esc(p.nombre)} al carrito">${ico("plus", 16)}Agregar</button>`
         : `<button class="agregar contorno" type="button" data-ver="${p.id}" aria-label="Cotizar ${esc(p.nombre)}">Cotizar</button>`;
