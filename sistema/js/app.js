@@ -103,6 +103,15 @@
     try { localStorage.setItem("emtecsa.sistema.modo", m); } catch (e) {}
   }
 
+  function ponerTema(t) {
+    const ok = t && t !== "emtecsa" && (window.EMT_TEMAS || []).some(x => x.id === t);
+    if (ok) document.documentElement.dataset.tema = t; else delete document.documentElement.dataset.tema;
+    try { localStorage.setItem("emtecsa.sistema.tema", ok ? t : "emtecsa"); } catch (e) {}
+    const m = document.querySelector('meta[name="theme-color"]'); const c = getComputedStyle(document.documentElement).getPropertyValue("--bg").trim(); if (m && /^#[0-9a-f]{6}$/i.test(c)) m.content = c;
+  }
+  const temaActual = () => document.documentElement.dataset.tema || "emtecsa";
+  const muestraTema = x => `<span class="tm" style="--tf:${x.f};--tc:${x.c};--tb:${x.b};--ta:${x.a}" aria-hidden="true"><i class="tm-b"></i><i class="tm-c"><i></i><i></i></i><i class="tm-p"></i></span>`;
+
   function saludo() { const h = new Date().getHours(); return h < 12 ? "Buenos días" : h < 19 ? "Buenas tardes" : "Buenas noches"; }
   const fechaLarga = () => new Date().toLocaleDateString("es-GT", { weekday: "long", day: "numeric", month: "long" });
   const iniciales = n => (n || "?").trim().split(/\s+/).slice(0, 2).map(p => p[0]).join("").toUpperCase();
@@ -182,6 +191,8 @@
 
   function arrancarApp() {
     ponerModo(sesion.perfil.modo || "oscuro");
+    ponerTema(sesion.perfil.tema || "emtecsa");
+    D.temasOcultos().then(o => { if (o.includes(temaActual())) ponerTema("emtecsa"); }).catch(() => {});
     document.title = "EMTECSA";
     app.innerHTML = `
       <header class="barra"><div class="ancho">
@@ -851,6 +862,6 @@
     D.alCambiarSesion(ev => { if (ev === "SIGNED_OUT") { sesion = null; pintarEntrada(); } });
     if (sesion) arrancarApp(); else pintarEntrada();
   }
-  window.EMT_APP = { marcarInsignia, pintarAvatar, iniciales, $, $$, esc, ico, Q, cant, aviso, modal, cerrarCapas, numero, montoTxt, campoMonto, formatoAlSalir, ir, guardia, quieto, sostener, filtrar, normal, chipsASelect, sesion: () => sesion, recargarHoy: () => { const v = document.getElementById("vista"); return v && /^#\/hoy$|^#?\/?$/.test(location.hash) ? quieto(() => vHoy(v)) : null; } };
+  window.EMT_APP = { marcarInsignia, pintarAvatar, iniciales, $, $$, esc, ico, Q, cant, aviso, modal, cerrarCapas, numero, montoTxt, campoMonto, formatoAlSalir, ir, guardia, quieto, sostener, filtrar, normal, chipsASelect, ponerTema, temaActual, muestraTema, sesion: () => sesion, recargarHoy: () => { const v = document.getElementById("vista"); return v && /^#\/hoy$|^#?\/?$/.test(location.hash) ? quieto(() => vHoy(v)) : null; } };
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", arrancar); else arrancar();
 })();

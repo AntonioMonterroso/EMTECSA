@@ -1,7 +1,7 @@
 "use strict";
 window.EMT_EMPRESA = (() => {
   const GRUPOS_E = [
-    ["empresa", "La empresa", ["Datos de la empresa", "Constructora e ingeniero", "Logos de distribuidoras"]],
+    ["empresa", "La empresa", ["Datos de la empresa", "Constructora e ingeniero", "Logos de distribuidoras", "Colores del sistema"]],
     ["firmas", "Firmas y documentos", ["Quién firma las propuestas", "Carta de presentación", "Documentos de la empresa"]],
     ["cotizar", "Cómo se cotiza", ["Textos para cada cotización nueva", "Seguimiento de cotizaciones", "Del plano a la cotización"]],
     ["obras", "Obras", ["Etapas por tipo de trabajo", "Checklists de cada obra", "Costos de obra"]]
@@ -72,6 +72,10 @@ window.EMT_EMPRESA = (() => {
           <details class="caja plegable"><summary><span class="pl-t"><h2>Documentos de la empresa</h2><span class="suave">Para el expediente</span></span><span class="chev">${ico("chev", 16, 2.2)}</span></summary><div class="pl-cuerpo" data-fijos></div></details>
           <details class="caja plegable"><summary><span class="pl-t"><h2>Del plano a la cotización</h2><span class="suave">Estructuras y metros de cable</span></span><span class="chev">${ico("chev", 16, 2.2)}</span></summary><div class="pl-cuerpo" data-conteo-emp></div></details>
           <details class="caja plegable"><summary><span class="pl-t"><h2>Logos de distribuidoras</h2><span class="suave">Para el machote de los planos</span></span><span class="chev">${ico("chev", 16, 2.2)}</span></summary><div class="pl-cuerpo"><div class="logos-d" data-logos-d></div></div></details>
+          <details class="caja plegable"><summary><span class="pl-t"><h2>Colores del sistema</h2><span class="suave" data-temas-res></span></span><span class="chev">${ico("chev", 16, 2.2)}</span></summary><div class="pl-cuerpo">
+            <div class="temas-herr"><label class="busca-v ancho-busca"><span class="sr">Buscar color</span>${ico("search", 16)}<input type="search" data-temas-busca placeholder="Buscar color" autocomplete="off"></label>${puede ? `<button class="s-btn suave-b chico" type="button" data-temas-todos>Marcar todos</button>` : ""}</div>
+            <div class="temas-op" data-temas-op></div>
+          </div></details>
           <details class="caja plegable"><summary><span class="pl-t"><h2>Checklists de cada obra</h2><span class="suave">Cada obra nueva los trae</span></span><span class="chev">${ico("chev", 16, 2.2)}</span></summary><div class="pl-cuerpo" data-ck-pl></div></details>
         </fieldset>
         ${puede ? `<div class="fila-b"><button class="s-btn lleno" type="button" data-guardar-emp>${ico("check", 16)}Guardar</button><span class="guardado" data-est-emp style="margin:0;align-self:center">Todo guardado</span></div>` : ""}
@@ -204,6 +208,26 @@ window.EMT_EMPRESA = (() => {
     const pintarLogos = () => {
       $("[data-logos-d]", v).innerHTML = Object.entries(D.DISTRIBUIDORAS).map(([k, x]) => { const src = logosD[k] || x.logo; return `<div class="logo-d"><div class="logo-d-img">${src ? `<img src="${esc(src)}" alt="Logo de ${esc(x.n)}">` : `<span class="suave">Sin logo</span>`}</div><div><b>${esc(x.n)}</b><small class="suave">${logosD[k] ? "Logo subido" : x.logo ? "Logo de ejemplo" : "Falta el logo"}</small></div><div class="acc">${puede ? `<label class="s-btn suave-b chico">${ico("plus", 14)}${src ? "Cambiar" : "Subir"}<input type="file" accept="image/png,image/jpeg,image/svg+xml,image/webp" hidden data-logo-sub="${k}"></label>${logosD[k] ? `<button class="s-link" type="button" data-logo-q="${k}">Quitar</button>` : ""}` : ""}</div></div>`; }).join("");
     };
+    let ocultosT = await D.temasOcultos().catch(() => []);
+    const pintarTemasE = () => {
+      const l = window.EMT_TEMAS || [];
+      $("[data-temas-res]", v).textContent = `${l.length - ocultosT.length} de ${l.length} para escoger`;
+      $("[data-temas-op]", v).innerHTML = l.map(x => `<label class="tema-o">${x.id === "emtecsa" ? `<input type="checkbox" checked disabled>` : `<input type="checkbox" data-tema-o="${x.id}" ${ocultosT.includes(x.id) ? "" : "checked"} ${puede ? "" : "disabled"}>`}${A().muestraTema(x)}<span><b>${esc(x.n)}</b>${x.id === "emtecsa" ? `<small>El de EMTECSA, siempre queda</small>` : ""}</span></label>`).join("");
+      const q = $("[data-temas-busca]", v).value; if (q) A().filtrar($("[data-temas-op]", v), ".tema-o", q);
+    };
+    pintarTemasE();
+    const guardarTemasE = async () => {
+      try { await D.guardarTemasOcultos(ocultosT); if (ocultosT.includes(A().temaActual())) A().ponerTema("emtecsa"); aviso("Colores guardados."); }
+      catch (err) { aviso(err.message, "mal"); ocultosT = await D.temasOcultos().catch(() => ocultosT); }
+      pintarTemasE();
+    };
+    v.addEventListener("input", ev => { if (ev.target.matches("[data-temas-busca]")) A().filtrar($("[data-temas-op]", v), ".tema-o", ev.target.value); });
+    v.addEventListener("change", ev => {
+      const t = ev.target.dataset && ev.target.dataset.temaO; if (!t) return;
+      ocultosT = ev.target.checked ? ocultosT.filter(x => x !== t) : ocultosT.concat(t);
+      guardarTemasE();
+    });
+    v.addEventListener("click", ev => { if (!ev.target.closest("[data-temas-todos]")) return; ocultosT = []; guardarTemasE(); });
     pintarLogos();
     v.onchange = async ev => {
       if (ev.target.matches("[data-pl-sel]")) { plSel = Number(ev.target.value); pintarPls(); return; }

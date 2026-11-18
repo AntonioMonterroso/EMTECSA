@@ -31,7 +31,7 @@ svg { flex: none; }
 .e-btn-p > svg:first-child { width: 34px; height: 34px; padding: 8px; border-radius: 50%; background: var(--blanco); color: var(--marino-800); }
 
 .e-btn-salida { background: var(--marino-100); border-color: transparent; color: var(--marino-800); }
-:root[data-modo="oscuro"] .e-btn-salida { background: #13284A; color: var(--marino-100); }
+:root[data-modo="oscuro"] .e-btn-salida { background: color-mix(in srgb, var(--marino-700) 70%, var(--marino-950)); color: var(--marino-100); }
 .e-btn-peligro { color: var(--peligro); border-color: color-mix(in srgb, var(--peligro) 35%, transparent); }
 .e-btn[disabled] { opacity: 0.45; cursor: not-allowed; }
 @media (hover: hover) and (pointer: fine) {

@@ -104,6 +104,11 @@ window.EMT_PERFIL = (() => {
           <div class="f-campo"><span>Rol</span><p class="pf-fijo">${esc(D.ROLES[p.rol] || p.rol)}</p><small>Lo asigna gerencia.</small></div></div>
           <div class="fila-b"><button class="s-btn lleno" type="button" data-pf-guardar>${ico("check", 16)}Guardar</button><span class="guardado" data-pf-est>Todo guardado</span></div>
         </section>
+        <section class="caja">
+          <div class="sub" style="margin:0"><h2>Color del sistema</h2><span class="suave" data-tema-res></span></div>
+          <label class="busca-v ancho-busca"><span class="sr">Buscar color</span>${ico("search", 16)}<input type="search" data-tema-busca placeholder="Buscar color" autocomplete="off"></label>
+          <div class="temas" data-temas></div>
+        </section>
         <details class="caja plegable"><summary><span class="pl-t"><h2>Firma</h2><span class="suave" data-pf-res-firma>${firma ? "Ya tiene su firma" : "Todavía no tiene firma"}</span></span><span class="chev">${ico("chev", 16, 2.2)}</span></summary><div class="pl-cuerpo" data-pf-firma></div></details>
         <details class="caja plegable" open><summary><span class="pl-t"><h2>Avisos en este teléfono</h2><span class="suave" data-av-res>Revisando…</span></span><span class="chev">${ico("chev", 16, 2.2)}</span></summary><div class="pl-cuerpo" data-avisos></div></details>
         ${D.nube ? `<details class="caja plegable"><summary><span class="pl-t"><h2>Contraseña</h2><span class="suave">Cambiarla</span></span><span class="chev">${ico("chev", 16, 2.2)}</span></summary><div class="pl-cuerpo">
@@ -181,7 +186,23 @@ window.EMT_PERFIL = (() => {
         }
       });
     };
-    v.oninput = e => { if (e.target.matches("[data-pf]")) marcar(); };
+    const ocultosT = await D.temasOcultos().catch(() => []);
+    const temasV = (window.EMT_TEMAS || []).filter(x => x.id === "emtecsa" || !ocultosT.includes(x.id));
+    const pintarTemas = () => {
+      const act = A().temaActual();
+      const x0 = temasV.find(x => x.id === act) || temasV[0];
+      v.querySelector("[data-tema-res]").textContent = x0 ? x0.n : "";
+      v.querySelector("[data-temas]").innerHTML = temasV.map(x => `<button class="tema-b" type="button" data-tema-b="${x.id}" aria-pressed="${x.id === act}">${A().muestraTema(x)}<span class="tema-n"><span>${esc(x.n)}</span>${x.id === act ? ico("check", 16) : ""}</span></button>`).join("");
+      const q = v.querySelector("[data-tema-busca]").value; if (q) A().filtrar(v.querySelector("[data-temas]"), ".tema-b", q);
+    };
+    pintarTemas();
+    v.addEventListener("click", async ev => {
+      const tb = ev.target.closest("[data-tema-b]"); if (!tb) return;
+      const t = tb.dataset.temaB; if (t === A().temaActual()) return;
+      A().ponerTema(t); pintarTemas();
+      try { await D.guardarTema(p, t); } catch (err) { aviso(err.message, "mal"); }
+    });
+    v.oninput = e => { if (e.target.matches("[data-tema-busca]")) { A().filtrar(v.querySelector("[data-temas]"), ".tema-b", e.target.value); return; } if (e.target.matches("[data-pf]")) marcar(); };
     v.onclick = async e => {
       if (e.target.closest("[data-pf-foto]")) { elegirFoto(); return; }
       if (e.target.closest("[data-pf-dibujar]")) { dibujarFirma(); return; }

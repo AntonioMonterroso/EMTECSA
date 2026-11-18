@@ -76,7 +76,7 @@ window.EMT_DATOS = (() => {
       if (!sbErrores || !(await sbErrores.auth.getSession()).data.session) { try { sessionStorage.removeItem(CLAVE_DEV); } catch (e) {} location.reload(); return new Promise(() => {}); }
       const m = mioPrueba();
       await cargarPermisos();
-      return { correo: DEV.correo, perfil: { id: DEV.id, nombre: m.nombre || DEV.nombre, rol: "gerencia", modo: DEV.modo || "oscuro", activo: true, dev: true, telefono: m.telefono || null, puesto: m.puesto || null, foto: m.foto || null } };
+      return { correo: DEV.correo, perfil: { id: DEV.id, nombre: m.nombre || DEV.nombre, rol: "gerencia", modo: DEV.modo || "oscuro", tema: DEV.tema || null, activo: true, dev: true, telefono: m.telefono || null, puesto: m.puesto || null, foto: m.foto || null } };
     }
     if (!nube) {
       let p = null; try { p = JSON.parse(sessionStorage.getItem(CLAVE_PRUEBA)); } catch (e) {}
@@ -88,11 +88,11 @@ window.EMT_DATOS = (() => {
     const { data } = await sb.auth.getSession();
     const u = data.session && data.session.user;
     if (!u) return null;
-    const { data: perfil, error } = await sb.from("perfiles").select("id, nombre, rol, modo, activo, aprobado, telefono, puesto, foto").eq("id", u.id).maybeSingle();
+    const { data: perfil, error } = await sb.from("perfiles").select("id, nombre, rol, modo, tema, activo, aprobado, telefono, puesto, foto").eq("id", u.id).maybeSingle();
     if (error && !navigator.onLine) { try { const g = JSON.parse(localStorage.getItem("emtecsa.sistema.perfil")); if (g && g.id === u.id) return { correo: u.email, perfil: g }; } catch (e) {} }
     if (!error && perfil && !perfil.activo && !perfil.aprobado) { await sb.auth.signOut(); throw new Error("Su cuenta está esperando que gerencia la apruebe. Le avisarán cuando ya pueda entrar."); }
     if (error || !perfil || !perfil.activo) { await sb.auth.signOut(); throw new Error("Su usuario no tiene acceso. Pídale a gerencia que lo active."); }
-    if (perfil.rol === "desarrollo") { try { sessionStorage.setItem(CLAVE_DEV, JSON.stringify({ id: perfil.id, nombre: perfil.nombre, correo: u.email, modo: perfil.modo })); } catch (e) {} location.reload(); return new Promise(() => {}); }
+    if (perfil.rol === "desarrollo") { try { sessionStorage.setItem(CLAVE_DEV, JSON.stringify({ id: perfil.id, nombre: perfil.nombre, correo: u.email, modo: perfil.modo, tema: perfil.tema })); } catch (e) {} location.reload(); return new Promise(() => {}); }
     await cargarPermisos();
     try { localStorage.setItem("emtecsa.sistema.perfil", JSON.stringify(perfil)); } catch (e) {}
     return { correo: u.email, perfil };
@@ -186,6 +186,27 @@ window.EMT_DATOS = (() => {
     if (error) throw new Error("No se pudo guardar su preferencia.");
   }
 
+  async function guardarTema(perfil, tema) {
+    if (!/^[a-z]{2,20}$/.test(tema)) throw new Error("Ese color no existe.");
+    perfil.tema = tema;
+    if (!nube) { try { sessionStorage.setItem(CLAVE_PRUEBA, JSON.stringify(perfil)); if (DEV) { const d = JSON.parse(sessionStorage.getItem(CLAVE_DEV)); d.tema = tema; sessionStorage.setItem(CLAVE_DEV, JSON.stringify(d)); } } catch (e) {} return; }
+    const { error } = await sb.from("perfiles").update({ tema }).eq("id", perfil.id);
+    if (error) throw new Error("No se pudo guardar su color.");
+  }
+  const CLAVE_TEMAS = "emtecsa.sistema.temas-ocultos";
+  async function temasOcultos() {
+    if (!nube) { try { return JSON.parse(localStorage.getItem(CLAVE_TEMAS)) || []; } catch (e) { return []; } }
+    const r = await sb.from("ajustes").select("valor").eq("clave", "temas").maybeSingle();
+    const l = r.data && r.data.valor && r.data.valor.ocultos;
+    return Array.isArray(l) ? l : [];
+  }
+  async function guardarTemasOcultos(l) {
+    const limpia = [...new Set(l)].filter(t => /^[a-z]{2,20}$/.test(t) && t !== "emtecsa");
+    if (!nube) { try { localStorage.setItem(CLAVE_TEMAS, JSON.stringify(limpia)); } catch (e) {} return; }
+    const r = await sb.from("ajustes").upsert({ clave: "temas", valor: { ocultos: limpia } });
+    if (r.error) throw new Error("No se pudieron guardar los colores.");
+  }
+
   let cache = null;
   async function catalogo(forzar) {
     if (cache && !forzar) return cache;
@@ -275,5 +296,5 @@ window.EMT_DATOS = (() => {
 
   function alCambiarSesion(fn) { if (nube) sb.auth.onAuthStateChange((ev) => { if (ev === "SIGNED_OUT" || ev === "PASSWORD_RECOVERY") fn(ev); }); }
 
-  return { nube, sb, sbErrores, DEV: !!DEV, conectado, ROLES, PERMISOS, CLAVE_EQUIPO, puede, cargarPermisos, registrarse, sesion, entrar, entrarPrueba, salir, recuperar, guardarModo, guardarMiPerfil, miFirma, guardarFirma, cambiarClave, catalogo, guardarMaterial, guardarEstructura, siguienteCodigo, cambiosLocales, alCambiarSesion };
+  return { nube, sb, sbErrores, DEV: !!DEV, conectado, ROLES, PERMISOS, CLAVE_EQUIPO, puede, cargarPermisos, registrarse, sesion, entrar, entrarPrueba, salir, recuperar, guardarModo, guardarTema, temasOcultos, guardarTemasOcultos, guardarMiPerfil, miFirma, guardarFirma, cambiarClave, catalogo, guardarMaterial, guardarEstructura, siguienteCodigo, cambiosLocales, alCambiarSesion };
 })();

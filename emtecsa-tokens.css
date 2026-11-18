@@ -11,6 +11,10 @@
   --marino-200: #BCCBDD;
   --marino-100: #E3EAF2;
   --marino-50:  #F2F5F9;
+  --marino-990: #050D18;
+  --marino-920: #091628;
+  --marino-sup: #0E1C30;
+  --marino-borde: #1F3352;
 
   --gris-900: #1C232B;
   --gris-700: #3A4552;
@@ -24,6 +28,7 @@
   --blanco:   #FFFFFF;
 
   --laton: #C8A96A;
+  --laton-claro: #D9BE84;
   --laton-oscuro: #A88A4C;
   --laton-texto: #7A5C22;
   --laton-tinta: #241A09;
@@ -91,12 +96,12 @@
   --accent-texto: var(--laton);
   --link: var(--marino-300);
   --bg: var(--marino-950);
-  --bg2: #091628;
+  --bg2: var(--marino-920);
   --card: var(--marino-900);
-  --border: #1F3352;
+  --border: var(--marino-borde);
   --text: #F2F4F7;
   --text-muted: var(--marino-200);
-  --lateral: #050D18;
+  --lateral: var(--marino-990);
   --lateral-texto: #D7DFEA;
   --exito: #5CC49A; --aviso: #E0B04F; --peligro: #F07B72; --info: var(--marino-300);
   --primary-tinte: color-mix(in srgb, var(--laton) 14%, transparent);
@@ -109,8 +114,8 @@
   :root:not([data-modo]) {
     --primary: var(--laton); --primary-dark: var(--laton-oscuro); --sobre-primary: var(--laton-tinta);
     --accent-texto: var(--laton); --link: var(--marino-300);
-    --bg: var(--marino-950); --bg2: #091628; --card: var(--marino-900); --border: #1F3352;
-    --text: #F2F4F7; --text-muted: var(--marino-200); --lateral: #050D18;
+    --bg: var(--marino-950); --bg2: var(--marino-920); --card: var(--marino-900); --border: var(--marino-borde);
+    --text: #F2F4F7; --text-muted: var(--marino-200); --lateral: var(--marino-990);
     --exito: #5CC49A; --aviso: #E0B04F; --peligro: #F07B72; --info: var(--marino-300);
     --primary-tinte: color-mix(in srgb, var(--laton) 14%, transparent);
     --foco: color-mix(in srgb, var(--laton) 60%, transparent);
