@@ -127,8 +127,16 @@
     const [r, rc] = await Promise.all([sb.from("ajustes").select("valor").eq("clave", "empresa").maybeSingle(), sb.from("ajustes").select("valor").eq("clave", "costos_obra").maybeSingle()]);
     return { ...EMPRESA, ...((r.data && r.data.valor) || {}), costo_dia_persona: (rc.data && rc.data.valor && rc.data.valor.costo_dia_persona) || "" };
   }
+  const ING_K = { ing_nombre: "nombre", ing_titulo: "titulo", ing_colegiado: "colegiado", ing_vence: "vence", ing_telefono: "telefono", ing_id: "id" };
+  const ingenierosDe = e => {
+    const l = Array.isArray(e && e.ingenieros) ? e.ingenieros.filter(i => i && String(i.nombre || "").trim()) : [];
+    if (l.length) return l;
+    return e && String(e.ing_nombre || "").trim() ? [Object.fromEntries(Object.entries(ING_K).map(([a, b]) => [b, String(e[a] || "")]))] : [];
+  };
   async function guardarEmpresa(e) {
     const limpio = Object.fromEntries(Object.keys(EMPRESA).map(k => [k, String(e[k] == null ? "" : e[k]).trim()]));
+    limpio.ingenieros = ingenierosDe(e).map(i => Object.fromEntries(Object.values(ING_K).map(b => [b, String(i[b] == null ? "" : i[b]).trim()])));
+    Object.entries(ING_K).forEach(([a, b]) => { limpio[a] = limpio.ingenieros.length ? limpio.ingenieros[0][b] : ""; });
     if (!limpio.nombre) throw new Error("Escriba el nombre de la empresa.");
     if (limpio.correo && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(limpio.correo)) throw new Error("Revise el correo de la empresa.");
     if (!nube) { const d = leer(); d.ajustes.empresa = limpio; escribir(d); return; }
@@ -238,5 +246,5 @@
     return { ...cat, materiales, estructuras: cat.estructuras.map(e => ({ ...e, materiales: e.materiales.map(x => ({ ...x, material: porId[x.material.id] || x.material })) })) };
   }
 
-  Object.assign(D, { catalogoParaCotizacion, empresa, guardarEmpresa, ESTADOS, IVA, precioPieza, precioEstructura, calcularCotizacion: calcular, aumentoDefecto, guardarAumentoDefecto, cotizaciones, cotizacion, crearCotizacion: crear, guardarCotizacion: guardar, cambiarVigencia, escenariosCotizacion: escenarios, nombreGrupo });
+  Object.assign(D, { catalogoParaCotizacion, empresa, guardarEmpresa, ingenierosDe, ING_K, ESTADOS, IVA, precioPieza, precioEstructura, calcularCotizacion: calcular, aumentoDefecto, guardarAumentoDefecto, cotizaciones, cotizacion, crearCotizacion: crear, guardarCotizacion: guardar, cambiarVigencia, escenariosCotizacion: escenarios, nombreGrupo });
 })();

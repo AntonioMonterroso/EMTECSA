@@ -188,7 +188,7 @@ window.EMT_EG_DOCS = (() => {
     const cen = !!x.v.centralizacion;
     const h = await hoja({ titulo: cen ? "Solicitud de Dictamen de Centralización" : "Solicitud de Dictamen de Medida", sub: "Versión 2026", codigo: "v.2026", x });
     h.dos(["No. dictamen de capacidad", x.guard.campos.dictamen_no || ""], ["Fecha de emisión", fechaTxt(x.guard.campos.dictamen_fecha)]);
-    h.dos(["Nombre subestación", x.guard.campos.subestacion || ""], ["Nombre SMT", x.guard.campos.smt || ""]);
+    h.dos(["Nombre subestación", x.gc("subestacion")], ["Nombre SMT", x.gc("smt")]);
     h.seccion("Datos específicos del dictamen");
     h.campo("Nombre propietario o representante legal", v(x, "sol_nombre")); h.campo("Nombre del proyecto", obraN(x));
     h.dos(["Teléfono solicitante", v(x, "sol_telefono")], ["Dirección del proyecto", v(x, "obra_direccion")]);
@@ -235,7 +235,7 @@ window.EMT_EG_DOCS = (() => {
     wb.removeWorksheet(wb.getWorksheet(cen ? "Dictamen de Medida" : "Dictamen de Centralización").id);
     const s = (c, val) => { if (val === "" || val == null) return; ws.getCell(c).value = val; };
     const fila = et => { let r = null; ws.eachRow((row, n) => { if (r) return; row.eachCell(c => { if (!r && typeof c.value === "string" && c.value.trim().toLowerCase().startsWith(et.toLowerCase())) r = n; }); }); return r; };
-    s("E9", x.guard.campos.dictamen_no); s("K9", fechaTxt(x.guard.campos.dictamen_fecha)); s("D11", x.guard.campos.subestacion); s("J11", x.guard.campos.smt);
+    s("E9", x.guard.campos.dictamen_no); s("K9", fechaTxt(x.guard.campos.dictamen_fecha)); s("D11", x.gc("subestacion")); s("J11", x.gc("smt"));
     s("F16", v(x, "sol_nombre")); s("E19", obraN(x)); s("E21", v(x, "sol_telefono")); s("K21", v(x, "obra_direccion")); s("E22", v(x, "sol_correo")); s("E23", v(x, "sol_telefono")); s("K23", v(x, "obra_municipio"));
     s("E24", empN(x)); s("K24", v(x, "obra_departamento")); s("E25", x.emp.telefono); s("J25", v(x, "region")); s("E26", x.emp.correo);
     s("F30", x.kva || ""); s("E31", v(x, "trafo_medida")); s("C32", x.op.kv || ""); s("K32", v(x, "prot_primaria")); s("C33", v(x, "volt_bt")); s("K33", v(x, "prot_secundaria"));
@@ -351,6 +351,35 @@ window.EMT_EG_DOCS = (() => {
     materiales: { pdf: materiales }, gps: { pdf: gps }, plano: { pdf: plano }
   };
 
+  function planTodos(x) {
+    const l = [{ nombre: "Lista de requisitos", falta: [], hacer: () => [requisitos(x)] }];
+    D.REQUISITOS_EG.forEach(rq => {
+      if (!rq.doc || !GEN[rq.doc] && rq.doc !== "paso") return;
+      const e = D.estadoRequisito(rq, x);
+      if (e.e === "no_aplica") return;
+      const f = (e.faltan || []).map(z => z.n);
+      if (rq.doc === "paso") {
+        if (!x.terrenos.length) { l.push({ nombre: rq.t, falta: f.length ? f : ["Datos de cada terreno por donde pasa la línea"] }); return; }
+        x.terrenos.forEach((t, i) => l.push({ nombre: `Derecho de paso ${i + 1} · ${t.nombre || "terreno"}`, falta: f, hacer: () => [pasoDOCX(x, t, i), pasoPDF(x, t, i)] }));
+        return;
+      }
+      const g = GEN[rq.doc];
+      l.push({ nombre: rq.t, falta: f, hacer: () => [g.pdf(x), ...(g.original ? [g.original(x)] : [])] });
+    });
+    return l;
+  }
+  async function todos(x) {
+    const JSZip = await lib("zip");
+    const z = new JSZip();
+    let n = 0;
+    for (const it of planTodos(x)) {
+      if (it.falta.length || !it.hacer) continue;
+      for (const pr of it.hacer()) { const r = await pr; z.file(r.nombre, r.bytes); n++; }
+    }
+    if (!n) throw new Error("Todavía no hay documentos listos.");
+    return { bytes: await z.generateAsync({ type: "uint8array" }), nombre: `Documentos Energuate - ${limpio(obraN(x))}.zip`, tipo: "application/zip", n };
+  }
+
   function descargar(r) {
     if (window.EMT_PREVIA && /pdf/i.test(r.tipo || "")) { window.EMT_PREVIA.abrir({ titulo: String(r.nombre || "Documento").replace(/\.pdf$/i, ""), pdf: r.bytes, nombre: r.nombre }); return; }
     bajarDirecto(r);
@@ -399,5 +428,5 @@ window.EMT_EG_DOCS = (() => {
     return { bytes: await doc.save(), nombre: `Expediente licencia de construcción - ${limpio(obraN(x))}.pdf`, tipo: "application/pdf" };
   }
 
-  return { GEN, requisitos, pasoDOCX, pasoPDF, expediente, descargar };
+  return { GEN, requisitos, pasoDOCX, pasoPDF, expediente, descargar, bajarDirecto, planTodos, todos };
 })();

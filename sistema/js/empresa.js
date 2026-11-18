@@ -51,9 +51,7 @@ window.EMT_EMPRESA = (() => {
           </div></details>
           <details class="caja plegable"><summary><span class="pl-t"><h2>Constructora e ingeniero</h2><span class="suave">Para los trámites con Energuate</span></span><span class="chev">${ico("chev", 16, 2.2)}</span></summary><div class="pl-cuerpo">
             <div class="f-fila">${campo("resp_nombre", "Responsable de la constructora")}${campo("resp_dpi", "DPI del responsable")}</div>
-            <div class="f-fila">${campo("ing_nombre", "Ingeniero electricista que firma")}${campo("ing_titulo", "Título")}</div>
-            <div class="f-fila">${campo("ing_colegiado", "No. de colegiado activo")}${campo("ing_vence", "Constancia vigente hasta (aaaa-mm-dd)")}</div>
-            <div class="f-fila">${campo("ing_telefono", "Teléfono del ingeniero")}${campo("ing_id", "Identificador en Energuate")}</div>
+            <div data-ings></div>
           </div></details>
           <details class="caja plegable"><summary><span class="pl-t"><h2>Quién firma las propuestas</h2></span><span class="chev">${ico("chev", 16, 2.2)}</span></summary><div class="pl-cuerpo">
             <div class="f-fila">${campo("firma_nombre", "Nombre")}${campo("firma_puesto", "Puesto")}</div>
@@ -194,6 +192,31 @@ window.EMT_EMPRESA = (() => {
         ${puede ? `<button class="s-btn suave-b chico" type="button" data-fijo-nuevo>${ico("plus", 14)}Agregar documento</button>` : ""}`;
     };
     pintarFijos();
+    e.ingenieros = D.ingenierosDe(e).map(i => ({ ...i }));
+    const ING_C = [["nombre", "Ingeniero electricista"], ["titulo", "Título"], ["colegiado", "No. de colegiado activo"], ["vence", "Constancia vigente hasta", "date"], ["telefono", "Teléfono", "tel"], ["id", "Identificador en Energuate"]];
+    const pintarIngs = () => {
+      const l = e.ingenieros;
+      $("[data-ings]", v).innerHTML = `
+        <p class="suave" style="margin:0;font-size:13.5px">Los que firman los dictámenes de Energuate. En cada obra se escoge quién firma; el primero sale si no se escoge otro.</p>
+        <div class="lista ck-pl">${l.length ? l.map((g, i) => `<div class="fila ck-pl-f" style="cursor:default"><span></span><span class="num-l">${i + 1}</span><span class="ck-t"><b>${esc(g.nombre)}</b><small class="suave">${esc([g.colegiado ? "Colegiado " + g.colegiado : "Sin colegiado", g.vence ? "vigente hasta " + g.vence : ""].filter(Boolean).join(" · "))}</small></span>
+          <span class="acc">${puede ? `<button class="s-ib" type="button" aria-label="Subir: ${esc(g.nombre)}" data-ing-sube="${i}" ${i === 0 ? "disabled" : ""}>${ico("arriba", 15)}</button><button class="s-ib" type="button" aria-label="Bajar: ${esc(g.nombre)}" data-ing-baja="${i}" ${i === l.length - 1 ? "disabled" : ""}>${ico("abajo", 15)}</button><button class="s-ib" type="button" aria-label="Editar: ${esc(g.nombre)}" data-ing-ed="${i}">${ico("pen", 15)}</button>` : ""}</span></div>`).join("") : `<p class="suave" style="padding:14px 16px;margin:0">Todavía no hay ingenieros.</p>`}</div>
+        ${puede ? `<button class="s-btn suave-b chico" type="button" data-ing-nuevo>${ico("plus", 14)}Agregar ingeniero</button>` : ""}`;
+    };
+    pintarIngs();
+    const editarIng = i => {
+      const nuevo = i == null, g = nuevo ? {} : e.ingenieros[i];
+      A().modal({
+        titulo: nuevo ? "Ingeniero nuevo" : "Editar ingeniero", guardarTxt: nuevo ? "Agregar" : "Guardar",
+        quitar: nuevo ? null : () => { e.ingenieros.splice(i, 1); A().cerrarCapas(); pintarIngs(); sinGuardar(); },
+        cuerpo: ING_C.map(([k, t, tipo]) => `<label class="f-campo">${t}<input name="${k}" value="${esc(g[k] || "")}" ${tipo === "date" ? 'type="date"' : tipo === "tel" ? 'inputmode="tel"' : ""} autocomplete="off"></label>`).join(""),
+        alGuardar: async f => {
+          const n = Object.fromEntries(ING_C.map(([k]) => [k, String(f.elements[k].value || "").trim()]));
+          if (!n.nombre) throw new Error("Escriba el nombre del ingeniero.");
+          if (nuevo) e.ingenieros.push(n); else e.ingenieros[i] = n;
+          A().cerrarCapas(); pintarIngs(); sinGuardar();
+        }
+      });
+    };
     const editarFijo = x => {
       let archivoSel = null;
       A().modal({
@@ -263,6 +286,10 @@ window.EMT_EMPRESA = (() => {
       const cs = ev.target.closest("[data-ck-sube], [data-ck-baja]");
       if (cs && !cs.disabled) { const i = Number(cs.dataset.ckSube ?? cs.dataset.ckBaja), j = cs.dataset.ckSube != null ? i - 1 : i + 1; const l = ck[ckTab]; [l[i], l[j]] = [l[j], l[i]]; pintarCk(); sinGuardar(); const b = $(`[data-ck-${cs.dataset.ckSube != null ? "sube" : "baja"}="${j}"]`, v); if (b && !b.disabled) b.focus(); return; }
       const lq = ev.target.closest("[data-logo-q]"); if (lq) { try { await D.guardarLogoDistribuidora(lq.dataset.logoQ, null); logosD = await D.logosDistribuidoras(); pintarLogos(); aviso("Quedó el logo de ejemplo."); } catch (err) { aviso(err.message, "mal"); } return; }
+      if (ev.target.closest("[data-ing-nuevo]")) { editarIng(null); return; }
+      const ie = ev.target.closest("[data-ing-ed]"); if (ie) { editarIng(Number(ie.dataset.ingEd)); return; }
+      const is = ev.target.closest("[data-ing-sube], [data-ing-baja]");
+      if (is && !is.disabled) { const i = Number(is.dataset.ingSube ?? is.dataset.ingBaja), j = is.dataset.ingSube != null ? i - 1 : i + 1; const l = e.ingenieros; [l[i], l[j]] = [l[j], l[i]]; pintarIngs(); sinGuardar(); const b = $(`[data-ing-${is.dataset.ingSube != null ? "sube" : "baja"}="${j}"]`, v); if (b && !b.disabled) b.focus(); return; }
       if (ev.target.closest("[data-nueva-pl]")) { editarTipo(true); return; }
       if (ev.target.closest("[data-pl-ren]")) { editarTipo(false); return; }
       const pt = ev.target.closest("[data-pl-tab]"); if (pt) { plSel = Number(pt.dataset.plTab); pintarPls(); return; }

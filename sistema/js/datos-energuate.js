@@ -109,12 +109,40 @@
   }
 
   const vacioS = v => v == null || String(v).trim() === "";
+  const ACTIVIDAD = { industria: "Industrial", comercio: "Comercial", gobierno: "Servicio público", residencial: "Residencial", distribuidora: "Distribución de energía" };
+  const FUSIBLES = [1, 2, 3, 5, 6, 8, 10, 12, 15, 20, 25, 30, 40, 50, 65, 80, 100, 140, 200];
+  const FLIPONES = [15, 20, 30, 40, 50, 60, 70, 80, 100, 125, 150, 175, 200, 225, 250, 300, 350, 400, 450, 500, 600, 700, 800, 1000, 1200, 1600, 2000, 2500, 3000];
+  const arriba = (l, n) => l.find(z => z >= n) || l[l.length - 1];
+  function protecciones(kva, kv, fases, vbt) {
+    if (!(kva > 0)) return { p: "", s: "" };
+    const kvl = Number(kv) >= 30 ? 34.5 : 13.8, r3 = Math.sqrt(3), v = Number(vbt) || 240;
+    const ip = fases >= 3 ? kva / (r3 * kvl) : fases === 2 ? kva / kvl : kva / (kvl / r3);
+    const is = fases >= 3 ? kva * 1000 / (r3 * v) : kva * 1000 / v;
+    return { p: String(arriba(FUSIBLES, ip * 1.5)), s: String(arriba(FLIPONES, is * 1.25)) };
+  }
+  const voltDe = mc => { const t = String((mc && mc.servicio) || ""); return /480/.test(t) ? "480" : /208/.test(t) ? "208" : "240"; };
+  const claveIng = g => String((g && (g.colegiado || g.nombre)) || "");
+  async function anteriores(obraId) {
+    let l = [];
+    if (!nube) l = Object.entries(leer().obras).filter(([id]) => String(id) !== String(obraId)).map(([, g]) => (g && g.campos) || {}).sort((a, b) => String(b._fecha || "").localeCompare(String(a._fecha || "")));
+    else { const r = await sb.from("obra_energuate").select("obra_id, datos, actualizado").neq("obra_id", obraId).order("actualizado", { ascending: false }).limit(300); l = (r.data || []).map(z => (z.datos && z.datos.campos) || {}); }
+    return l;
+  }
+  function recordar(lista, mun, dep) {
+    const r = {};
+    const igual = (a, b) => String(a || "").trim().toLowerCase() === String(b || "").trim().toLowerCase() && String(a || "").trim() !== "";
+    ["region", "subestacion", "smt"].forEach(k => {
+      const c = lista.find(z => !vacioS(z[k]) && igual(z._mun, mun) && igual(z._dep, dep)) || (k === "region" ? lista.find(z => !vacioS(z[k]) && igual(z._dep, dep)) : null);
+      if (c) r[k] = c[k];
+    });
+    return r;
+  }
   const POSTE_LONG = { poste9_pr: "9 M", poste106_pr: "10.67 M" };
 
   async function contexto(obraId) {
     const o = await D.obra(obraId);
     if (!o) return null;
-    const [cat, cfg, emp, cot, cli, guard] = await Promise.all([D.catalogo(), D.ajustesConteo(), D.empresa(), o.cotizacion_id ? D.cotizacion(o.cotizacion_id) : null, D.cliente(o.cliente_id), guardado(obraId)]);
+    const [cat, cfg, emp, cot, cli, guard, previas] = await Promise.all([D.catalogo(), D.ajustesConteo(), D.empresa(), o.cotizacion_id ? D.cotizacion(o.cotizacion_id) : null, D.cliente(o.cliente_id), guardado(obraId), anteriores(obraId).catch(() => [])]);
     let pl = await D.plano("obra", obraId).catch(() => null);
     if ((!pl || !pl.datos || !(pl.datos.elementos || []).length) && o.cotizacion_id) pl = await D.plano("cot", o.cotizacion_id).catch(() => null);
     const en = o.cotizacion_id && D.enlaceDe ? await D.enlaceDe(o.cotizacion_id).catch(() => null) : null;
@@ -130,40 +158,56 @@
     const kvaCot = k ? k.partidas.filter(p => p.incluida !== false && p.estructura && p.estructura.clase === "transformador").reduce((a, p) => a + Number(p.estructura.kva || 0) * p.cantidad, 0) : 0;
     const kva = plano.kva || kvaCot;
     const op = d ? D.opcionesConteo(d, cfg, pl.machote) : { kv: cfg.kv, calibre: cfg.calibre, triplex: cfg.triplex };
+    const ings = D.ingenierosDe(emp);
+    const ing = ings.find(g => claveIng(g) === guard.campos.ingeniero) || ings[0] || {};
+    const empV = { ...emp, ...Object.fromEntries(Object.entries(D.ING_K).map(([a, b]) => [a, ing[b] || ""])) };
+    const quien = String(guard.campos.interesado || "");
+    const kSel = cli && quien.startsWith("k:") ? cli.contactos.find(z => String(z.id) === quien.slice(2)) : null;
+    const kDe = kSel || contacto;
+    const rec = recordar(previas, sitio && sitio.municipio, sitio && sitio.departamento);
+    const fasesV = plano.fases;
+    const vbt = !vacioS(guard.campos.volt_bt) ? guard.campos.volt_bt : voltDe(pl && pl.machote);
+    const pr = protecciones(kva, op.kv, fasesV, vbt);
+    const act = cli ? ACTIVIDAD[cli.tipo] || "" : "";
     const auto = {
-      sol_nombre: cli ? (cli.razon_social || cli.nombre) : "", sol_telefono: (contacto && contacto.telefono) || (cli && cli.telefono) || "", sol_correo: (contacto && contacto.correo) || (cli && cli.correo) || "", sol_direccion: (cli && cli.direccion) || "",
+      sol_nombre: kSel ? kSel.nombre : cli ? (cli.razon_social || cli.nombre) : "", sol_telefono: (kDe && kDe.telefono) || (cli && cli.telefono) || "", sol_correo: (kDe && kDe.correo) || (cli && cli.correo) || "", sol_direccion: (cli && cli.direccion) || "",
+      actividad: act, descripcion_carga: act ? `Carga ${act.toLowerCase()} para ${(cot && cot.titulo) || o.titulo || "la obra"}` : "",
+      matricula_ct: plano.matricula || "", region: rec.region || "", prot_primaria: pr.p, prot_secundaria: pr.s,
       obra_direccion: sitio ? (sitio.direccion || sitio.nombre || "") : "", obra_municipio: (sitio && sitio.municipio) || "", obra_departamento: (sitio && sitio.departamento) || "",
       tension: `${Number(op.kv) >= 30 ? "34.5" : "13.8"} ${plano.fases >= 2 ? "Trifásico" : "Monofásico"}`, tipo_trafo: "Autoprotegido", servicio: "Exclusivo", fases: plano.fases >= 3 ? "RST" : plano.fases === 2 ? "RS" : "R",
       conductor: /4\/0/.test(op.calibre) ? "4/0 AWG Penguin" : "1/0 AWG Raven", neutro: "1/0 AWG Raven", bt: op.triplex === "4/0" ? "Triplex 4/0 AAC-4/0 AAAC" : "Triplex 1/0 AAC-1/0 AAAC",
-      poste_material: (plano.postes.find(q => q.material) || {}).material || "Concreto", medicion: kva > 50 ? "BT Indirecto" : "BT Simple", clientes_n: "1", incremento: "0", trafo_medida: "Convencional", volt_bt: "240", tipo_medida: "Indirecta en Baja Tensión",
+      poste_material: (plano.postes.find(q => q.material) || {}).material || "Concreto", medicion: kva > 50 ? "BT Indirecto" : "BT Simple", clientes_n: "1", incremento: "0", trafo_medida: "Convencional", volt_bt: voltDe(pl && pl.machote), tipo_medida: "Indirecta en Baja Tensión",
       potencia_kw: kva ? String(Math.round(kva * 0.9)) : "", medida_x: plano.arranque ? String(plano.arranque.x) : "", medida_y: plano.arranque ? String(plano.arranque.y) : "",
       paso_desde_mun: (sitio && sitio.municipio) || "", paso_desde_dep: (sitio && sitio.departamento) || "", paso_hasta_mun: (sitio && sitio.municipio) || "", paso_hasta_dep: (sitio && sitio.departamento) || ""
     };
     const v = {};
     CAMPOS.forEach(c => {
-      const g = c.donde === "emp" ? emp[c.k] : c.donde === "sol" ? (!vacioS(solCot[c.k]) ? solCot[c.k] : solCliente[c.k]) : guard.campos[c.k];
+      const g = c.donde === "emp" ? empV[c.k] : c.donde === "sol" ? (!vacioS(solCot[c.k]) ? solCot[c.k] : !vacioS(guard.campos[c.k]) ? guard.campos[c.k] : solCliente[c.k]) : guard.campos[c.k];
       v[c.k] = !vacioS(g) ? g : (auto[c.k] != null ? auto[c.k] : "");
     });
     v.centralizacion = !!guard.campos.centralizacion;
     const terrenos = (guard.terrenos && guard.terrenos.length ? guard.terrenos : (en && en.tramite && en.tramite.terrenos) || []).map(t => ({ ...t }));
     const fianzaC = fz ? (fz.fianzas || []).find(f => f.obra_id === obraId && f.tipo === "cumplimiento") : null;
     const fijos = await D.docsFijos().catch(() => []);
-    return { o, cot, k, cli, sitio, contacto, emp, cat, cfg, pl, d, conteo, plano, op, kva, v, guard, terrenos, en, fianzaC, fijos, solCliente };
+    const gc = k => !vacioS(guard.campos[k]) ? guard.campos[k] : (rec[k] || "");
+    return { o, cot, k, cli, sitio, contacto, emp, empV, ings, ing, cat, cfg, pl, d, conteo, plano, op, kva, v, guard, terrenos, en, fianzaC, fijos, solCliente, rec, gc };
   }
 
   function analizarPlano(d, cat, cfg, mc) {
-    const r = { kva: 0, trafos: {}, otros: 0, metrosMT: 0, metrosBT: 0, postes: [], fases: 1, arranque: null, centros: [], sinUtm: 0, gps: [] };
+    const r = { kva: 0, trafos: {}, otros: 0, metrosMT: 0, metrosBT: 0, postes: [], fases: 1, arranque: null, centros: [], sinUtm: 0, gps: [], matricula: "", puntos: [], tramo: () => 0 };
     if (!d) return r;
     const m = Object.fromEntries(d.elementos.map(e => [e.id, e]));
     const ref = d.ref;
     const pos = e => (e.utm && e.utm.e != null && e.utm.n != null && ref) ? [Number(e.utm.e) - ref.e, ref.n - Number(e.utm.n)] : [e.x, e.y];
     const utmDe = e => { if (e.utm && e.utm.e != null && e.utm.n != null) return { x: Number(e.utm.e), y: Number(e.utm.n) }; if (ref) { const [x, y] = pos(e); return { x: Math.round(ref.e + x), y: Math.round(ref.n - y) }; } return null; };
     const MT = { mt1f: 1, mt2f: 2, mt3f: 3 };
+    const ady = {};
     d.lineas.forEach(l => {
       if (l.e !== "proyectado") return;
       const a = m[l.a], b = m[l.b]; if (!a || !b) return;
       const mts = l.m != null && String(l.m).trim() !== "" && isFinite(Number(String(l.m).replace(",", "."))) ? Number(String(l.m).replace(",", ".")) : Math.hypot(pos(a)[0] - pos(b)[0], pos(a)[1] - pos(b)[1]);
       if (MT[l.t]) { r.metrosMT += mts; r.fases = Math.max(r.fases, MT[l.t]); } else if (l.t === "triplex" || l.t === "bt") r.metrosBT += mts;
+      (ady[l.a] = ady[l.a] || []).push([l.b, mts]); (ady[l.b] = ady[l.b] || []).push([l.a, mts]);
     });
     r.metrosMT = Math.round(r.metrosMT); r.metrosBT = Math.round(r.metrosBT);
     const postes = d.elementos.filter(e => /^poste/.test(e.s) || e.s === "tubo_ex");
@@ -173,7 +217,26 @@
       if (u) r.gps.push({ cod: e.cod || "", tipo: /_pr$/.test(e.s) ? "Nuevo" : "Existente", desc: [window.EMT_SIMB && window.EMT_SIMB.P[e.s] ? window.EMT_SIMB.P[e.s].n : e.s, String(e.det || "").split("\n")[0]].filter(Boolean).join(" · "), x: u.x, y: u.y, zona: (e.utm && e.utm.z) || "15 P" });
     });
     const arr = postes.find(e => !/_pr$/.test(e.s) && D.situacionPoste(d, e, cfg, m)) || postes.find(e => /_pr$/.test(e.s));
-    if (arr) r.arranque = utmDe(arr);
+    if (arr) {
+      r.arranque = utmDe(arr);
+      const [ax, ay] = pos(arr);
+      const t = d.elementos.filter(e => e.s === "trafo_ex").map(e => [e, Math.hypot(pos(e)[0] - ax, pos(e)[1] - ay)]).sort((a, b) => a[1] - b[1])[0];
+      if (t) { const mm = String(t[0].det || "").match(/matr[ií]cula\s*[:#.]?\s*([A-Z0-9-]+)/i) || String(t[0].det || "").match(/\bMAT\.?\s*[:#]?\s*([A-Z0-9-]+)/i); r.matricula = mm ? mm[1] : String(t[0].cod || "").trim(); }
+    }
+    let sinCod = 0;
+    r.puntos = postes.filter(e => ady[e.id]).map(e => ({ id: e.id, cod: String(e.cod || "").trim() || `Poste sin código ${++sinCod}` }));
+    r.tramo = (a, b) => {
+      if (a == null || b == null || a === "" || b === "" || !ady[a] || !ady[b]) return 0;
+      if (String(a) === String(b)) return 0;
+      const dist = { [a]: 0 }, hecho = new Set();
+      for (;;) {
+        let u = null; Object.keys(dist).forEach(k => { if (!hecho.has(k) && (u == null || dist[k] < dist[u])) u = k; });
+        if (u == null) return 0;
+        if (String(u) === String(b)) return Math.round(dist[u] * 100) / 100;
+        hecho.add(u);
+        (ady[u] || []).forEach(([w, mm]) => { const n = dist[u] + mm; if (dist[w] == null || n < dist[w]) dist[w] = n; });
+      }
+    };
     d.elementos.filter(e => e.s === "trafo_pr" && !e.noCot).forEach(e => {
       const kva = Number(e.kva || 0);
       r.kva += kva;
