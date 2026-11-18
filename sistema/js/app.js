@@ -85,6 +85,7 @@
   let sesion = null;
   let busqueda = "";
   let mantener = false;
+  let pulsarLuego = null;
   let vistaActual = "";
 
   function aviso(texto, tipo = "bien") {
@@ -287,6 +288,7 @@
     pestanasGrupo(v, s, sub);
     infoEnTitulos(v);
     chipsASelect(v);
+    if (pulsarLuego) { const sel = pulsarLuego; pulsarLuego = null; const b = v.querySelector(sel); if (b) b.click(); }
     if (window.EMT_TIENDA) window.EMT_TIENDA.insignia();
     if (window.EMT_ENLACES) window.EMT_ENLACES.insignia();
     if (window.EMT_EQUIPO) window.EMT_EQUIPO.insignia();
@@ -334,23 +336,51 @@
     const pl = (k, titulo, res, cuerpo) => `<details class="caja plegable" data-hoy-pl="${k}" ${abierto(k) ? "open" : ""}><summary><span class="pl-t"><h2>${titulo}</h2><span class="suave">${res}</span></span><span class="chev">${ico("chev", 16, 2.2)}</span></summary><div class="pl-cuerpo">${cuerpo}</div></details>`;
     const esperando = vistos.map(x => ({ ...x, h: x.h })).concat(espera.map(x => ({ c: "gris", i: x.i, t: x.t, d: x.d, h: "" })));
     const primeros = avisosC.slice(0, 5), resto = avisosC.slice(5);
+    const pp = sesion.perfil;
+    const accesos = [
+      D.puede(pp, "registrarPago") && verC ? { t: "Registrar pago", i: "wallet", c: "ambar", h: "#/cobros", p: "[data-reg-pago]" } : null,
+      D.puede(pp, "editarCliente") ? { t: "Agregar cliente", i: "building", c: "azul", h: "#/clientes", p: "[data-nuevo-cli]" } : null,
+      { t: "Obras", i: "hammer", c: "verde", h: "#/obras" },
+      { t: "Catálogo", i: "box", c: "gris", h: "#/catalogo" },
+      D.puede(pp, "verTienda") ? { t: "Tienda", i: "cart", c: "laton", h: "#/tienda" } : null
+    ].filter(Boolean).slice(0, 4);
     v.innerHTML = `
       <div class="cuerpo hoy">
         <section class="hoy-cab">
           <div><span class="eti">${esc(fechaLarga())}</span><h1 class="t">${saludo()}, ${esc(sesion.perfil.nombre.split(" ")[0])}.</h1></div>
           <a class="s-btn lleno" href="#/cotizaciones">${ico("plus", 16)}Nueva cotización</a>
         </section>
-        <div class="sub"><h2>Lo que toca hoy</h2>${avisosC.length ? `<span class="suave">${avisosC.length}</span>` : ""}</div>
-        ${avisosC.length ? `<div class="lista toca">${primeros.map(toca).join("")}</div>${resto.length ? `<details class="mas-toca"><summary>Ver ${resto.length} más</summary><div class="lista toca">${resto.map(toca).join("")}</div></details>` : ""}`
-          : `<div class="toca-vacio">${ico("check", 18)}<span>Todo al día.</span></div>`}
-        ${pend.length ? pl("listo", "Para dejarlo listo", `${pend.length} ${pend.length === 1 ? "paso" : "pasos"}`, `<div class="lista sin-chip">${pend.map(fila).join("")}</div>`) : ""}
-        ${esperando.length ? pl("espera", "Esperando a otros", `${esperando.length}`, `<div class="lista sin-chip">${esperando.map(x => x.h ? fila(x) : `<div class="fila" style="cursor:default"><span class="icono gris">${ico(x.i, 18)}</span><span><b>${esc(x.t)}</b><small>${esc(x.d)}</small></span><span></span></div>`).join("")}</div>`) : ""}
-        ${pl("mes", "Este mes", `${esc(Q(cotizado))} cotizado · ${enCurso.length} ${enCurso.length === 1 ? "obra" : "obras"}`, `<div class="widgets">
-          <a class="w" href="#/cotizaciones"><span class="w-cab"><span class="icono laton">${ico("file", 18)}</span><span class="chev">${ico("chev", 16, 2.2)}</span></span><span class="l">Cotizado</span><b>${Q(cotizado)}</b><small>${delMes.length} ${delMes.length === 1 ? "cotización" : "cotizaciones"} · ${aprobadas} ${aprobadas === 1 ? "aprobada" : "aprobadas"}</small></a>
-          <a class="w" href="#/obras"><span class="w-cab"><span class="icono azul">${ico("hammer", 18)}</span><span class="chev">${ico("chev", 16, 2.2)}</span></span><span class="l">Obras en curso</span><b>${enCurso.length}</b><small>${enCurso.filter(x => x.estado === "programada").length} por empezar${pausadas ? ` · ${pausadas} en pausa` : ""}</small></a>
-          <a class="w" href="#/catalogo/materiales"><span class="w-cab"><span class="icono verde">${ico("box", 18)}</span><span class="chev">${ico("chev", 16, 2.2)}</span></span><span class="l">Materiales</span><b>${c.materiales.length}</b><small>${sinPrecio ? `${sinPrecio} sin costo` : "Todos con costo"}</small></a>
-        </div>`)}
+        ${accesos.length ? `<nav class="hoy-acc" aria-label="Accesos rápidos">${accesos.map(a => `<a class="hoy-a" href="${a.h}"${a.p ? ` data-pulsar="${a.p}"` : ""}><span class="icono ${a.c}">${ico(a.i, 16)}</span><span>${a.t}</span></a>`).join("")}</nav>` : ""}
+        <div class="hoy-cols">
+          <div class="hoy-izq">
+            <section class="hoy-toca">
+              <div class="sub"><h2>Lo que toca hoy</h2>${avisosC.length ? `<span class="suave">${avisosC.length}</span>` : ""}</div>
+              ${avisosC.length ? `<div class="lista toca">${primeros.map(toca).join("")}</div>${resto.length ? `<details class="mas-toca"><summary>Ver ${resto.length} más</summary><div class="lista toca">${resto.map(toca).join("")}</div></details>` : ""}`
+                : `<div class="toca-vacio">${ico("check", 18)}<span>Todo al día.</span></div>`}
+            </section>
+            ${pend.length || esperando.length ? `<section class="hoy-pls">
+              ${pend.length ? pl("listo", "Para dejarlo listo", `${pend.length} ${pend.length === 1 ? "paso" : "pasos"}`, `<div class="lista sin-chip">${pend.map(fila).join("")}</div>`) : ""}
+              ${esperando.length ? pl("espera", "Esperando a otros", `${esperando.length}`, `<div class="lista sin-chip">${esperando.map(x => x.h ? fila(x) : `<div class="fila" style="cursor:default"><span class="icono gris">${ico(x.i, 18)}</span><span><b>${esc(x.t)}</b><small>${esc(x.d)}</small></span><span></span></div>`).join("")}</div>`) : ""}
+            </section>` : ""}
+          </div>
+          <div class="hoy-der">
+            <section class="hoy-mes">
+              <div class="sub"><h2>Este mes</h2></div>
+              <div class="widgets hoy-w">
+                <a class="w" href="#/cotizaciones"><span class="w-cab"><span class="icono laton">${ico("file", 18)}</span><span class="chev">${ico("chev", 16, 2.2)}</span></span><span class="l">Cotizado</span><b>${Q(cotizado)}</b><small>${delMes.length} ${delMes.length === 1 ? "cotización" : "cotizaciones"} · ${aprobadas} ${aprobadas === 1 ? "aprobada" : "aprobadas"}</small></a>
+                <a class="w" href="#/obras"><span class="w-cab"><span class="icono azul">${ico("hammer", 18)}</span><span class="chev">${ico("chev", 16, 2.2)}</span></span><span class="l">Obras en curso</span><b>${enCurso.length}</b><small>${enCurso.filter(x => x.estado === "programada").length} por empezar${pausadas ? ` · ${pausadas} en pausa` : ""}</small></a>
+                <a class="w" href="#/catalogo/materiales"><span class="w-cab"><span class="icono verde">${ico("box", 18)}</span><span class="chev">${ico("chev", 16, 2.2)}</span></span><span class="l">Materiales</span><b>${c.materiales.length}</b><small>${sinPrecio ? `${sinPrecio} sin costo` : "Todos con costo"}</small></a>
+              </div>
+            </section>
+            <section class="hoy-obras">
+              <div class="sub"><h2>Obras en curso</h2>${enCurso.length ? `<a href="#/obras">Ver todas</a>` : ""}</div>
+              ${enCurso.length ? `<div class="lista">${enCurso.slice().sort((a, b) => (a.estado === "en_curso" ? 0 : 1) - (b.estado === "en_curso" ? 0 : 1) || b.avance - a.avance).slice(0, 4).map(o => `<a class="fila obra-av" href="#/obras/${o.id}"><span class="icono verde">${ico("hammer", 18)}</span><span><b>${esc(o.cliente ? o.cliente.nombre : "Cliente no encontrado")}</b><small>${esc(o.numero)}${o.etapa_actual ? " · ahora: " + esc(o.etapa_actual) : o.estado === "programada" ? " · por empezar" : ""}</small><i class="mini-av"><span style="transform:scaleX(${o.avance / 100})"></span></i></span><span class="der"><b class="e-cifra">${o.avance} %</b></span></a>`).join("")}</div>`
+                : `<div class="hoy-nada">${ico("hammer", 18)}<span>No hay obras en curso.</span></div>`}
+            </section>
+          </div>
+        </div>
       </div>`;
+    v.onclick = e => { const a = e.target.closest("[data-pulsar]"); if (a) pulsarLuego = a.dataset.pulsar; };
     v.querySelectorAll("[data-hoy-pl]").forEach(d => d.addEventListener("toggle", () => { try { localStorage.setItem("emtecsa.sistema.hoy." + d.dataset.hoyPl, d.open ? "1" : "0"); } catch (e) {} }));
   }
 
