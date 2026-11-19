@@ -317,8 +317,8 @@
   async function vHoy(v) {
     if (D.nube) [D.catalogo(), D.clientes(), D.obras(), D.cotizaciones(), D.empresa(), D.puede(sesion.perfil, "verCobros") && D.resumenCobros(), D.puede(sesion.perfil, "verTienda") && D.pedidosTienda && D.pedidosTienda(), window.EMT_ENLACES && window.EMT_ENLACES.porAtender(), window.EMT_EQUIPO && window.EMT_EQUIPO.pendientes(), window.EMT_COSTOS && window.EMT_COSTOS.avisos(), window.EMT_SEGUIMIENTO && window.EMT_SEGUIMIENTO.avisos()].forEach(p => { if (p && p.catch) p.catch(() => {}); });
     const c = await D.catalogo();
-    const sinPrecio = c.materiales.filter(m => m.costo == null).length;
-    const sinMano = c.estructuras.filter(e => e.mano_obra == null).length;
+    const sinPrecio = c.materiales.filter(m => m.activo !== false && m.costo == null).length;
+    const sinMano = c.estructuras.filter(e => e.activo !== false && e.mano_obra == null).length;
     const nClientes = (await D.clientes()).length;
     const obrasL = await D.obras();
     const enCurso = obrasL.filter(x => x.estado === "en_curso" || x.estado === "programada"), pausadas = obrasL.filter(x => x.estado === "pausada").length;
@@ -425,26 +425,35 @@
     const edM = D.puede(p, "editarMaterial"), edE = D.puede(p, "editarEstructura");
     const usos = {};
     c.estructuras.forEach(e => e.materiales.forEach(r => { usos[r.material.id] = (usos[r.material.id] || 0) + 1; }));
-    const boton = pestana === "estructuras" ? (edE ? `<button class="s-btn lleno" type="button" data-nueva-est>${ico("plus", 16)}Agregar estructura</button>` : "") : (edM ? `<button class="s-btn lleno" type="button" data-nuevo-mat>${ico("plus", 16)}Agregar material</button>` : "");
+    const enTabla = (pestana === "estructuras" && tablaMO) || (pestana === "materiales" && tablaC);
+    const boton = enTabla ? "" : pestana === "estructuras" ? (edE ? `<button class="s-btn lleno" type="button" data-nueva-est>${ico("plus", 16)}Agregar estructura</button>` : "") : (edM ? `<button class="s-btn lleno" type="button" data-nuevo-mat>${ico("plus", 16)}Agregar material</button>` : "");
     v.innerHTML = `
       <div class="cuerpo">
         <div class="cab-v"><div><h1 class="t">Catálogo</h1><p class="desc">Lo que vende EMTECSA y el material que lleva cada cosa. Aquí va el costo de compra de cada material y la mano de obra; el precio para el cliente se arma en cada cotización con el aumento.</p></div>${boton}</div>
         ${D.nube ? "" : `<div class="nota-local">${ico("shield", 18)}<span>Modo de prueba: lo que guarde se queda en esta computadora y se sube a la base de EMTECSA cuando se conecte.</span></div>`}
         <div class="herr">
           <label class="busca-v"><span class="sr">Buscar</span>${ico("search", 16)}<input type="search" placeholder="${pestana === "estructuras" ? "Buscar estructura, kV o kVA" : "Buscar material o código"}" value="${esc(busqueda)}" data-filtro></label>
-          <nav class="seg" aria-label="Ver"><a href="#/catalogo" ${pestana === "estructuras" ? 'aria-current="page"' : ""}>Lo que vende</a><a href="#/catalogo/materiales" ${pestana === "materiales" ? 'aria-current="page"' : ""}>Materiales</a>${verAum ? `<a href="#/catalogo/precios" ${pestana === "precios" ? 'aria-current="page"' : ""}>Precios</a>` : ""}<a href="#/catalogo/proveedores" ${pestana === "proveedores" ? 'aria-current="page"' : ""}>Proveedores</a></nav>
+          <nav class="seg pest-cat" aria-label="Ver"><a href="#/catalogo" ${pestana === "estructuras" ? 'aria-current="page"' : ""}>Lo que vende</a><a href="#/catalogo/materiales" ${pestana === "materiales" ? 'aria-current="page"' : ""}>Materiales</a>${verAum ? `<a href="#/catalogo/precios" ${pestana === "precios" ? 'aria-current="page"' : ""}>Precios</a>` : ""}<a href="#/catalogo/proveedores" ${pestana === "proveedores" ? 'aria-current="page"' : ""}>Proveedores</a></nav>
         </div>
         <div data-res></div>
       </div>`;
     const res = $("[data-res]", v);
     const pintar = () => {
-      const q = busqueda.toLowerCase();
+      const q = normal(busqueda);
       if (pestana === "estructuras") {
-        const pasa = e => !q || (e.nombre + " " + e.codigo + " " + e.voltaje_kv + " kv " + (e.kva || "") + " kva").toLowerCase().includes(q);
+        const pasa = e => (!q || normal(e.nombre + " " + e.codigo + " " + e.voltaje_kv + " kv " + (e.kva || "") + " kva " + (e.clase === "linea" ? "linea estructura" : "transformador") + " " + (Number(e.fases) === 3 ? "trifasica" : "monofasica")).includes(q));
+        const act = c.estructuras.filter(e => e.activo !== false), sinMO = act.filter(e => e.mano_obra == null).length;
+        const barra = `<div class="pr-acc ct-barra">${sinMO || soloSinM ? `<button type="button" class="chip-b est ${soloSinM ? "ambar" : ""}" data-solo-sin aria-pressed="${soloSinM}">Solo sin mano de obra · ${sinMO}</button>` : ""}<span class="esp"></span>${tablaMO ? `<span class="guardado ${moPend.size ? "sin" : ""}" data-ct-est>${moPend.size ? `${moPend.size} ${moPend.size === 1 ? "cambio sin guardar" : "cambios sin guardar"}` : "Todo guardado"}</span><button class="s-btn suave-b" type="button" data-tabla-listo>Listo</button><button class="s-btn lleno" type="button" data-mo-guardar ${moPend.size ? "" : "disabled"}>${ico("check", 16)}Guardar mano de obra</button>` : edE ? `<button class="s-btn suave-b" type="button" data-tabla-mo>${ico("pen", 15)}Poner mano de obra en tabla</button>` : ""}</div>`;
+        const vis = act.filter(e => pasa(e) && (!soloSinM || e.mano_obra == null));
+        if (tablaMO) {
+          res.innerHTML = barra + (vis.length ? `<div class="pr-tabla ct-tabla">${vis.map(e => { const x = moPend.has(e.id) ? moPend.get(e.id) : montoTxt(e.mano_obra); return `<div class="ct-fila mo${moPend.has(e.id) ? " cambio" : ""}" data-ct="${e.id}"><span class="pr-nom"><b>${esc(e.nombre)}</b><small>${esc(e.codigo)} · ${cant(e.voltaje_kv)} kV · ${e.materiales.length} materiales</small></span><label class="f-campo"><span class="sr">Mano de obra de ${esc(e.nombre)}</span><span class="f-monto"><span>Q</span><input data-mo-v="${e.id}" inputmode="decimal" value="${esc(x)}" placeholder="0.00" autocomplete="off"></span></label></div>`; }).join("")}</div>` : `<div class="vacio chico"><p>${soloSinM ? "Todas tienen mano de obra." : `Nada con «${esc(busqueda)}».`}</p></div>`);
+          return;
+        }
         const grupos = [["linea", "Estructuras de línea"], ["transformador", "Transformadores en poste"]].flatMap(([cl, t]) =>
-          [...new Set(c.estructuras.filter(e => e.clase === cl).map(e => Number(e.voltaje_kv)))].sort((a, b) => a - b).map(kv => [`${t} · ${cant(kv)} kV`, c.estructuras.filter(e => e.clase === cl && Number(e.voltaje_kv) === kv && pasa(e))]))
+          [...new Set(act.filter(e => e.clase === cl).map(e => Number(e.voltaje_kv)))].sort((a, b) => a - b).map(kv => [`${t} · ${cant(kv)} kV`, vis.filter(e => e.clase === cl && Number(e.voltaje_kv) === kv)]))
           .filter(([, l]) => l.length);
-        res.innerHTML = grupos.length ? grupos.map(([t, l]) => `<div class="grupo-t">${t} · ${l.length}</div><div class="lista">${l.map(e => {
+        const arch = c.estructuras.filter(e => e.activo === false && pasa(e));
+        res.innerHTML = barra + (grupos.length ? grupos.map(([t, l]) => `<div class="grupo-t">${t} · ${l.length}</div><div class="lista">${l.map(e => {
           const k = calc(e);
           const der = k.total != null ? (verCosto ? `<span class="e-cifra">${esc(Q(k.total))}</span><small>costo y mano de obra</small>` : '<span class="chip verde">Completa</span>') : `<span class="chip ambar">${k.falt ? `Faltan ${k.falt} costos` : "Falta mano de obra"}</span>`;
           return `<details class="est" data-est="${e.id}" ${abiertos.has(e.id) ? "open" : ""}><summary class="fila"><span class="icono ${e.clase === "linea" ? "azul" : "laton"}">${ico(e.clase === "linea" ? "torre" : "zap", 18)}</span><span><b>${esc(e.nombre)}</b><small>${esc(e.codigo)} · ${cant(e.voltaje_kv)} kV · ${e.materiales.length} materiales</small></span><span class="der">${der}</span><span class="chev">${ico("chev", 16, 2.2)}</span></summary>
@@ -455,7 +464,8 @@
               ${edE ? `<button class="s-btn suave-b" type="button" data-editar-est="${e.id}">${ico("pen", 15)}Editar</button>` : ""}
             </div>
             ${e.materiales.map(r => `<div><span>${esc(r.material.descripcion)}</span><span>${cant(r.cantidad)}${verCosto && r.material.costo != null ? ` <small class="suave">× ${esc(Q(r.material.costo))}</small>` : ""}</span></div>`).join("")}
-          </div></details>`; }).join("")}</div>`).join("") : `<div class="vacio"><h2>Nada con «${esc(busqueda)}»</h2><p>Pruebe con otra palabra, el voltaje o los kVA.</p></div>`;
+          </div></details>`; }).join("")}</div>`).join("") : soloSinM && !q ? `<div class="vacio chico"><p>Todas tienen mano de obra.</p></div>` : `<div class="vacio"><h2>Nada con «${esc(busqueda)}»</h2><p>Pruebe con otra palabra, el voltaje o los kVA.</p></div>`)
+          + archivados(arch.map(e => ({ id: e.id, t: e.nombre, s: `${e.codigo} · ${cant(e.voltaje_kv)} kV`, d: "est" })), edE);
       } else if (pestana === "precios") {
         pintarPrecios(res, c, q);
       } else if (pestana === "proveedores") {
@@ -468,11 +478,20 @@
           ${edP ? `<button class="s-ib" type="button" aria-label="Editar ${esc(x.nombre)}" data-ed-prov="${x.id}">${ico("pen", 16)}</button>` : "<span></span>"}</div>`; }).join("")}</div>`
           : `<div class="vacio"><h2>Nada con «${esc(busqueda)}»</h2><p>Pruebe con otro nombre o teléfono.</p></div>`;
       } else {
-        const l = c.materiales.filter(m => !q || (m.descripcion + " " + m.codigo).toLowerCase().includes(q));
-        res.innerHTML = l.length ? `<div class="grupo-t">${l.length} ${l.length === 1 ? "material" : "materiales"} · ${l.filter(m => m.costo == null).length} sin costo</div><div class="lista">${l.map(m => `
+        const pasaM = m => !q || normal(m.descripcion + " " + m.codigo + " " + (m.unidad || "")).includes(q);
+        const act = c.materiales.filter(m => m.activo !== false), sinC = act.filter(m => m.costo == null).length;
+        const l = act.filter(m => pasaM(m) && (!soloSinC || m.costo == null));
+        const barra = `<div class="pr-acc ct-barra">${verCosto && (sinC || soloSinC) ? `<button type="button" class="chip-b est ${soloSinC ? "ambar" : ""}" data-solo-sin aria-pressed="${soloSinC}">Solo sin costo · ${sinC}</button>` : ""}<span class="esp"></span>${tablaC ? `<span class="guardado ${costosPend.size ? "sin" : ""}" data-ct-est>${costosPend.size ? `${costosPend.size} ${costosPend.size === 1 ? "cambio sin guardar" : "cambios sin guardar"}` : "Todo guardado"}</span><button class="s-btn suave-b" type="button" data-tabla-listo>Listo</button><button class="s-btn lleno" type="button" data-ct-guardar ${costosPend.size ? "" : "disabled"}>${ico("check", 16)}Guardar costos</button>` : edM ? `${verCosto ? `<button class="s-btn suave-b" type="button" data-tabla-c>${ico("pen", 15)}Poner costos en tabla</button>` : ""}<button class="s-btn suave-b" type="button" data-excel-sub>${ico("download", 15)}Cargar desde Excel</button><button class="e-btn e-btn-salida chico-e" type="button" data-excel-baj>${ico("file", 15)}Lista en Excel</button>` : ""}</div>`;
+        if (tablaC) {
+          res.innerHTML = barra + `<datalist id="unidades-c">${UNIDADES.map(u => `<option value="${u}">`).join("")}</datalist>` + (l.length ? `<div class="pr-tabla ct-tabla">${l.map(m => { const x = costosPend.get(m.id) || {}; return `<div class="ct-fila${costosPend.has(m.id) ? " cambio" : ""}" data-ct="${m.id}"><span class="pr-nom"><b>${esc(m.descripcion)}</b><small>${esc(m.codigo)}</small></span><label class="f-campo"><span class="sr">Unidad de ${esc(m.descripcion)}</span><input data-ct-u="${m.id}" list="unidades-c" value="${esc(x.unidad ?? (m.unidad || ""))}" placeholder="unidad" autocomplete="off"></label><label class="f-campo"><span class="sr">Costo de ${esc(m.descripcion)}</span><span class="f-monto"><span>Q</span><input data-ct-c="${m.id}" inputmode="decimal" value="${esc(x.costo ?? montoTxt(m.costo))}" placeholder="0.00" autocomplete="off"></span></label></div>`; }).join("")}</div>` : `<div class="vacio chico"><p>${soloSinC ? "Todos tienen costo." : `Nada con «${esc(busqueda)}».`}</p></div>`);
+          return;
+        }
+        const arch = c.materiales.filter(m => m.activo === false && pasaM(m));
+        res.innerHTML = barra + (l.length ? `<div class="grupo-t">${l.length} ${l.length === 1 ? "material" : "materiales"} · ${l.filter(m => m.costo == null).length} sin costo</div><div class="lista">${l.map(m => `
           <div class="fila ${edM ? "con-lapiz" : ""}" style="cursor:default"><span class="icono gris">${ico("box", 18)}</span><span><b>${esc(m.descripcion)}</b><small>${esc(m.codigo)}${m.unidad ? " · por " + esc(m.unidad) : ""} · en ${usos[m.id] || 0} estructuras</small></span>
           <span class="der">${m.costo == null && !(verAum && m.venta_modo === "precio") ? '<span class="chip ambar">Sin costo</span>' : verAum ? ventaTxt(m) : verCosto ? `<span class="e-cifra">${esc(Q(m.costo))}</span>` : '<span class="chip verde">Con costo</span>'}</span>
-          ${edM ? `<button class="s-ib" type="button" aria-label="Editar ${esc(m.descripcion)}" data-editar-mat="${m.id}">${ico("pen", 16)}</button>` : "<span></span>"}</div>`).join("")}</div>` : `<div class="vacio"><h2>Nada con «${esc(busqueda)}»</h2><p>Pruebe con otra palabra o con el código.</p></div>`;
+          ${edM ? `<button class="s-ib" type="button" aria-label="Editar ${esc(m.descripcion)}" data-editar-mat="${m.id}">${ico("pen", 16)}</button>` : "<span></span>"}</div>`).join("")}</div>` : soloSinC && !q ? `<div class="vacio chico"><p>Todos tienen costo.</p></div>` : `<div class="vacio"><h2>Nada con «${esc(busqueda)}»</h2><p>Pruebe con otra palabra o con el código.</p></div>`)
+          + archivados(arch.map(m => ({ id: m.id, t: m.descripcion, s: m.codigo, d: "mat" })), edM);
       }
     };
     pintar();
@@ -480,6 +499,25 @@
     if (pestana === "precios") { $("[data-filtro]", v).placeholder = "Buscar material o código"; $(".cab-v > .s-btn", v)?.remove(); }
     if (pestana === "proveedores") { $("[data-filtro]", v).placeholder = "Buscar proveedor o teléfono"; const b = $(".cab-v > .s-btn", v); if (b) { if (edP) { b.outerHTML = `<button class="s-btn lleno" type="button" data-nuevo-prov>${ico("plus", 16)}Agregar proveedor</button>`; } else b.remove(); } }
     res.addEventListener("toggle", e => { const d = e.target.closest("[data-est]"); if (d) { const id = Number(d.dataset.est); if (d.open) abiertos.add(id); else abiertos.delete(id); } }, true);
+    if (enTabla) guardia({ limpio: () => !costosPend.size && !moPend.size, soltar: () => { costosPend.clear(); moPend.clear(); tablaC = tablaMO = false; } });
+    const marcarEst = () => { const n = pestana === "materiales" ? costosPend.size : moPend.size; const est = res.querySelector("[data-ct-est]"); if (est) { est.textContent = n ? `${n} ${n === 1 ? "cambio sin guardar" : "cambios sin guardar"}` : "Todo guardado"; est.className = "guardado" + (n ? " sin" : ""); } const g = res.querySelector("[data-ct-guardar], [data-mo-guardar]"); if (g) g.disabled = !n; };
+    res.addEventListener("input", e => {
+      const t = e.target;
+      if (t.dataset.ctU || t.dataset.ctC) {
+        const fila = t.closest("[data-ct]"), id = Number(fila.dataset.ct), m = c.materiales.find(x => x.id === id);
+        const u = fila.querySelector("[data-ct-u]").value.trim(), co = fila.querySelector("[data-ct-c]").value.trim();
+        let n = null, bien = true; try { n = numero(co); } catch (er) { bien = false; }
+        if (bien && u === (m.unidad || "") && (n == null ? m.costo == null : Number(m.costo) === n)) costosPend.delete(id); else costosPend.set(id, { unidad: u, costo: co });
+        fila.classList.toggle("cambio", costosPend.has(id)); marcarEst();
+      }
+      if (t.dataset.moV) {
+        const id = Number(t.dataset.moV), e2 = c.estructuras.find(x => x.id === id);
+        let n = null, bien = true; try { n = numero(t.value.trim()); } catch (er) { bien = false; }
+        if (bien && (n == null ? e2.mano_obra == null : Number(e2.mano_obra) === n)) moPend.delete(id); else moPend.set(id, t.value.trim());
+        t.closest("[data-ct]").classList.toggle("cambio", moPend.has(id)); marcarEst();
+      }
+    });
+    res.addEventListener("focusout", e => { if (e.target.matches("[data-ct-c], [data-mo-v]")) { try { e.target.value = montoTxt(numero(e.target.value)); } catch (er) {} } });
     if (pestana === "precios") {
       guardia({ limpio: () => !preciosPend.size, soltar: () => preciosPend.clear() });
       const cambiar = (id, cambios) => {
@@ -509,6 +547,22 @@
       });
     }
     v.onclick = async e => {
+      if (e.target.closest("[data-solo-sin]")) { if (pestana === "materiales") soloSinC = !soloSinC; else soloSinM = !soloSinM; pintar(); return; }
+      if (e.target.closest("[data-tabla-c]")) { tablaC = true; await quieto(() => vCatalogo(v, pestana)); return; }
+      if (e.target.closest("[data-tabla-mo]")) { tablaMO = true; await quieto(() => vCatalogo(v, pestana)); return; }
+      if (e.target.closest("[data-tabla-listo]")) { if (costosPend.size || moPend.size) { aviso("Guarde los cambios primero.", "mal"); return; } tablaC = tablaMO = false; guardia(null); await quieto(() => vCatalogo(v, pestana)); return; }
+      const cg = e.target.closest("[data-ct-guardar], [data-mo-guardar]");
+      if (cg) {
+        cg.disabled = true;
+        try {
+          if (cg.matches("[data-ct-guardar]")) for (const [id, x] of [...costosPend]) { const m = c.materiales.find(y => y.id === id); let costo; try { costo = numero(x.costo); } catch (er) { throw new Error(`Revise el costo de ${m.descripcion}.`); } await D.guardarMaterial({ ...m, unidad: x.unidad, costo }); costosPend.delete(id); }
+          else for (const [id, x] of [...moPend]) { const es = c.estructuras.find(y => y.id === id); let mo; try { mo = numero(x); } catch (er) { throw new Error(`Revise la mano de obra de ${es.nombre}.`); } await D.guardarManoObra(id, mo); moPend.delete(id); }
+          aviso(cg.matches("[data-ct-guardar]") ? "Costos guardados." : "Mano de obra guardada."); await refrescar();
+        } catch (err) { aviso(err.message, "mal"); cg.disabled = false; await refrescar(); }
+        return;
+      }
+      if (e.target.closest("[data-excel-sub]")) { cargarExcel(c); return; }
+      if (e.target.closest("[data-excel-baj]")) { bajarExcel(c); return; }
       const pg = e.target.closest("[data-pr-guardar]");
       if (pg) {
         pg.disabled = true;
@@ -534,9 +588,11 @@
     if (!m.venta_modo) return `<span class="e-cifra">${esc(costo)}</span><small>aumento de la cotización</small>`;
     return `<span class="e-cifra">${esc(costo)} → ${esc(z.precio == null ? "—" : Q(z.precio))}</span><small>${m.venta_modo === "pct" ? "+" + esc(cant(m.venta_pct)) + " %" : "precio fijo"}${z.ganancia != null ? " · gana " + esc(Q(z.ganancia)) : ""}</small>`;
   }
-  const preciosPend = new Map();
+  const preciosPend = new Map(), costosPend = new Map(), moPend = new Map();
+  let tablaC = false, tablaMO = false, soloSinC = false, soloSinM = false;
+  const archivados = (l, ed) => l.length ? `<details class="caja plegable arch-cat"><summary><span class="pl-t"><h2>Archivados</h2><span class="suave">${l.length} · no salen al cotizar</span></span><span class="chev">${ico("chev", 16, 2.2)}</span></summary><div class="pl-cuerpo"><div class="lista">${l.map(x => `<div class="fila ${ed ? "con-lapiz" : ""}" style="cursor:default"><span class="icono gris">${ico("box", 18)}</span><span><b>${esc(x.t)}</b><small>${esc(x.s)}</small></span><span class="der"><span class="chip gris">Archivado</span></span>${ed ? `<button class="s-ib" type="button" aria-label="Editar ${esc(x.t)}" data-editar-${x.d === "mat" ? "mat" : "est"}="${x.id}">${ico("pen", 16)}</button>` : "<span></span>"}</div>`).join("")}</div></div></details>` : "";
   function pintarPrecios(res, c, q) {
-    const l = c.materiales.filter(m => !q || (m.descripcion + " " + m.codigo).toLowerCase().includes(q));
+    const l = c.materiales.filter(m => m.activo !== false && (!q || normal(m.descripcion + " " + m.codigo).includes(q)));
     const val = m => preciosPend.has(m.id) ? preciosPend.get(m.id) : { venta_modo: m.venta_modo || "", precio: m.precio, venta_pct: m.venta_pct };
     const fila = m => {
       const x = val(m);
@@ -665,6 +721,98 @@
     });
   }
 
+  let excelP = null;
+  const libExcel = () => window.ExcelJS ? Promise.resolve(window.ExcelJS) : (excelP = excelP || new Promise((ok, mal) => { const s = document.createElement("script"); s.src = "https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"; s.integrity = "sha384-Pqp51FUN2/qzfxZxBCtF0stpc9ONI6MYZpVqmo8m20SoaQCzf+arZvACkLkirlPz"; s.crossOrigin = "anonymous"; s.onload = () => ok(window.ExcelJS); s.onerror = () => { excelP = null; mal(new Error("No se pudo abrir el lector de Excel. Revise el internet.")); }; document.head.append(s); }));
+  async function bajarExcel(c) {
+    try {
+      aviso("Armando el Excel…");
+      const ExcelJS = await libExcel(), verC = D.puede(sesion.perfil, "verCosto");
+      const wb = new ExcelJS.Workbook(), ws = wb.addWorksheet("Materiales");
+      ws.columns = [{ header: "Código", key: "codigo", width: 12 }, { header: "Descripción", key: "descripcion", width: 54 }, { header: "Unidad", key: "unidad", width: 14 }, ...(verC ? [{ header: "Costo", key: "costo", width: 14, style: { numFmt: '"Q" #,##0.00' } }] : [])];
+      ws.getRow(1).font = { bold: true };
+      c.materiales.filter(m => m.activo !== false).forEach(m => ws.addRow({ codigo: m.codigo, descripcion: m.descripcion, unidad: m.unidad || "", ...(verC ? { costo: m.costo } : {}) }));
+      const u = URL.createObjectURL(new Blob([await wb.xlsx.writeBuffer()], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }));
+      const a = document.createElement("a"); a.href = u; a.download = "Materiales EMTECSA.xlsx"; document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(u), 30000);
+    } catch (err) { aviso(err.message || "No se pudo armar el Excel.", "mal"); }
+  }
+  function leerExcel(wb) {
+    const txt = v => { if (v == null) return ""; if (typeof v === "object") { if (v instanceof Date) return v.toISOString().slice(0, 10); if (v.richText) return v.richText.map(r => r.text).join("").trim(); if (v.result != null) return String(v.result).trim(); if (v.text != null) return String(v.text).trim(); return ""; } return String(v).trim(); };
+    for (const ws of wb.worksheets) {
+      for (let r = 1; r <= Math.min(10, ws.rowCount); r++) {
+        const col = {};
+        ws.getRow(r).eachCell((cel, i) => { const h = normal(txt(cel.value)); if (!h) return; if (col.codigo == null && /^cod/.test(h)) col.codigo = i; else if (col.descripcion == null && /descrip|material|nombre/.test(h)) col.descripcion = i; else if (col.unidad == null && /^(unidad|u\.?m|medida)/.test(h)) col.unidad = i; else if (col.costo == null && /costo|precio/.test(h)) col.costo = i; });
+        if (col.codigo == null && col.descripcion == null) continue;
+        const filas = [];
+        for (let k = r + 1; k <= ws.rowCount; k++) { const row = ws.getRow(k), g = i => i == null ? "" : txt(row.getCell(i).value), cv = col.costo == null ? null : row.getCell(col.costo).value; const x = { fila: k, codigo: g(col.codigo).toUpperCase(), descripcion: g(col.descripcion), unidad: g(col.unidad), costo: typeof cv === "number" ? cv : (cv && typeof cv === "object" && typeof cv.result === "number" ? cv.result : g(col.costo)), conCosto: col.costo != null }; if (x.codigo || x.descripcion) filas.push(x); }
+        return filas;
+      }
+    }
+    throw new Error("No encontré los encabezados. La primera fila debe decir Código, Descripción, Unidad y Costo.");
+  }
+  function cargarExcel(c) {
+    const inp = document.createElement("input"); inp.type = "file"; inp.accept = ".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+    inp.addEventListener("change", async () => {
+      const file = inp.files[0]; if (!file) return;
+      try { aviso("Leyendo el Excel…"); const ExcelJS = await libExcel(); const wb = new ExcelJS.Workbook(); await wb.xlsx.load(await file.arrayBuffer()); revisarCarga(c, leerExcel(wb), file.name); }
+      catch (err) { aviso(/[áéíóúñ]/i.test(err.message) ? err.message : "Ese archivo no se pudo leer. Guárdelo como Excel (.xlsx) y súbalo otra vez.", "mal"); }
+    });
+    inp.click();
+  }
+  function revisarCarga(c, filas, nombre) {
+    const verC = D.puede(sesion.perfil, "verCosto");
+    const act = c.materiales;
+    const porCod = Object.fromEntries(act.map(m => [m.codigo.toUpperCase(), m])), porDesc = Object.fromEntries(act.map(m => [m.descripcion.toUpperCase(), m]));
+    const nuevos = [], cambios = [], malos = [], vistos = new Set(); let iguales = 0;
+    for (const x of filas) {
+      let costo = null, conC = verC && x.conCosto && x.costo !== "" && x.costo != null;
+      if (conC) { if (typeof x.costo === "number") costo = Math.round(x.costo * 100) / 100; else { try { costo = numero(x.costo); } catch (er) { malos.push({ x, por: "el costo no es un número" }); continue; } } if (costo != null && costo < 0) { malos.push({ x, por: "el costo es negativo" }); continue; } }
+      const llave = x.codigo || "D:" + x.descripcion.toUpperCase();
+      if (vistos.has(llave)) { malos.push({ x, por: "está repetido en el Excel" }); continue; }
+      vistos.add(llave);
+      const m = x.codigo ? porCod[x.codigo] : porDesc[x.descripcion.toUpperCase()];
+      if (m) {
+        const ch = {};
+        if (x.descripcion && x.descripcion !== m.descripcion) { const otro = porDesc[x.descripcion.toUpperCase()]; if (otro && otro.id !== m.id) { malos.push({ x, por: `esa descripción ya la tiene ${otro.codigo}` }); continue; } ch.descripcion = x.descripcion; }
+        if (x.unidad && x.unidad !== (m.unidad || "")) ch.unidad = x.unidad;
+        if (conC && costo != null && costo !== (m.costo == null ? null : Number(m.costo))) ch.costo = costo;
+        if (Object.keys(ch).length) cambios.push({ m, ch }); else iguales++;
+      } else {
+        if (!x.descripcion) { malos.push({ x, por: `el código ${x.codigo} no existe y no trae descripción` }); continue; }
+        if (porDesc[x.descripcion.toUpperCase()]) { malos.push({ x, por: `esa descripción ya la tiene ${porDesc[x.descripcion.toUpperCase()].codigo}` }); continue; }
+        nuevos.push({ codigo: x.codigo, descripcion: x.descripcion, unidad: x.unidad, costo: conC ? costo : null });
+      }
+    }
+    const mx = 40, mas = n => n > mx ? `<p class="suave" style="font-size:13px;margin:6px 4px 0">y ${n - mx} más</p>` : "";
+    const cambioTxt = ({ m, ch }) => [ch.descripcion ? `Descripción: ${ch.descripcion}` : "", ch.unidad != null ? `Unidad: ${m.unidad || "—"} → ${ch.unidad}` : "", ch.costo !== undefined ? `Costo: ${m.costo == null ? "sin costo" : Q(m.costo)} → ${Q(ch.costo)}` : ""].filter(Boolean).join(" · ");
+    if (!nuevos.length && !cambios.length) { modal({ titulo: "Nada que cargar", guardarTxt: "Cerrar", soloUno: true, cuerpo: `<p class="suave" style="font-size:15px">«${esc(nombre)}» ya coincide con el catálogo${malos.length ? `, y ${malos.length} ${malos.length === 1 ? "fila tiene" : "filas tienen"} problemas:` : "."}</p>${malos.length ? `<div class="lista">${malos.slice(0, mx).map(z => `<div class="fila" style="cursor:default"><span><b>Fila ${z.x.fila} · ${esc(z.x.codigo || z.x.descripcion)}</b><small>${esc(z.por)}</small></span></div>`).join("")}</div>` : ""}`, alGuardar: async () => cerrarCapas() }); return; }
+    modal({
+      titulo: "Cargar desde Excel", guardarTxt: "Cargar",
+      cuerpo: `<p class="suave" style="font-size:14px;margin:0">${esc(nombre)} · ${filas.length} filas${iguales ? ` · ${iguales} ya estaban igual` : ""}</p>
+        ${nuevos.length ? `<section class="carga-p"><div class="caja-cab"><h3>Nuevos · ${nuevos.length}</h3><span class="chip verde">Segura</span></div><label class="f-check"><input type="checkbox" name="nuevos" checked><span>${nuevos.length === 1 ? "Agregar el material nuevo" : `Agregar los ${nuevos.length} materiales nuevos`}</span></label><div class="lista">${nuevos.slice(0, mx).map(n => `<div class="fila" style="cursor:default"><span><b>${esc(n.descripcion)}</b><small>${esc([n.codigo || "código nuevo", n.unidad, n.costo != null ? Q(n.costo) : ""].filter(Boolean).join(" · "))}</small></span></div>`).join("")}</div>${mas(nuevos.length)}</section>` : ""}
+        ${cambios.length ? `<section class="carga-p"><div class="caja-cab"><h3>Cambios · ${cambios.length}</h3><span class="chip ambar">Revisar</span></div><label class="f-check"><input type="checkbox" name="cambios" checked><span>${cambios.length === 1 ? "Aplicar el cambio" : `Aplicar los ${cambios.length} cambios`}</span></label><div class="lista">${cambios.slice(0, mx).map(z => `<div class="fila" style="cursor:default"><span><b>${esc(z.m.codigo)} · ${esc(z.m.descripcion)}</b><small>${esc(cambioTxt(z))}</small></span></div>`).join("")}</div>${mas(cambios.length)}</section>` : ""}
+        ${malos.length ? `<section class="carga-p"><div class="caja-cab"><h3>No se cargan · ${malos.length}</h3><span class="chip gris">Con problema</span></div><div class="lista">${malos.slice(0, mx).map(z => `<div class="fila" style="cursor:default"><span><b>Fila ${z.x.fila} · ${esc(z.x.codigo || z.x.descripcion)}</b><small>${esc(z.por)}</small></span></div>`).join("")}</div>${mas(malos.length)}</section>` : ""}`,
+      alGuardar: async f => {
+        const conN = !f.nuevos || f.nuevos.checked, conC = !f.cambios || f.cambios.checked;
+        if (!(conN && nuevos.length) && !(conC && cambios.length)) throw new Error("Marque qué quiere cargar.");
+        const codigos = act.map(m => ({ codigo: m.codigo })); let n = 0, k = 0; const fallas = [];
+        aviso("Cargando…");
+        if (conN) for (const x of nuevos) { const codigo = x.codigo || D.siguienteCodigo(codigos, "MAT"); try { await D.guardarMaterial({ codigo, descripcion: x.descripcion, unidad: x.unidad, costo: x.costo, precio: null, venta_modo: null, venta_pct: null }); codigos.push({ codigo }); n++; } catch (er) { fallas.push(`${x.descripcion}: ${er.message}`); } }
+        if (conC) for (const z of cambios) { try { await D.guardarMaterial({ ...z.m, ...z.ch }); k++; } catch (er) { fallas.push(`${z.m.codigo}: ${er.message}`); } }
+        cerrarCapas(); aviso(`Listo: ${n} ${n === 1 ? "nuevo" : "nuevos"} y ${k} ${k === 1 ? "cambio" : "cambios"}.${fallas.length ? ` ${fallas.length} no se pudieron.` : ""}`, fallas.length ? "mal" : undefined);
+        await refrescar();
+      }
+    });
+  }
+
+  function archivar(tabla, x, c) {
+    const esMat = tabla === "materiales", nombre = esMat ? x.descripcion : x.nombre;
+    const usos = esMat ? c.estructuras.filter(e => e.activo !== false && e.materiales.some(r => r.material.id === x.id)).length : 0;
+    const vuelve = x.activo === false;
+    modal({ titulo: vuelve ? `¿Volver a activar ${esMat ? "el material" : "la estructura"}?` : `¿Archivar ${esMat ? "el material" : "la estructura"}?`, guardarTxt: vuelve ? "Volver a activar" : "Archivar",
+      cuerpo: `<p class="suave" style="font-size:15px"><b style="color:var(--text)">${esc(nombre)}</b></p><p class="suave" style="font-size:14px">${vuelve ? "Vuelve a salir al cotizar, en el plano y al sacar material." : `Deja de salir al cotizar, en el plano y al sacar material. No se borra: queda en «Archivados» y se puede volver a activar.${usos ? ` Está en ${usos} ${usos === 1 ? "estructura" : "estructuras"}, que lo siguen usando.` : ""}`}</p>`,
+      alGuardar: async () => { await D.activarCatalogo(tabla, x.id, vuelve); cerrarCapas(); aviso(vuelve ? "Activado otra vez." : "Archivado."); await refrescar(); } });
+  }
+
   async function editarMaterial(mat, c) {
     const fichaAct = mat ? (await D.fichas().catch(() => ({})))[mat.id] || null : null;
     let fichaNueva = null, fichaQuitar = false;
@@ -673,6 +821,7 @@
     const m0 = mat || { codigo: D.siguienteCodigo(c.materiales, "MAT"), descripcion: "", unidad: "", costo: null, precio: null, venta_modo: null, venta_pct: null };
     modal({
       titulo: nuevo ? "Material nuevo" : "Editar material",
+      extra: nuevo ? "" : `<button class="s-btn suave-b" type="button" data-archivar-x>${ico("box", 15)}${mat.activo === false ? "Volver a activar" : "Archivar"}</button>`,
       cuerpo: `
         <div class="f-fila"><label class="f-campo">Código<input name="codigo" value="${esc(m0.codigo)}" autocomplete="off"></label>
         <label class="f-campo">Unidad<input name="unidad" list="unidades" value="${esc(m0.unidad || "")}" placeholder="unidad, metro, juego…" autocomplete="off"></label></div>
@@ -689,6 +838,7 @@
         const est = f.querySelector("[data-ficha-est]");
         f.querySelector("[data-ficha-arch]").addEventListener("change", ev => { fichaNueva = ev.target.files[0] || null; fichaQuitar = false; if (fichaNueva) est.innerHTML = `${ico("file", 15)}<b>${esc(fichaNueva.name)}</b><small>Se sube al guardar</small>`; });
         mm.addEventListener("click", async ev => {
+          if (ev.target.closest("[data-archivar-x]")) { archivar("materiales", mat, c); return; }
           if (ev.target.closest("[data-ficha-q]")) { fichaQuitar = true; fichaNueva = null; est.innerHTML = `<small>Se quita al guardar</small>`; }
           if (ev.target.closest("[data-ficha-ver]") && fichaAct) { const b = await D.archivo(fichaAct.ref); if (!b) { aviso("No se encontró el archivo.", "mal"); return; } const u = URL.createObjectURL(b); const w = window.open(u, "_blank"); if (w) w.opener = null; setTimeout(() => URL.revokeObjectURL(u), 60000); }
         });
@@ -723,11 +873,11 @@
     const nuevo = !est || copia;
     const base = est || { codigo: "", nombre: "", voltaje_kv: 13.2, clase: "linea", fases: 1, conductor: null, kva: null, mano_obra: null, materiales: [] };
     const e0 = { ...base, codigo: nuevo ? D.siguienteCodigo(c.estructuras, "EST") : base.codigo, nombre: copia ? base.nombre + " (copia)" : base.nombre };
-    let filas = base.materiales.map(r => ({ material: r.material, cantidad: r.cantidad }));
+    let filas = base.materiales.map(r => ({ material: r.material, cantidad: r.cantidad })), marcadaE = null;
     const kvs = [...new Set([13.2, 34.5, ...c.estructuras.map(x => Number(x.voltaje_kv))])].sort((a, b) => a - b);
     modal({
       titulo: copia ? "Copia de estructura" : nuevo ? "Estructura nueva" : "Editar estructura",
-      extra: !nuevo ? `<button class="s-btn suave-b" type="button" data-duplicar>${ico("layers", 15)}Duplicar</button>` : "",
+      extra: !nuevo ? `<button class="s-btn suave-b" type="button" data-archivar-x>${ico("box", 15)}${est.activo === false ? "Volver a activar" : "Archivar"}</button><button class="s-btn suave-b" type="button" data-duplicar>${ico("layers", 15)}Duplicar</button>` : "",
       cuerpo: `
         <div class="f-fila"><label class="f-campo">Código<input name="codigo" value="${esc(e0.codigo)}" autocomplete="off"></label>
         <label class="f-campo">Voltaje<select name="kv">${kvs.map(k => `<option value="${k}" ${Number(e0.voltaje_kv) === k ? "selected" : ""}>${cant(k)} kV</option>`).join("")}</select></label></div>
@@ -757,7 +907,7 @@
         const pintarFilas = () => {
           cajaF.innerHTML = filas.length ? filas.map((r, i) => `<div class="f-mat"><span><b>${esc(r.material.descripcion)}</b><small>${esc(r.material.codigo)}${r.material.costo == null ? " · sin costo" : verCosto ? " · " + esc(Q(r.material.costo)) : ""}</small></span>
             <label class="f-cant"><span class="sr">Cantidad de ${esc(r.material.descripcion)}</span><input inputmode="decimal" value="${esc(cant(r.cantidad))}" data-cant="${i}" autocomplete="off"></label>
-            <button class="s-ib" type="button" aria-label="Quitar ${esc(r.material.descripcion)}" data-quitar="${i}">${ico("x", 15)}</button></div>`).join("") : `<p class="suave" style="padding:12px 4px">Todavía no tiene materiales. Búsquelos abajo.</p>`;
+            ${marcadaE === i ? `<button class="s-btn peligro-b chico" type="button" data-quitar="${i}">Quitar</button>` : `<button class="s-ib" type="button" aria-label="Quitar ${esc(r.material.descripcion)}" data-marca-q="${i}">${ico("pen", 15)}</button>`}</div>`).join("") : `<p class="suave" style="padding:12px 4px">Todavía no tiene materiales. Búsquelos abajo.</p>`;
           totales();
         };
         pintarFilas();
@@ -771,7 +921,7 @@
           const q = busca.value.trim().toLowerCase();
           if (!q) { res.hidden = true; return; }
           const ya = new Set(filas.map(r => r.material.id));
-          const l = c.materiales.filter(x => !ya.has(x.id) && (x.descripcion + " " + x.codigo).toLowerCase().includes(q)).slice(0, 8);
+          const l = c.materiales.filter(x => x.activo !== false && !ya.has(x.id) && normal(x.descripcion + " " + x.codigo).includes(normal(q))).slice(0, 8);
           res.hidden = false;
           res.innerHTML = l.length ? l.map(x => `<button type="button" data-add="${x.id}"><b>${esc(x.descripcion)}</b><small>${esc(x.codigo)}${x.costo == null ? " · sin costo" : verCosto ? " · " + esc(Q(x.costo)) : ""}</small></button>`).join("") : `<p class="suave">No hay más materiales con «${esc(busca.value)}». Agréguelo primero en Materiales.</p>`;
         };
@@ -780,8 +930,10 @@
         m.addEventListener("click", e => {
           const a = e.target.closest("[data-add]");
           if (a) { filas.push({ material: c.materiales.find(x => x.id === Number(a.dataset.add)), cantidad: 1 }); busca.value = ""; res.hidden = true; pintarFilas(); const ult = $$("[data-cant]", f).pop(); ult?.focus(); ult?.select(); }
+          const mq = e.target.closest("[data-marca-q]"); if (mq) { marcadaE = marcadaE === Number(mq.dataset.marcaQ) ? null : Number(mq.dataset.marcaQ); pintarFilas(); return; }
           const qq = e.target.closest("[data-quitar]");
-          if (qq) { filas.splice(Number(qq.dataset.quitar), 1); pintarFilas(); }
+          if (qq) { filas.splice(Number(qq.dataset.quitar), 1); marcadaE = null; pintarFilas(); }
+          if (e.target.closest("[data-archivar-x]")) { archivar("estructuras", est, c); return; }
           if (e.target.closest("[data-duplicar]")) editarEstructura({ ...est, materiales: filas.map(r => ({ ...r })) }, c, true);
         });
       },

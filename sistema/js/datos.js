@@ -287,6 +287,20 @@ window.EMT_DATOS = (() => {
     cache = null; return id;
   }
 
+  async function cambiarCatalogo(tabla, id, cambios) {
+    if (!nube) {
+      const d = leerLocal(); const x = (tabla === "materiales" ? d.materiales : d.estructuras).find(z => z.id === id);
+      if (!x) throw new Error("Ya no existe."); Object.assign(x, cambios); d.cambios = true; escribirLocal(d); cache = null; return;
+    }
+    const r = await sb.from(tabla).update(cambios).eq("id", id);
+    if (r.error) throw new Error("No se pudo guardar."); cache = null;
+  }
+  const activarCatalogo = (tabla, id, activo) => cambiarCatalogo(tabla, id, { activo: !!activo });
+  async function guardarManoObra(id, mo) {
+    if (mo != null && !(mo >= 0)) throw new Error("La mano de obra no puede ser negativa.");
+    await cambiarCatalogo("estructuras", id, { mano_obra: mo });
+  }
+
   function siguienteCodigo(lista, prefijo) {
     const n = lista.map(x => Number((x.codigo.match(new RegExp("^" + prefijo + "-(\\d+)$")) || [])[1] || 0)).reduce((a, b) => Math.max(a, b), 0);
     return `${prefijo}-${String(n + 1).padStart(3, "0")}`;
@@ -296,5 +310,5 @@ window.EMT_DATOS = (() => {
 
   function alCambiarSesion(fn) { if (nube) sb.auth.onAuthStateChange((ev) => { if (ev === "SIGNED_OUT" || ev === "PASSWORD_RECOVERY") fn(ev); }); }
 
-  return { nube, sb, sbErrores, DEV: !!DEV, conectado, ROLES, PERMISOS, CLAVE_EQUIPO, puede, cargarPermisos, registrarse, sesion, entrar, entrarPrueba, salir, recuperar, guardarModo, guardarTema, temasOcultos, guardarTemasOcultos, guardarMiPerfil, miFirma, guardarFirma, cambiarClave, catalogo, guardarMaterial, guardarEstructura, siguienteCodigo, cambiosLocales, alCambiarSesion };
+  return { nube, sb, sbErrores, DEV: !!DEV, conectado, ROLES, PERMISOS, CLAVE_EQUIPO, puede, cargarPermisos, registrarse, sesion, entrar, entrarPrueba, salir, recuperar, guardarModo, guardarTema, temasOcultos, guardarTemasOcultos, guardarMiPerfil, miFirma, guardarFirma, cambiarClave, catalogo, guardarMaterial, guardarEstructura, activarCatalogo, guardarManoObra, siguienteCodigo, cambiosLocales, alCambiarSesion };
 })();

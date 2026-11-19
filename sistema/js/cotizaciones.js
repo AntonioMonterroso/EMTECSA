@@ -467,8 +467,8 @@ window.EMT_COTIZACIONES = (() => {
     const buscar = () => {
       const q = buscaEst.value.toLowerCase().trim();
       if (!q) { resEst.hidden = true; return; }
-      const l = cat.estructuras.filter(e => (e.nombre + " " + e.codigo + " " + e.voltaje_kv + " kv " + (e.kva || "") + " kva").toLowerCase().includes(q)).slice(0, 6);
-      const lm = cat.materiales.filter(m => (m.descripcion + " " + m.codigo).toLowerCase().includes(q)).slice(0, 6);
+      const l = cat.estructuras.filter(e => e.activo !== false && (e.nombre + " " + e.codigo + " " + e.voltaje_kv + " kv " + (e.kva || "") + " kva").toLowerCase().includes(q)).slice(0, 6);
+      const lm = cat.materiales.filter(m => m.activo !== false && (m.descripcion + " " + m.codigo).toLowerCase().includes(q)).slice(0, 6);
       resEst.hidden = false;
       resEst.innerHTML = (l.length ? `<p class="res-t">Estructuras</p>` + l.map(e => { const pe = D.precioEstructura(e, c.aumento_pct, c.precios); return `<button type="button" data-add-est="${e.id}"><b>${esc(e.nombre)}</b><small>${esc(e.codigo)} · ${cant(e.voltaje_kv)} kV · ${esc(Q(pe.unitario))} c/u${pe.faltCosto ? " · faltan costos" : ""}</small></button>`; }).join("") : "")
         + (lm.length ? `<p class="res-t">Materiales sueltos</p>` + lm.map(m => `<button type="button" data-add-mat="${m.id}"><b>${esc(m.descripcion)}</b><small>${esc(m.codigo)} · ${(z => z.precio == null ? "sin costo" : esc(Q(z.precio)) + " c/u")(D.precioPieza(m, c.aumento_pct, c.precios))}</small></button>`).join("") : "")
@@ -508,7 +508,7 @@ window.EMT_COTIZACIONES = (() => {
               const q = busca.value.toLowerCase().trim();
               if (!q) { res.hidden = true; return; }
               const ya = new Set(filas.map(r => r.material.id));
-              const l = cat.materiales.filter(x => !ya.has(x.id) && (x.descripcion + " " + x.codigo).toLowerCase().includes(q)).slice(0, 8);
+              const l = cat.materiales.filter(x => x.activo !== false && !ya.has(x.id) && (x.descripcion + " " + x.codigo).toLowerCase().includes(q)).slice(0, 8);
               res.hidden = false;
               res.innerHTML = l.length ? l.map(x => `<button type="button" data-aj-add="${x.id}"><b>${esc(x.descripcion)}</b><small>${esc(x.codigo)}</small></button>`).join("") : `<p class="suave">No hay más materiales con «${esc(busca.value)}».</p>`;
             }
@@ -551,7 +551,7 @@ window.EMT_COTIZACIONES = (() => {
         const i = Number(t.dataset.pmBusca), res = partBox.querySelector(`[data-pm-res="${i}"]`), q = t.value.toLowerCase().trim();
         if (!q) { res.hidden = true; return; }
         const ya = new Set((k.partidas[i].mats || []).map(r => r.material.id));
-        const l = cat.materiales.filter(x => !ya.has(x.id) && (x.descripcion + " " + x.codigo).toLowerCase().includes(q)).slice(0, 8);
+        const l = cat.materiales.filter(x => x.activo !== false && !ya.has(x.id) && (x.descripcion + " " + x.codigo).toLowerCase().includes(q)).slice(0, 8);
         res.hidden = false;
         res.innerHTML = l.length ? l.map(x => `<button type="button" data-pm-add="${i}:${x.id}"><b>${esc(x.descripcion)}</b><small>${esc(x.codigo)}</small></button>`).join("") : `<p class="suave">No hay más materiales con «${esc(t.value)}».</p>`;
         return;

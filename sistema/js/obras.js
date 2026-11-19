@@ -321,7 +321,7 @@ window.EMT_OBRAS = (() => {
               const q = ev.target.value.toLowerCase().trim(), res = f.querySelector("[data-mov-res]");
               if (!q) { res.hidden = true; return; }
               const ya = new Set(items.map(x => x.material.id));
-              const r = cat.materiales.filter(x => !ya.has(x.id) && (x.descripcion + " " + x.codigo).toLowerCase().includes(q)).slice(0, 8);
+              const r = cat.materiales.filter(x => x.activo !== false && !ya.has(x.id) && (x.descripcion + " " + x.codigo).toLowerCase().includes(q)).slice(0, 8);
               res.hidden = false; res.innerHTML = r.length ? r.map(x => `<button type="button" data-mov-add="${x.id}"><b>${esc(x.descripcion)}</b><small>${esc(x.codigo)}</small></button>`).join("") : `<p class="suave">No hay materiales con «${esc(ev.target.value)}».</p>`;
             }
           });

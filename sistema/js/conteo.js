@@ -7,7 +7,7 @@ window.EMT_CONTEO = (() => {
   function selector(box, cat, { titulo, actual, filtro, nada = true }, alEscoger, alVolver) {
     const { esc, ico } = A();
     let q = "";
-    const todos = [...cat.estructuras.filter(e => !filtro || filtro(e, "e")).map(e => ({ t: "e", codigo: e.codigo, n: e.nombre, s: `${e.codigo} · ${e.voltaje_kv} kV` })), ...cat.materiales.filter(m => !filtro || filtro(m, "m")).map(m => ({ t: "m", codigo: m.codigo, n: m.descripcion, s: `${m.codigo} · material` }))];
+    const todos = [...cat.estructuras.filter(e => e.activo !== false && (!filtro || filtro(e, "e"))).map(e => ({ t: "e", codigo: e.codigo, n: e.nombre, s: `${e.codigo} · ${e.voltaje_kv} kV` })), ...cat.materiales.filter(m => m.activo !== false && (!filtro || filtro(m, "m"))).map(m => ({ t: "m", codigo: m.codigo, n: m.descripcion, s: `${m.codigo} · material` }))];
     box.innerHTML = `<div class="cnt-sel"><div class="cnt-sel-cab">${alVolver ? `<button class="s-btn suave-b chico" type="button" data-cs-volver>${ico("chev", 14, 2.2)}Volver</button>` : ""}<b>${esc(titulo)}</b></div>
       <label class="busca-v ancho-busca"><span class="sr">Buscar en el catálogo</span>${ico("search", 16)}<input type="search" data-cs-q placeholder="Buscar estructura, material o código" autocomplete="off"></label>
       <div class="cnt-sel-l" data-cs-l></div>

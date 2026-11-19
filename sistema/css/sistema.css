@@ -255,7 +255,7 @@ details.est[open] .chev { transform: rotate(90deg); }
 .f-sub { display: flex; justify-content: space-between; align-items: baseline; padding-top: 6px; }
 .f-sub h3 { font-size: 17px; font-weight: 800; letter-spacing: -0.02em; }
 .f-mats { border-radius: 18px; background: var(--seg); overflow: hidden; }
-.f-mat { display: grid; grid-template-columns: 1fr 92px 38px; gap: 10px; align-items: center; padding: 10px 10px 10px 14px; }
+.f-mat { display: grid; grid-template-columns: 1fr 92px minmax(38px, auto); gap: 10px; align-items: center; padding: 10px 10px 10px 14px; }
 .f-mat + .f-mat { border-top: 1px solid var(--linea-s); }
 .f-mat b { display: block; font-size: 13.5px; font-weight: 650; }
 .f-mat small { font-size: 12px; color: var(--text-muted); }
@@ -579,6 +579,17 @@ main.vista { overflow-anchor: none; }
 .pr-cab span:nth-child(2), .pr-cab span:nth-child(5), .pr-cab span:nth-child(6) { text-align: right; }
 .pr-fila + .pr-fila { border-top: 1px solid var(--linea-s); }
 .pr-fila.cambio { background: color-mix(in srgb, var(--accent) 8%, transparent); }
+.ct-fila { display: grid; grid-template-columns: minmax(0, 1fr) 150px 170px; gap: 12px; align-items: center; padding: 10px 18px; }
+.ct-fila.mo { grid-template-columns: minmax(0, 1fr) 190px; }
+.ct-fila + .ct-fila { border-top: 1px solid var(--linea-s); }
+.ct-fila.cambio { background: color-mix(in srgb, var(--accent) 8%, transparent); }
+.ct-fila .f-campo { margin: 0; }
+.ct-barra { margin-bottom: 4px; }
+.carga-p { display: grid; gap: 10px; }
+.carga-p + .carga-p { margin-top: 6px; }
+.carga-p h3 { font-size: 15px; font-weight: 750; }
+.carga-p .lista { max-height: 260px; overflow-y: auto; }
+@media (max-width: 640px) { .ct-fila { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); padding: 12px 14px; } .ct-fila > .pr-nom { grid-column: 1 / -1; order: 0; } .ct-fila > .f-campo { order: 1; } .ct-fila.mo { grid-template-columns: minmax(0, 1fr); } .herr > .seg.pest-cat { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border-radius: 22px; gap: 4px; width: 100%; } .herr > .seg.pest-cat a { justify-content: center; text-align: center; white-space: nowrap; } }
 .pr-nom b { display: block; font-size: 14px; }
 .pr-nom small { color: var(--text-muted); font-size: 12px; }
 .pr-c, .pr-p, .pr-g { text-align: right; font-size: 14px; font-variant-numeric: tabular-nums; }
