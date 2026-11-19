@@ -28,6 +28,7 @@
       const t = [emp.razon_social || emp.nombre, emp.nit ? "NIT " + nb(emp.nit) : "", emp.telefono, emp.correo, emp.web].filter(x => String(x || "").trim()).join("  ·  ");
       pg.drawLine({ start: { x: M, y: PIE + 10 }, end: { x: W - M, y: PIE + 10 }, thickness: 0.5, color: hex(COL.linea) });
       txt(pg, t, M, PIE - 4, { s: 7.5, c: COL.gris });
+      if (String(emp.direccion || "").trim()) txt(pg, [emp.direccion, emp.ciudad].filter(x => String(x || "").trim()).join(", "), M, PIE - 14, { s: 7.5, c: COL.gris });
     };
     return { doc, F, hex, txt, cabeza, pie };
   }

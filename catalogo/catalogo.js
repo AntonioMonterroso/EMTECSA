@@ -984,6 +984,7 @@
     $("#cinta-prueba").hidden = !D.modoPrueba;
     $("#nota-iva").textContent = "Elija lo que necesita y la cantidad. Le enviamos el precio de todo.";
     pintarLineas(); pintarChips(); pintarProductos(false); marquesina(); obras(); pie();
+    if (A.empresa) A.empresa().then(x => { if (!x) return; const e = D.empresa, b = D.banco; ["telefono", "whatsapp", "correo", "direccion"].forEach(k => { if (x[k]) e[k] = x[k]; }); [["banco", "banco"], ["tipo", "banco_tipo"], ["numero", "banco_numero"], ["nombre", "banco_titular"], ["moneda", "banco_moneda"]].forEach(([a, k]) => { if (x[k]) b[a] = x[k]; }); pie(); }).catch(() => {});
     guardarCarrito();
     window.EMT.iconos();
     revelar(); recorrido();

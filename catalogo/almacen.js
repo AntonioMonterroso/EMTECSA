@@ -126,5 +126,9 @@
 
   const q = n => "Q " + Number(n || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-  window.EMT_ALMACEN = { nube, siguienteNumero, guardar, leer, todos, guardarArchivo, leerArchivo, emitir, alOir: f => oyentes.add(f), avisar, sw, q };
+  async function empresa() {
+    if (nube) return rpc("catalogo_empresa", {});
+    try { const d = JSON.parse(localStorage.getItem("emtecsa.sistema.cotizaciones")); return (d && d.ajustes && d.ajustes.empresa) || null; } catch (x) { return null; }
+  }
+  window.EMT_ALMACEN = { nube, empresa, siguienteNumero, guardar, leer, todos, guardarArchivo, leerArchivo, emitir, alOir: f => oyentes.add(f), avisar, sw, q };
 })();

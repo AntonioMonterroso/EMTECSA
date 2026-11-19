@@ -319,8 +319,8 @@ window.EMT_COTIZACIONES = (() => {
           <span class="p-nom" ${pp.estructura ? `data-pver="${i}" role="button" tabindex="0" aria-expanded="${abiertas.has(i)}" title="Ver sus materiales"` : ""}><b>${pp.estructura ? `<span class="p-chev ${abiertas.has(i) ? "abierta" : ""}">${ico("chev", 13, 2.4)}</span>` : ""}${esc(pp.descripcion)}${pp.ajustada ? ' <span class="chip azul chico-c">Ajustada</span>' : ""}${pp.del_plano ? ' <span class="chip gris chico-c">Del plano</span>' : ""}${hayOp() && puede && !fijo() ? ` <button type="button" class="chip-g" data-pgrupo="${i}">Mover</button>` : ""}</b><small>${pp.material_id ? (pp.material ? esc(pp.material.codigo) + " · material suelto" : "Ya no está en el catálogo") : pp.estructura ? esc(pp.estructura.codigo + " · " + cant(pp.estructura.voltaje_kv) + " kV") : "Ya no está en el catálogo"} · <span data-punit="${i}">${esc(Q(pp.precio_unitario))}</span> c/u${pp.faltCosto ? ` · <span class="falta">${pp.faltCosto} sin costo</span>` : ""}</small></span>
           <label class="f-cant"><span class="sr">Cantidad</span><input inputmode="decimal" value="${esc(cant(pp.cantidad))}" data-pcant="${i}" autocomplete="off"></label>
           <b class="e-cifra p-tot" data-ptot="${i}">${esc(Q(pp.total))}</b>
-          <button class="s-ib p-aj" type="button" aria-label="${pp.estructura ? `Ajustar o quitar ${esc(pp.descripcion)}` : `Quitar ${esc(pp.descripcion)}`}" data-pajustar="${i}">${ico("pen", 15)}</button>
-          <span class="p-qu"></span></div>${pp.estructura && abiertas.has(i) ? panelMats(pp, i) : ""}`;
+          ${pp.estructura ? `<button class="s-ib p-aj" type="button" aria-label="Ajustar materiales de ${esc(pp.descripcion)} en esta cotización" title="Ajustar materiales solo en esta cotización" data-pajustar="${i}">${ico("pen", 15)}</button>` : '<span class="p-aj"></span>'}
+          <button class="s-ib p-qu" type="button" aria-label="Quitar ${esc(pp.descripcion)}" data-pquitar="${i}">${ico("x", 15)}</button></div>${pp.estructura && abiertas.has(i) ? panelMats(pp, i) : ""}`;
     const pintarPartidas = () => {
       const sel = $("[data-agregar-a]", v), lab = $("[data-agregar-a-l]", v);
       if (lab) { lab.hidden = !hayOp(); if (hayOp()) { if (!gruposOp().includes(destino)) destino = null; sel.innerHTML = gruposOp().map(g => `<option value="${esc(g || "")}" ${g === destino ? "selected" : ""}>${esc(D.nombreGrupo(c, g))}</option>`).join(""); } }
@@ -476,17 +476,14 @@ window.EMT_COTIZACIONES = (() => {
     };
     buscaEst.addEventListener("input", buscar);
     buscaEst.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); resEst.querySelector("[data-add-est], [data-add-mat]")?.click(); } });
-    const quitarPartida = i => { c.partidas.splice(i, 1); k = D.calcularCotizacion(c, cat); pintarPartidas(); marcar(); pintarTotales(); };
     const ajustar = i => {
       const pp = k.partidas[i], part = c.partidas[i];
-      if (!pp.estructura) { A().modal({ titulo: pp.descripcion, guardarTxt: "Listo", quitar: () => { A().cerrarCapas(); quitarPartida(i); aviso("Se quitó de la cotización."); }, quitarTxt: "Quitar de la cotización", cuerpo: `<p class="suave" style="font-size:14px;margin:0">La cantidad se cambia en la misma fila.</p>`, alGuardar: async () => A().cerrarCapas() }); return; }
       const base = pp.estructura.materiales.map(r => ({ material: r.material, cantidad: r.cantidad }));
       let filas = pp.mats.map(r => ({ material: r.material, cantidad: r.cantidad }));
       const verCosto = D.puede(p, "verCosto");
       A().modal({
         titulo: "Materiales en esta cotización",
         guardarTxt: "Aplicar",
-        quitar: () => { A().cerrarCapas(); quitarPartida(i); aviso("Se quitó de la cotización."); }, quitarTxt: "Quitar de la cotización",
         extra: `<button class="s-btn suave-b" type="button" data-restablecer>${ico("layers", 15)}Como en el catálogo</button>`,
         cuerpo: `<p class="suave" style="font-size:13.5px"><b style="color:var(--text)">${esc(pp.descripcion)}</b>. Los cambios valen solo para esta cotización; el catálogo no cambia.</p>
           <div class="f-mats" data-aj-filas></div>
@@ -684,7 +681,7 @@ window.EMT_COTIZACIONES = (() => {
         return;
       }
       const pa = e.target.closest("[data-pajustar]"); if (pa && !pa.closest("fieldset:disabled")) ajustar(Number(pa.dataset.pajustar));
-      const q = e.target.closest("[data-pquitar]"); if (q) quitarPartida(Number(q.dataset.pquitar));
+      const q = e.target.closest("[data-pquitar]"); if (q) { c.partidas.splice(Number(q.dataset.pquitar), 1); k = D.calcularCotizacion(c, cat); pintarPartidas(); marcar(); pintarTotales(); }
       if (e.target.closest("[data-nuevo-cargo]")) { c.cargos.push({ descripcion: "", monto: 0 }); pintarCargos(); marcar(); cargoBox.querySelector(`[data-gdesc="${c.cargos.length - 1}"]`)?.focus(); }
       const gq = e.target.closest("[data-gquitar]"); if (gq) { c.cargos.splice(Number(gq.dataset.gquitar), 1); pintarCargos(); marcar(); pintarTotales(); }
       const dt = e.target.closest("[data-dtipo]"); if (dt && !dt.closest("fieldset:disabled")) { c.descuento_tipo = dt.dataset.dtipo; $$("[data-dtipo]", v).forEach(b => b.setAttribute("aria-pressed", String(b === dt))); marcar(); pintarTotales(); }
@@ -707,7 +704,7 @@ window.EMT_COTIZACIONES = (() => {
       const ip = e.target.closest("[data-ir-paso]"); if (ip) { irPaso(Number(ip.dataset.irPaso)); return; }
       const sg = e.target.closest("[data-sig]");
       if (sg) {
-        if (sg.dataset.accion === "siguiente") { if (paso === 2 && !c.partidas.length) { aviso("Agregue al menos una estructura o material.", "mal"); $("[data-busca-est]", v)?.focus(); return; } if (sucio && puede && !fijo()) { if (!(await guardarCot())) return; } irPaso(paso + 1); return; }
+        if (sg.dataset.accion === "siguiente") { if (sucio && puede && !fijo()) { if (!(await guardarCot())) return; } irPaso(paso + 1); return; }
         if (sg.dataset.accion === "mandar") { if (sucio && !(await guardarCot())) return; window.EMT_ENLACES.mandar(enlO).catch(err => aviso(err.message, "mal")); return; }
         const vb = $('[data-pdf="ver"]', v); if (vb) vb.click(); return;
       }

@@ -27,6 +27,7 @@ window.EMT_EMPRESA = (() => {
     let sucio = false;
     A().guardia({ limpio: () => !sucio });
     const campo = (k, t, ayuda = "", extra = "") => `<label class="f-campo">${t}<input data-e="${k}" value="${esc(e[k] || "")}" autocomplete="off" ${extra}>${ayuda ? `<small>${ayuda}</small>` : ""}</label>`;
+    const lista = (k, t, ops) => `<label class="f-campo">${t}<select data-e="${k}"><option value="">Escoja…</option>${ops.map(o => `<option ${e[k] === o ? "selected" : ""}>${o}</option>`).join("")}</select></label>`;
     const area = (k, t, ayuda = "", filas = 3) => `<label class="f-campo">${t}<textarea data-e="${k}" rows="${filas}">${esc(e[k] || "")}</textarea>${ayuda ? `<small>${ayuda}</small>` : ""}</label>`;
     v.innerHTML = `
       <div class="cuerpo">
@@ -40,6 +41,11 @@ window.EMT_EMPRESA = (() => {
             <div class="f-fila">${campo("correo", "Correo", "", 'type="email"')}${campo("web", "Sitio web")}</div>
             ${campo("correo_pedidos", "Correo que recibe los pedidos del catálogo", "Si queda vacío, se usa el correo de arriba.", 'type="email"')}
             <div class="f-fila">${campo("direccion", "Dirección")}${campo("ciudad", "Ciudad", "Sale en la fecha de la carta.")}</div>
+            ${campo("whatsapp", "WhatsApp para los clientes", "Sale en el catálogo en línea.", 'inputmode="tel"')}
+            <div class="f-sub"><h3>Cuenta para recibir pagos</h3><span class="suave">Sale en la Tienda cuando el cliente va a transferir</span></div>
+            <div class="f-fila">${campo("banco", "Banco")}${lista("banco_tipo", "Tipo de cuenta", ["Monetaria", "Ahorro"])}</div>
+            <div class="f-fila">${campo("banco_numero", "Número de cuenta", "", 'inputmode="numeric"')}${campo("banco_titular", "A nombre de")}</div>
+            ${lista("banco_moneda", "Moneda", ["Quetzales", "Dólares"])}
           </div></details>
           <details class="caja plegable"><summary><span class="pl-t"><h2>Seguimiento de cotizaciones</h2><span class="suave">Cuándo recordar al cliente</span></span><span class="chev">${ico("chev", 16, 2.2)}</span></summary><div class="pl-cuerpo">
             <div class="f-fila">${campo("seg_primer", "Primer recordatorio: días después de la fecha de la cotización", "", 'inputmode="numeric"')}${campo("seg_antes", "Recordar otra vez: días antes de que venza", "", 'inputmode="numeric"')}</div>
@@ -67,9 +73,9 @@ window.EMT_EMPRESA = (() => {
             <div class="f-fila">${area("tiempo_entrega", "Tiempo de entrega", "", 2)}${area("garantia", "Garantía", "", 2)}</div>
           </div></details>
           <details class="caja plegable"><summary><span class="pl-t"><h2>Etapas por tipo de trabajo</h2><span class="suave">Para cada obra nueva</span></span><span class="chev">${ico("chev", 16, 2.2)}</span></summary><div class="pl-cuerpo" data-pls></div></details>
-          <details class="caja plegable"><summary><span class="pl-t"><h2>Documentos de la empresa</h2><span class="suave">Para el expediente</span></span><span class="chev">${ico("chev", 16, 2.2)}</span></summary><div class="pl-cuerpo" data-fijos></div></details>
+          <details class="caja plegable"><summary><span class="pl-t"><h2>Documentos de la empresa</h2><span class="suave">Para el expediente · se guarda solo</span></span><span class="chev">${ico("chev", 16, 2.2)}</span></summary><div class="pl-cuerpo" data-fijos></div></details>
           <details class="caja plegable"><summary><span class="pl-t"><h2>Del plano a la cotización</h2><span class="suave">Estructuras y metros de cable</span></span><span class="chev">${ico("chev", 16, 2.2)}</span></summary><div class="pl-cuerpo" data-conteo-emp></div></details>
-          <details class="caja plegable"><summary><span class="pl-t"><h2>Logos de distribuidoras</h2><span class="suave">Para el machote de los planos</span></span><span class="chev">${ico("chev", 16, 2.2)}</span></summary><div class="pl-cuerpo"><div class="logos-d" data-logos-d></div></div></details>
+          <details class="caja plegable"><summary><span class="pl-t"><h2>Logos de distribuidoras</h2><span class="suave">Para el machote de los planos · se guarda solo</span></span><span class="chev">${ico("chev", 16, 2.2)}</span></summary><div class="pl-cuerpo"><div class="logos-d" data-logos-d></div></div></details>
           <details class="caja plegable"><summary><span class="pl-t"><h2>Colores del sistema</h2><span class="suave" data-temas-res></span></span><span class="chev">${ico("chev", 16, 2.2)}</span></summary><div class="pl-cuerpo">
             <div class="temas-herr"><label class="busca-v ancho-busca"><span class="sr">Buscar color</span>${ico("search", 16)}<input type="search" data-temas-busca placeholder="Buscar color" autocomplete="off"></label>${puede ? `<button class="s-btn suave-b chico" type="button" data-temas-todos>Marcar todos</button>` : ""}</div>
             <nav class="seg pest-o pest-temas" aria-label="Familias de colores" data-temas-fams></nav>
@@ -77,7 +83,7 @@ window.EMT_EMPRESA = (() => {
           </div></details>
           <details class="caja plegable"><summary><span class="pl-t"><h2>Checklists de cada obra</h2><span class="suave">Cada obra nueva los trae</span></span><span class="chev">${ico("chev", 16, 2.2)}</span></summary><div class="pl-cuerpo" data-ck-pl></div></details>
         </fieldset>
-        ${puede ? `<div class="fila-b"><button class="s-btn lleno" type="button" data-guardar-emp>${ico("check", 16)}Guardar</button><span class="guardado" data-est-emp style="margin:0;align-self:center">Todo guardado</span></div>` : ""}
+        ${puede ? `<div class="fila-b guardar-emp"><button class="s-btn lleno" type="button" data-guardar-emp>${ico("check", 16)}Guardar</button><span class="guardado" data-est-emp style="margin:0;align-self:center">Todo guardado</span></div>` : ""}
       </div>`;
     v.querySelectorAll("fieldset.empresa > details.plegable").forEach(d => { const h = d.querySelector("summary h2"); const t = h ? h.textContent.trim() : ""; const g = GRUPOS_E.find(([, , l]) => l.includes(t)); d.dataset.grupoE = g ? g[0] : "empresa"; });
     v.addEventListener("click", ev => { const b = ev.target.closest("[data-ge]"); if (!b) return; grupoE = b.dataset.ge; v.querySelectorAll("[data-ge]").forEach(x => x.setAttribute("aria-pressed", String(x === b))); const fs = v.querySelector("fieldset.empresa"); if (fs) fs.dataset.grupoAct = grupoE; });
@@ -237,7 +243,7 @@ window.EMT_EMPRESA = (() => {
     const pintarTemasE = () => {
       const l = window.EMT_TEMAS || [];
       const fams = A().FAMILIAS_TEMA.filter(([k]) => l.some(x => x.g === k));
-      $("[data-temas-res]", v).textContent = `${l.length - ocultosT.filter(t => l.some(x => x.id === t)).length} de ${l.length} para escoger`;
+      $("[data-temas-res]", v).textContent = `${l.length - ocultosT.filter(t => l.some(x => x.id === t)).length} de ${l.length} para escoger · se guarda solo`;
       $("[data-temas-fams]", v).innerHTML = [["todos", "Todos"], ...fams].map(([k, t]) => `<button type="button" data-temas-fam="${k}" aria-pressed="${famE === k}">${t}</button>`).join("");
       const q = A().normal($("[data-temas-busca]", v).value);
       const op = x => `<label class="tema-o">${x.id === "emtecsa" ? `<input type="checkbox" checked disabled>` : `<input type="checkbox" data-tema-o="${x.id}" ${ocultosT.includes(x.id) ? "" : "checked"} ${puede ? "" : "disabled"}>`}${A().muestraTema(x)}<span><b>${esc(x.n)}</b>${x.id === "emtecsa" ? `<small>El de EMTECSA, siempre queda</small>` : ""}</span></label>`;
@@ -265,6 +271,7 @@ window.EMT_EMPRESA = (() => {
     });
     pintarLogos();
     v.onchange = async ev => {
+      if (ev.target.matches("select[data-e]")) { v.oninput(ev); return; }
       if (ev.target.matches("[data-pl-sel]")) { plSel = Number(ev.target.value); pintarPls(); return; }
       const k = ev.target.dataset.logoSub; if (!k || !ev.target.files[0]) return;
       const f = ev.target.files[0];

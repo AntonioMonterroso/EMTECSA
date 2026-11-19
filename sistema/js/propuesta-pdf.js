@@ -245,7 +245,7 @@ window.EMT_PDF = (() => {
     titulo2("Aceptación");
     if (es) parrafo(`Aceptamos la propuesta ${c.numero}${es.opciones.length ? ", opción ______" : ""}${es.extras.length ? ", con los extras ______________________" : ""}, por un total de Q ______________${c.iva ? ", IVA incluido" : ""}, con el alcance y las condiciones descritas.`);
     else parrafo(`Aceptamos la propuesta ${c.numero} por un total de ${Q(k.total)}${c.iva ? ", IVA incluido" : ""}, con el alcance y las condiciones descritas.`);
-    y -= 16; lugar(122);
+    y -= 16; lugar(150);
     const caja = (x, yy, w, t) => { pg.drawRectangle({ x, y: yy - 52, width: w, height: 52, borderColor: hex(COL.linea), borderWidth: 0.8 }); txt(pg, t.toUpperCase(), x + 10, yy - 14, { f: F.b, s: 7.5, c: COL.gris }); };
     const mw = (W - 2 * M - 14) / 2;
     caja(M, y, mw, "Nombre"); caja(M + mw + 14, y, mw, "Puesto"); y -= 66;
@@ -255,6 +255,7 @@ window.EMT_PDF = (() => {
     paginas.forEach((p, i) => {
       p.drawLine({ start: { x: M, y: PIE + 10 }, end: { x: W - M, y: PIE + 10 }, thickness: 0.5, color: hex(COL.linea) });
       txt(p, pie, M, PIE - 4, { s: 7.5, c: COL.gris });
+      if (String(emp.direccion || "").trim()) txt(p, [emp.direccion, emp.ciudad].filter(x => String(x || "").trim()).join(", "), M, PIE - 14, { s: 7.5, c: COL.gris });
       txt(p, `Página ${i + 2} de ${paginas.length + 1}`, W - M, PIE - 4, { s: 7.5, c: COL.gris, der: true });
     });
     return doc.save();

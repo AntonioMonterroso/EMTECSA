@@ -117,7 +117,7 @@
   }
 
   const EMPRESA = {
-    nombre: "EMTECSA", razon_social: "", nit: "", direccion: "", telefono: "", correo: "", web: "", ciudad: "Guatemala",
+    nombre: "EMTECSA", razon_social: "", nit: "", direccion: "", telefono: "", correo: "", web: "", ciudad: "Guatemala", whatsapp: "", banco: "", banco_tipo: "", banco_numero: "", banco_titular: "", banco_moneda: "Quetzales",
     firma_nombre: "", firma_puesto: "", resp_nombre: "", resp_dpi: "", ing_nombre: "", ing_titulo: "", ing_colegiado: "", ing_vence: "", ing_telefono: "", ing_id: "", umbral_costos: "10", costo_dia_persona: "", seg_primer: "3", seg_antes: "5", correo_pedidos: "",
     carta: "Por medio de la presente le enviamos nuestra propuesta técnica y económica para {trabajo}{en_sitio}.\n\nEn las páginas siguientes encontrará el alcance del trabajo, el detalle de precios y las condiciones. Todos los trabajos se realizan con personal calificado y con el equipo de seguridad que exige cada obra.\n\nQuedamos a sus órdenes para resolver cualquier duda o ajustar la propuesta a lo que necesite.",
     forma_pago: "", tiempo_entrega: "", garantia: "", incluye: "", excluye: ""
