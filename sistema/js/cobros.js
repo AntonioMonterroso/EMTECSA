@@ -5,7 +5,7 @@ window.EMT_COBROS = (() => {
   let buscaC = "";
   const PEST = [["", "Por cobrar"], ["pagos", "Pagos"], ["clientes", "Clientes"], ["fianzas", "Fianzas"]];
   const fCorta = f => { if (!f) return ""; const [y, m, d] = String(f).slice(0, 10).split("-").map(Number); return new Date(y, m - 1, d).toLocaleDateString("es-GT", { day: "numeric", month: "short", year: "numeric" }); };
-  const hoyISO = () => new Date().toISOString().slice(0, 10);
+  const hoyISO = () => (d => new Date(d - d.getTimezoneOffset() * 6e4).toISOString().slice(0, 10))(new Date());
   const diasA = f => Math.round((new Date(f) - new Date(hoyISO())) / 864e5);
   const chipVenc = p => p.venc === "vencido" ? '<span class="chip ambar">Vencido</span>' : p.venc === "pronto" ? '<span class="chip azul">Vence pronto</span>' : '<span class="chip gris">Al día</span>';
   const telDe = t => String(t || "").replace(/\D/g, "");

@@ -10,7 +10,7 @@ window.EMT_OBRAS = (() => {
   const ANCLA_O = { bitacora: "b", checklist: "b", plano: "b", costos: "b" };
   let estadoF = "", buscaO = "", buscaP = "", obraP = 0;
   const fCorta = f => { if (!f) return ""; const [y, m, d] = String(f).slice(0, 10).split("-").map(Number); return new Date(y, m - 1, d).toLocaleDateString("es-GT", { day: "numeric", month: "short", year: "numeric" }); };
-  const hoyISO = () => new Date().toISOString().slice(0, 10);
+  const hoyISO = () => (d => new Date(d - d.getTimezoneOffset() * 6e4).toISOString().slice(0, 10))(new Date());
 
   async function vista(v, sub, pest) {
     const id = Number(sub);
@@ -29,15 +29,15 @@ window.EMT_OBRAS = (() => {
         ${D.nube ? "" : `<div class="nota-local">${ico("shield", 18)}<span>Modo de prueba: las obras y sus fotos se guardan en esta computadora y se suben a la base de EMTECSA cuando se conecte.</span></div>`}
         <div class="herr">
           <div class="chips-f" role="group" aria-label="Estado de la obra">${[["", "Todas"], ...Object.entries(D.ESTADOS_OBRA)].map(([k, n]) => `<button type="button" data-estado-o="${k}" aria-pressed="${estadoF === k}">${esc(n)}</button>`).join("")}</div>
-          <label class="busca-v"><span class="sr">Buscar obra</span>${ico("search", 16)}<input type="search" placeholder="Buscar por número, cliente o trabajo" value="${esc(buscaO)}" data-busca-o></label>
+          <label class="busca-v"><span class="sr">Buscar obra</span>${ico("search", 16)}<input type="search" placeholder="Número, cliente, NIT, teléfono o trabajo" value="${esc(buscaO)}" data-busca-o></label>
         </div>
         <div data-res-o></div>
       </div>`;
     const res = $("[data-res-o]", v);
     const pintar = () => {
       if (!todas.length) { res.innerHTML = `<div class="vacio"><span class="icono mezcla">${ico("hammer", 24)}</span><h2>Todavía no hay obras</h2><p>Cuando una cotización quede aprobada, ábrala y toque «Crear obra». Para una emergencia se puede crear aquí a mano.</p>${puede ? `<button class="s-btn lleno" type="button" data-nueva-obra>${ico("plus", 16)}Nueva obra</button>` : ""}</div>`; return; }
-      const q = buscaO.toLowerCase().trim();
-      const l = todas.filter(o => (!estadoF || o.estado === estadoF) && (!q || [o.numero, o.titulo, o.cliente && o.cliente.nombre].join(" ").toLowerCase().includes(q)));
+      const q = A().normal(buscaO.trim()), qd = buscaO.replace(/\D/g, ""), qn = D.normalNit ? D.normalNit(buscaO) : "";
+      const l = todas.filter(o => { if (estadoF && o.estado !== estadoF) return false; if (!q) return true; const c = o.cliente || {}; return A().normal([o.numero, o.titulo, c.nombre, c.razon_social, c.codigo].join(" ")).includes(q) || (qd.length >= 4 && String(c.telefono || "").replace(/\D/g, "").includes(qd)) || (qn.length >= 3 && D.normalNit && D.normalNit(c.nit || "").includes(qn)); });
       res.innerHTML = l.length ? `<div class="grupo-t">${l.length} ${l.length === 1 ? "obra" : "obras"}</div><div class="lista">${l.map(o => `
         <a class="fila" href="#/obras/${o.id}"><span class="icono mezcla">${ico("hammer", 18)}</span><span><b>${esc(o.cliente ? o.cliente.nombre : "Cliente no encontrado")}</b><small>${esc(o.numero)}${o.titulo ? " · " + esc(o.titulo) : ""}${o.etapa_actual ? " · ahora: " + esc(o.etapa_actual) : ""}</small><i class="mini-av"><span style="transform:scaleX(${o.avance / 100})"></span></i></span>
         <span class="der"><b class="e-cifra">${o.avance} %</b><small><span class="chip ${CHIP[o.estado]}">${esc(D.ESTADOS_OBRA[o.estado])}</span></small></span><span class="chev">${ico("chev", 16, 2.2)}</span></a>`).join("")}</div>`
@@ -159,7 +159,21 @@ window.EMT_OBRAS = (() => {
     filtrarP();
     v.oninput = e => { if (e.target.matches("[data-busca-pest]")) { buscaP = e.target.value; filtrarP(); } };
     v.onchange = async e => {
-      if (e.target.matches("[data-estado-obra]")) { try { await D.guardarObra({ ...o, estado: e.target.value }); aviso("Estado de la obra: " + D.ESTADOS_OBRA[e.target.value] + "."); } catch (err) { aviso(err.message, "mal"); } }
+      if (e.target.matches("[data-estado-obra]")) {
+        const sel = e.target, nuevo = sel.value;
+        const guardar = async () => { await D.guardarObra({ ...o, estado: nuevo }); aviso("Estado de la obra: " + D.ESTADOS_OBRA[nuevo] + "."); await recargar(); };
+        if (nuevo === "terminada" || nuevo === "cancelada") {
+          const faltan = o.etapas.filter(x => !x.hecha).length;
+          let hecho = false;
+          const m = A().modal({ titulo: nuevo === "terminada" ? "¿Dar la obra por terminada?" : "¿Cancelar la obra?", guardarTxt: nuevo === "terminada" ? "Sí, terminada" : "Sí, cancelar",
+            cuerpo: `<p class="suave" style="font-size:15px">${esc(o.numero)} · ${esc(o.titulo || "")}</p>${nuevo === "terminada" && faltan ? `<p class="aviso-cot">${ico("alerta", 15)}<span>Todavía ${faltan === 1 ? "falta 1 etapa" : `faltan ${faltan} etapas`} por marcar como hechas.</span></p>` : ""}${nuevo === "cancelada" ? `<p class="suave" style="font-size:14px">Se puede volver a abrir cambiando el estado.</p>` : ""}`,
+            alGuardar: async () => { hecho = true; A().cerrarCapas(); try { await guardar(); } catch (err) { aviso(err.message, "mal"); sel.value = o.estado; } } });
+          if (nuevo === "cancelada") m.querySelector("[data-guardar]").classList.add("peligro-b");
+          new MutationObserver((r, ob) => { if (!document.body.contains(m)) { ob.disconnect(); if (!hecho) sel.value = o.estado; } }).observe(document.body, { childList: true, subtree: true });
+          return;
+        }
+        try { await guardar(); } catch (err) { aviso(err.message, "mal"); sel.value = o.estado; }
+      }
     };
     v.onclick = async e => {
       if (e.target.closest("[data-ed-obra]")) editarObra(o, cli, recargar);
@@ -211,11 +225,12 @@ window.EMT_OBRAS = (() => {
   async function pBitacora(box, o, ed, recargar) {
     const { esc, ico, modal, cerrarCapas, aviso } = A();
     const dias = o.bitacora.slice().sort((a, b) => String(b.fecha).localeCompare(String(a.fecha)) || String(b.creado).localeCompare(String(a.creado)));
+    const segR = D.resumenSeguridad ? await D.resumenSeguridad(o.id).catch(() => ({})) : {};
     box.innerHTML = `
       <div class="sub"><h2>Bitácora · ${dias.length}</h2>${ed ? `<button class="s-btn suave-b" type="button" data-nuevo-dia>${ico("plus", 15)}Agregar día</button>` : ""}</div>
       ${dias.length ? dias.map(b => `
         <section class="dia">
-          <div class="dia-cab"><span class="icono mezcla chico">${ico("clock", 15)}</span><b>${esc(fCorta(b.fecha))}</b>${b.pendiente ? '<span class="chip ambar chico-c">Por subir</span>' : ""}${ed && !(b.id < 0) ? `<div class="acc"><button class="s-ib" type="button" aria-label="Editar el día" data-ed-dia="${b.id}">${ico("pen", 15)}</button></div>` : ""}</div>
+          <div class="dia-cab"><span class="icono mezcla chico">${ico("clock", 15)}</span><b>${esc(fCorta(b.fecha))}</b>${segR[b.fecha] ? `<span class="chip ${segR[b.fecha].hechos === segR[b.fecha].total ? "verde" : "ambar"} chico-c">Seguridad ${segR[b.fecha].hechos}/${segR[b.fecha].total}</span>` : ""}${b.pendiente ? '<span class="chip ambar chico-c">Por subir</span>' : ""}${ed && !(b.id < 0) ? `<div class="acc"><button class="s-ib" type="button" aria-label="Editar el día" data-ed-dia="${b.id}">${ico("pen", 15)}</button></div>` : ""}</div>
           <p>${esc(b.texto)}</p>
           ${b.personal ? `<p class="suave"><b>Personal:</b> ${esc(b.personal)}</p>` : ""}
           ${b.problemas ? `<p class="problema">${ico("alerta", 15)}<span>${esc(b.problemas)}</span></p>` : ""}
@@ -223,7 +238,7 @@ window.EMT_OBRAS = (() => {
         </section>`).join("") : `<div class="vacio chico"><p>Todavía no hay días anotados. Cada día se anota qué se hizo, quiénes fueron, los problemas y las fotos.</p></div>`}`;
     for (const img of box.querySelectorAll("img[data-ref]")) D.fotoUrl(img.dataset.ref).then(u => { if (u) img.src = u; });
     const editar = b0 => {
-      let fotos = b0 ? b0.fotos.slice() : [], nuevas = [];
+      let fotos = b0 ? b0.fotos.slice() : [], nuevas = [], marcada = null;
       const quitadas = [];
       modal({
         titulo: b0 ? "Editar día" : "Día nuevo",
@@ -237,14 +252,16 @@ window.EMT_OBRAS = (() => {
         alAbrir: (f, m) => {
           const caja = f.querySelector("[data-fotos-ed]");
           const pintar = () => {
-            caja.innerHTML = fotos.map((r, i) => `<span class="foto-d"><img data-r="${esc(r)}" alt=""><button class="s-ib" type="button" aria-label="Quitar foto" data-qf="${i}">${ico("x", 13)}</button></span>`).join("") + nuevas.map((n, i) => `<span class="foto-d"><img src="${n.url}" alt=""><button class="s-ib" type="button" aria-label="Quitar foto" data-qn="${i}">${ico("x", 13)}</button></span>`).join("");
+            const pieza = (img, k, i, n) => `<span class="foto-d">${img}${marcada === k + i ? `<button class="s-btn peligro-b chico quitar-f" type="button" data-q${k}="${i}">Quitar</button>` : `<button class="s-ib" type="button" aria-label="Foto ${n}: quitar" data-mf="${k}${i}">${ico("pen", 13)}</button>`}</span>`;
+            caja.innerHTML = fotos.map((r, i) => pieza(`<img data-r="${esc(r)}" alt="">`, "f", i, i + 1)).join("") + nuevas.map((nv, i) => pieza(`<img src="${nv.url}" alt="">`, "n", i, fotos.length + i + 1)).join("");
             caja.querySelectorAll("img[data-r]").forEach(img => D.fotoUrl(img.dataset.r).then(u => { if (u) img.src = u; }));
           };
           pintar();
           f.querySelector("[data-subir-f]").addEventListener("change", ev => { [...ev.target.files].forEach(file => nuevas.push({ file, url: URL.createObjectURL(file) })); ev.target.value = ""; pintar(); });
           m.addEventListener("click", ev => {
-            const qf = ev.target.closest("[data-qf]"); if (qf) { quitadas.push(fotos.splice(Number(qf.dataset.qf), 1)[0]); pintar(); }
-            const qn = ev.target.closest("[data-qn]"); if (qn) { const [n] = nuevas.splice(Number(qn.dataset.qn), 1); URL.revokeObjectURL(n.url); pintar(); }
+            const mf = ev.target.closest("[data-mf]"); if (mf) { marcada = marcada === mf.dataset.mf ? null : mf.dataset.mf; pintar(); return; }
+            const qf = ev.target.closest("[data-qf]"); if (qf) { quitadas.push(fotos.splice(Number(qf.dataset.qf), 1)[0]); marcada = null; pintar(); return; }
+            const qn = ev.target.closest("[data-qn]"); if (qn) { const [n] = nuevas.splice(Number(qn.dataset.qn), 1); URL.revokeObjectURL(n.url); marcada = null; pintar(); return; }
           });
         },
         alGuardar: async f => {
@@ -276,9 +293,9 @@ window.EMT_OBRAS = (() => {
     const r3 = n => Math.round(n * 1000) / 1000;
     box.innerHTML = `
       <div class="sub"><h2>Materiales</h2>${mover ? `<div class="fila-b"><button class="s-btn suave-b" type="button" data-mov="salida">${ico("arrowR", 15)}Registrar salida</button><button class="s-btn suave-b" type="button" data-mov="regreso">${ico("download", 15)}Registrar regreso</button></div>` : ""}</div>
-      ${l.length ? `<div class="tabla-m"><div class="tm-cab"><span>Material</span><span>Previsto</span><span>Salió</span><span>Regresó</span><span>Usado</span></div>${l.map(f => { const dif = r3(f.usado - f.previsto); return `
-        <div class="tm-fila"><span><b>${esc(f.material.descripcion)}</b><small>${esc(f.material.codigo)}${f.previsto && dif ? ` · <span class="${dif > 0 ? "falta" : "sobra"}">${dif > 0 ? "se usó " + cant(dif) + " de más" : "se usó " + cant(-dif) + " menos de lo previsto"}</span>` : ""}</small><small class="tm-res">Previsto ${cant(f.previsto)} · salió ${cant(f.salio)}${f.regreso ? " · regresó " + cant(f.regreso) : ""} · <b>usado ${cant(r3(f.usado))}</b></small></span>
-        <span data-l="Previsto">${cant(f.previsto)}</span><span data-l="Salió">${cant(f.salio)}</span><span data-l="Regresó">${cant(f.regreso)}</span><span data-l="Usado"><b>${cant(r3(f.usado))}</b></span></div>`; }).join("")}</div>` : `<div class="vacio chico"><p>${o.cotizacion_id ? "La cotización no tenía materiales." : "Esta obra no viene de una cotización, así que no tiene materiales previstos."} Registre la salida de bodega con el botón.</p></div>`}
+      ${l.length ? `<div class="tabla-m"><div class="tm-cab"><span>Material</span><span>Previsto</span><span>Salió</span><span>Regresó</span><span>En la obra</span></div>${l.map(f => { const dif = r3(f.usado - f.previsto); return `
+        <div class="tm-fila"><span><b>${esc(f.material.descripcion)}</b><small>${esc(f.material.codigo)}${f.previsto && dif ? ` · <span class="${dif > 0 ? "falta" : "sobra"}">${dif > 0 ? cant(dif) + " más de lo previsto" : cant(-dif) + " menos de lo previsto"}</span>` : ""}</small><small class="tm-res">Previsto ${cant(f.previsto)} · salió ${cant(f.salio)}${f.regreso ? " · regresó " + cant(f.regreso) : ""} · <b>en la obra ${cant(r3(f.usado))}</b></small></span>
+        <span data-l="Previsto">${cant(f.previsto)}</span><span data-l="Salió">${cant(f.salio)}</span><span data-l="Regresó">${cant(f.regreso)}</span><span data-l="En la obra"><b>${cant(r3(f.usado))}</b></span></div>`; }).join("")}</div>` : `<div class="vacio chico"><p>${o.cotizacion_id ? "La cotización no tenía materiales." : "Esta obra no viene de una cotización, así que no tiene materiales previstos."} Registre la salida de bodega con el botón.</p></div>`}
       ${movs.length ? `<details class="caja plegable movs" data-grupo="movs"><summary><span class="pl-t"><h2>Movimientos</h2><span class="suave">${movs.length} · salidas y regresos</span></span><span class="chev">${ico("chev", 16, 2.2)}</span></summary><div class="pl-cuerpo"><div class="lista">${movs.map(m => `
         <div class="fila con-lapiz" style="cursor:default"><span class="icono ${m.tipo === "salida" ? "azul" : "verde"} chico">${ico(m.tipo === "salida" ? "arrowR" : "download", 14)}</span><span><b>${esc(porId[m.material_id] ? porId[m.material_id].descripcion : "Material")}</b><small>${m.tipo === "salida" ? "Salió" : "Regresó"} el ${esc(fCorta(m.fecha))}${m.nota ? " · " + esc(m.nota) : ""}</small></span><span class="der"><b class="e-cifra">${m.tipo === "salida" ? "" : "+"}${cant(m.cantidad)}</b></span>${mover ? `<button class="s-ib" type="button" aria-label="Corregir el movimiento de ${esc(porId[m.material_id] ? porId[m.material_id].descripcion : "material")}" data-ed-mov="${m.id}">${ico("pen", 15)}</button>` : "<span></span>"}</div>`).join("")}</div></div></details>` : ""}`;
     const registrar = tipo => {
@@ -318,6 +335,7 @@ window.EMT_OBRAS = (() => {
           if (sal.some(x => x.cantidad < 0)) throw new Error("Las cantidades no pueden ser negativas.");
           if (tipo === "regreso" && sal.some(x => x.cantidad > x.tope)) throw new Error("No puede regresar más de lo que salió a la obra.");
           await D.registrarMovimientos(o.id, tipo, f.fecha.value, f.nota.value, sal);
+          if (tipo === "salida" && D.compras) { try { const ids = new Set(sal.filter(x => x.cantidad > 0).map(x => x.material_id)); const cl = (await D.compras(o, cat)).filter(c => ids.has(c.material_id) && c.estado !== "recibido"); if (cl.length) await D.guardarCompras(o.id, cl.map(c => ({ ...c, estado: "recibido", fecha_pedido: c.fecha_pedido || f.fecha.value, fecha_recibido: f.fecha.value }))); } catch (er) {} }
           cerrarCapas(); aviso(tipo === "salida" ? "Salida registrada." : "Regreso registrado."); await recargar();
         }
       });
@@ -348,14 +366,15 @@ window.EMT_OBRAS = (() => {
     const { esc, ico, modal, cerrarCapas, aviso } = A();
     const orden = Object.keys(D.PASOS);
     const tr = o.tramites.slice().sort((a, b) => orden.indexOf(a.paso) - orden.indexOf(b.paso));
-    box.innerHTML = `<div data-eg-obra></div>
-      <div class="sub"><h2>Trámites con la distribuidora</h2></div>
+    const dist = (tr.find(x => x.distribuidora) || {}).distribuidora || "";
+    const conEg = !dist || /energuate/i.test(dist);
+    box.innerHTML = `<div class="sub"><h2>Trámites con la distribuidora</h2></div>
       <div class="lista">${tr.map((r, i) => `
         <div class="fila tramite" style="cursor:default"><span class="paso-n ${r.estado}">${r.estado === "aprobado" ? ico("check", 15) : i + 1}</span>
           <span><b>${esc(D.PASOS[r.paso])}</b><small>${esc([r.distribuidora, r.expediente ? "exp. " + r.expediente : "", r.fecha_solicitud ? "pedido " + fCorta(r.fecha_solicitud) : "", r.fecha_resuelto ? "resuelto " + fCorta(r.fecha_resuelto) : ""].filter(Boolean).join(" · ") || "Sin datos todavía")}</small></span>
           <span class="der"><span class="chip ${CHIP_T[r.estado]}">${esc(D.ESTADOS_TRAMITE[r.estado])}</span></span>
-          ${ed ? `<button class="s-ib" type="button" aria-label="Editar ${esc(D.PASOS[r.paso])}" data-ed-tr="${r.id}">${ico("pen", 15)}</button>` : "<span></span>"}</div>`).join("")}</div>`;
-    if (window.EMT_ENERGUATE) window.EMT_ENERGUATE.pantalla(box.querySelector("[data-eg-obra]"), o.id, ed).catch(() => {});
+          ${ed ? `<button class="s-ib" type="button" aria-label="Editar ${esc(D.PASOS[r.paso])}" data-ed-tr="${r.id}">${ico("pen", 15)}</button>` : "<span></span>"}</div>`).join("")}</div>${conEg ? `<div data-eg-obra></div>` : ""}`;
+    if (conEg && window.EMT_ENERGUATE) window.EMT_ENERGUATE.pantalla(box.querySelector("[data-eg-obra]"), o.id, ed).catch(() => {});
     box.onclick = async e => {
       const b = e.target.closest("[data-ed-tr]"); if (!b) return;
       const r = tr.find(x => x.id === Number(b.dataset.edTr));
