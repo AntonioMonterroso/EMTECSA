@@ -4,7 +4,7 @@ window.EMT_ENLACES = (() => {
   const A = () => window.EMT_APP;
   let vivo = null;
 
-  const fechaC = f => { const [y, m, d] = String(f).slice(0, 10).split("-").map(Number); return new Date(y, m - 1, d).toLocaleDateString("es-GT", { day: "numeric", month: "short", year: "numeric" }); };
+  const fechaC = f => { const s = String(f); const dt = s.length > 10 ? new Date(s) : (([y, m, d]) => new Date(y, m - 1, d))(s.slice(0, 10).split("-").map(Number)); return dt.toLocaleDateString("es-GT", { day: "numeric", month: "short", year: "numeric" }); };
   const cuando = iso => {
     if (!iso) return "";
     const f = new Date(iso), h = new Date(), ay = new Date(); ay.setDate(h.getDate() - 1);
@@ -21,11 +21,12 @@ window.EMT_ENLACES = (() => {
     try { await navigator.clipboard.writeText(t); A().aviso("Enlace copiado."); }
     catch (e) { const i = document.createElement("input"); i.value = t; document.body.appendChild(i); i.select(); try { document.execCommand("copy"); A().aviso("Enlace copiado."); } catch (er) { A().aviso("No se pudo copiar. Mantenga presionado el enlace para copiarlo.", "mal"); } i.remove(); }
   }
-  const botonesCompartir = (c, contacto, url) => {
+  const destino = (contacto, cli) => { const pr = cli && (cli.contactos || []).find(k => k.principal); return { tel: telDe((contacto && contacto.telefono) || (pr && pr.telefono) || (cli && cli.telefono)), correo: (contacto && contacto.correo) || (pr && pr.correo) || (cli && cli.correo) || "" }; };
+  const botonesCompartir = (c, contacto, url, cli) => {
     const { ico, esc } = A();
-    const tel = telDe(contacto && contacto.telefono);
+    const dst = destino(contacto, cli), tel = dst.tel;
     const wa = `https://wa.me/${tel}?text=${encodeURIComponent(textoMensaje(c, contacto, url))}`;
-    const mail = `mailto:${contacto && contacto.correo ? encodeURIComponent(contacto.correo) : ""}?subject=${encodeURIComponent(`Propuesta ${c.numero} · EMTECSA`)}&body=${encodeURIComponent(textoMensaje(c, contacto, url))}`;
+    const mail = `mailto:${dst.correo ? encodeURIComponent(dst.correo) : ""}?subject=${encodeURIComponent(`Propuesta ${c.numero} · EMTECSA`)}&body=${encodeURIComponent(textoMensaje(c, contacto, url))}`;
     return `<button class="s-btn suave-b" type="button" data-enl-copiar>${ico("link", 15)}Copiar</button>
       <a class="s-btn suave-b" href="${esc(wa)}" target="_blank" rel="noopener">${ico("chat", 15)}WhatsApp</a>
       <a class="s-btn suave-b" href="${esc(mail)}">${ico("mail", 15)}Correo</a>`;
@@ -49,7 +50,7 @@ window.EMT_ENLACES = (() => {
     o.hayEnlace = !!en;
     const contacto = cli && cli.contactos.find(x => x.id === c.contacto_id);
     if (!en) {
-      box.innerHTML = o.puede && (c.estado === "borrador" || c.estado === "enviada") ? `<div class="enl enl-nuevo"><span class="icono laton">${ico("send", 18)}</span><span class="enl-t"><b>Mandar al cliente</b><small>Lo ve en su teléfono y la aprueba con su firma.</small></span><button class="s-btn suave-b" type="button" data-enl-mandar>${ico("send", 15)}Mandar</button></div>` : "";
+      box.innerHTML = o.puede && c.estado === "enviada" ? `<div class="enl enl-nuevo"><span class="icono laton">${ico("send", 18)}</span><span class="enl-t"><b>Mandar al cliente</b><small>Lo ve en su teléfono y la aprueba con su firma.</small></span><button class="s-btn suave-b" type="button" data-enl-mandar>${ico("send", 15)}Mandar</button></div>` : "";
       return;
     }
     const hoy = D.hoyGT();
@@ -67,10 +68,10 @@ window.EMT_ENLACES = (() => {
       <div class="enl-cab"><span class="icono ${chipC === "verde" ? "verde" : "laton"}">${ico(ap ? "check" : "send", 18)}</span><span class="enl-t"><b>Enlace del cliente</b><small>Mandado el ${esc(fechaC(en.creado))}${ap ? "" : ` · ${vencido ? "venció" : "válido hasta"} el ${esc(fechaC(en.vence))}`}</small></span><span class="chip ${chipC}">${esc(chipT)}</span>${o.puede ? `<button class="s-ib" type="button" aria-label="Editar el enlace" data-enl-ed>${ico("pen", 15)}</button>` : ""}</div>
       ${ap ? `<div class="enl-ap"><span><b>${esc(ap.nombre)}${ap.puesto ? " · " + esc(ap.puesto) : ""}</b><small>La aprobó con su firma ${esc(cuando(ap.fecha))} · ${esc(Q(ap.total))}${ap.eleccion_txt ? " · " + esc(ap.eleccion_txt) : ""}</small></span><span class="acc"><button class="s-btn suave-b chico" type="button" data-enl-firma>${ico("eye", 14)}Ver la firma</button><button class="e-btn e-btn-salida" type="button" data-enl-const>${ico("download", 16)}Constancia</button></span></div>` : ""}
       <p class="enl-vis">${en.vistas ? `${ico("eye", 14)}Lo abrió ${en.vistas === 1 ? "1 vez" : en.vistas + " veces"} · la última ${esc(cuando(en.ultima_vista))}` : `${ico("clock", 14)}Todavía no lo abre`}${descTxt ? ` · descargó ${esc(descTxt)}` : ""}</p>
-      ${pend.map(m => `<div class="enl-msg"><span>${ico("chat", 15)}</span><div><p>${esc(m.texto)}</p><small>${esc(cuando(m.fecha))}</small></div>${o.puede ? `<button class="s-btn suave-b chico" type="button" data-enl-atender="${m.id}">${ico("check", 14)}Ya lo atendí</button>` : ""}</div>`).join("")}
+      ${pend.map(m => `<div class="enl-msg"><span>${ico("chat", 15)}</span><div><p>${esc(m.texto)}</p><small>${esc(cuando(m.fecha))}</small></div>${o.puede ? `<span class="acc">${destino(contacto, cli).tel ? `<a class="s-btn suave-b chico" href="${esc(`https://wa.me/${destino(contacto, cli).tel}?text=${encodeURIComponent(`Buen día${contacto ? ", " + contacto.nombre.split(/\s+/)[0] : ""}. Sobre su pregunta en la propuesta ${c.numero}: «${m.texto}»\n\n`)}`)}" target="_blank" rel="noopener">${ico("chat", 14)}Responder por WhatsApp</a>` : ""}<button class="s-btn suave-b chico" type="button" data-enl-atender="${m.id}">${ico("check", 14)}Ya lo atendí</button></span>` : ""}</div>`).join("")}
       ${viejos.length ? `<details class="enl-viejos"><summary>${viejos.length} ${viejos.length === 1 ? "mensaje atendido" : "mensajes atendidos"}</summary>${viejos.map(m => `<div class="enl-msg viejo"><span>${ico("chat", 15)}</span><div><p>${esc(m.texto)}</p><small>${esc(cuando(m.fecha))}</small></div></div>`).join("")}</details>` : ""}
       ${cambio && o.puede ? `<div class="enl-cambio">${ico("alerta", 15)}<span>La cotización cambió desde que la mandó. El cliente sigue viendo la anterior.</span><button class="s-btn lleno chico" type="button" data-enl-mandar>Actualizar el enlace</button></div>` : ""}
-      ${en.activo && !vencido ? `<div class="enl-acc">${ap ? "" : botonesCompartir(c, contacto, url)}<a class="s-btn suave-b" href="${esc(urlEquipo(en.token))}" target="_blank" rel="noopener">${ico("eye", 15)}Verlo como el cliente</a></div>` : vencido && o.puede ? `<div class="enl-acc"><button class="s-btn suave-b" type="button" data-enl-ed>${ico("clock", 15)}Abrirlo otra vez</button></div>` : ""}
+      ${en.activo && !vencido ? `<div class="enl-acc">${ap ? "" : botonesCompartir(c, contacto, url, cli)}<a class="s-btn suave-b" href="${esc(urlEquipo(en.token))}" target="_blank" rel="noopener">${ico("eye", 15)}Verlo como el cliente</a></div>` : vencido && o.puede ? `<div class="enl-acc"><button class="s-btn suave-b" type="button" data-enl-ed>${ico("clock", 15)}Abrirlo otra vez</button></div>` : ""}
     </div>`;
     box.onclick = async e => {
       if (e.target.closest("[data-enl-copiar]")) copiar(url);
@@ -121,19 +122,19 @@ window.EMT_ENLACES = (() => {
         const en = await D.publicarEnlace({ c: listo.c, k: listo.k, cli, emp, contacto, sitio, cat: o.cat }, { expediente: !!(f.exp && f.exp.checked) });
         A().cerrarCapas();
         await o.recargar();
-        listoModal(listo.c, contacto, en, !!ya);
+        listoModal(listo.c, contacto, en, !!ya, cli);
       }
     });
   }
 
-  function listoModal(c, contacto, en, actualizado) {
+  function listoModal(c, contacto, en, actualizado, cli) {
     const { esc, ico } = A();
     const url = D.urlEnlace(en.token);
     const m = A().modal({
       titulo: actualizado ? "Enlace actualizado" : "Enlace listo", guardarTxt: "Listo", soloUno: true,
       cuerpo: `<p class="suave" style="font-size:14.5px;margin:0">${actualizado ? "El cliente ya ve la versión nueva en el mismo enlace." : `Mándeselo a ${esc(contacto ? contacto.nombre : "su cliente")}. Le avisamos en cuanto lo abra.`}</p>
         <label class="f-campo">Enlace<input readonly value="${esc(url)}" data-enl-url></label>
-        <div class="enl-acc">${botonesCompartir(c, contacto, url)}<a class="s-btn suave-b" href="${esc(urlEquipo(en.token))}" target="_blank" rel="noopener">${ico("eye", 15)}Verlo como el cliente</a></div>`,
+        <div class="enl-acc">${botonesCompartir(c, contacto, url, cli)}<a class="s-btn suave-b" href="${esc(urlEquipo(en.token))}" target="_blank" rel="noopener">${ico("eye", 15)}Verlo como el cliente</a></div>`,
       alAbrir: (f, mm) => { mm.addEventListener("click", e => { if (e.target.closest("[data-enl-copiar]")) copiar(url); }); f.querySelector("[data-enl-url]").addEventListener("focus", e => e.target.select()); },
       alGuardar: async () => A().cerrarCapas()
     });
