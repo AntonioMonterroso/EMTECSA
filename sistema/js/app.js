@@ -98,9 +98,16 @@
     setTimeout(() => { el.classList.add("sale"); setTimeout(() => el.remove(), 220); }, 3600);
   }
 
+  function pintarBarra() {
+    const m = document.querySelector('meta[name="theme-color"]'); if (!m) return;
+    const c = getComputedStyle(document.documentElement).getPropertyValue("--bg").trim();
+    if (c && !/var\(/.test(c)) m.content = c;
+  }
+  if (window.matchMedia) { try { matchMedia("(prefers-color-scheme: dark)").addEventListener("change", pintarBarra); } catch (e) {} }
   function aplicarModo() {
     let m = null; try { m = localStorage.getItem("emtecsa.sistema.modo"); } catch (e) {}
     if (m === "claro" || m === "oscuro") document.documentElement.dataset.modo = m; else delete document.documentElement.dataset.modo;
+    pintarBarra();
   }
   function ponerModo(m) {
     try { localStorage.setItem("emtecsa.sistema.modo", m); } catch (e) {}
@@ -112,7 +119,6 @@
     if (ok) document.documentElement.dataset.tema = t; else delete document.documentElement.dataset.tema;
     try { localStorage.setItem("emtecsa.sistema.tema", ok ? t : "emtecsa"); localStorage.removeItem("emtecsa.sistema.tema-claro"); } catch (e) {}
     aplicarModo();
-    const m = document.querySelector('meta[name="theme-color"]'); const c = getComputedStyle(document.documentElement).getPropertyValue("--bg").trim(); if (m && /^#[0-9a-f]{6}$/i.test(c)) m.content = c;
   }
   const temaActual = () => document.documentElement.dataset.tema || "emtecsa";
   const FAMILIAS_TEMA = [["clasicos", "Clásicos"], ["pastel", "Pastel"], ["joyas", "Joyas"], ["vivos", "Vivos"], ["naturales", "Naturales"]];

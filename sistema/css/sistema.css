@@ -30,7 +30,7 @@
   }
 }
 
-html { scroll-padding-top: 80px; }
+html { scroll-padding-top: 80px; background: var(--bg); }
 body { min-height: 100svh; }
 .ancho { width: min(1240px, 100% - 32px); margin-inline: auto; }
 .t { font-weight: 800; letter-spacing: -0.045em; line-height: 1; }
