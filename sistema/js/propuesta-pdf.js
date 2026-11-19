@@ -245,7 +245,7 @@ window.EMT_PDF = (() => {
     titulo2("Aceptación");
     if (es) parrafo(`Aceptamos la propuesta ${c.numero}${es.opciones.length ? ", opción ______" : ""}${es.extras.length ? ", con los extras ______________________" : ""}, por un total de Q ______________${c.iva ? ", IVA incluido" : ""}, con el alcance y las condiciones descritas.`);
     else parrafo(`Aceptamos la propuesta ${c.numero} por un total de ${Q(k.total)}${c.iva ? ", IVA incluido" : ""}, con el alcance y las condiciones descritas.`);
-    y -= 16; lugar(150);
+    y -= 16; lugar(122);
     const caja = (x, yy, w, t) => { pg.drawRectangle({ x, y: yy - 52, width: w, height: 52, borderColor: hex(COL.linea), borderWidth: 0.8 }); txt(pg, t.toUpperCase(), x + 10, yy - 14, { f: F.b, s: 7.5, c: COL.gris }); };
     const mw = (W - 2 * M - 14) / 2;
     caja(M, y, mw, "Nombre"); caja(M + mw + 14, y, mw, "Puesto"); y -= 66;
