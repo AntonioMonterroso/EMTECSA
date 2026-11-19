@@ -9,7 +9,7 @@
     seguridad: ["Permiso de trabajo y aviso a la distribuidora", "Línea desenergizada y verificada sin tensión", "Puesta a tierra temporal colocada", "Equipo de protección completo: casco, guantes dieléctricos y arnés", "Área señalizada y con conos", "Herramienta, escaleras y canasta revisadas", "Charla de seguridad con la cuadrilla"],
     entrega: ["Prueba de aislamiento", "Continuidad y secuencia de fases", "Medición de voltaje en el secundario", "Conexiones y herrajes apretados", "Fotos finales de cada estructura", "Área limpia", "Energización con la distribuidora", "Acta de entrega firmada por el cliente"]
   };
-  const hoy = () => new Date().toISOString().slice(0, 10);
+  const hoy = () => (d => new Date(d - d.getTimezoneOffset() * 6e4).toISOString().slice(0, 10))(new Date());
   const t = s => String(s == null ? "" : s).trim().replace(/\s+/g, " ");
   const o = s => t(s) || null;
   const r2 = n => Math.round((Number(n) || 0) * 100) / 100;
@@ -151,18 +151,29 @@
     await ok(await sb.from("ajustes").upsert({ clave: "checklists", valor: limpia }), "No se pudieron guardar los checklists.");
   }
 
-  async function checklist(obraId, tipo) {
-    let l = (await filasDe("checklist", obraId)).filter(x => x.tipo === tipo);
-    if (!l.length) {
-      const pl = (await plantillasCheck())[tipo] || [];
-      if (pl.length) {
-        const filas = pl.map((texto, i) => ({ tipo, texto, orden: i, hecho: false, fecha: null, nota: null }));
+  async function checklist(obraId, tipo, dia) {
+    const deDia = tipo === "seguridad";
+    const de = todas => deDia ? todas.filter(x => (x.dia || "") === dia) : todas;
+    let todas = (await filasDe("checklist", obraId)).filter(x => x.tipo === tipo);
+    let l = de(todas);
+    if (!l.length && (!deDia || dia === hoy())) {
+      let textos = (await plantillasCheck())[tipo] || [];
+      if (deDia) { const dias = [...new Set(todas.map(x => x.dia).filter(Boolean))].sort(); const ult = dias.filter(x => x < dia).pop(); if (ult) textos = todas.filter(x => x.dia === ult).sort((a, b) => a.orden - b.orden).map(x => x.texto); }
+      if (textos.length) {
+        const filas = textos.map((texto, i) => ({ tipo, texto, orden: i, hecho: false, fecha: null, nota: null, ...(deDia ? { dia } : {}) }));
         if (!nube) { const d = leerC(); filas.forEach(f => d.checklist.push({ id: d.sig.x++, obra_id: obraId, ...f })); escribirEn(CLAVE_C, d); }
         else await ok(await sb.from("obra_checklist").insert(filas.map(f => ({ ...f, obra_id: obraId }))), "No se pudo preparar el checklist.");
-        l = (await filasDe("checklist", obraId)).filter(x => x.tipo === tipo);
+        todas = (await filasDe("checklist", obraId)).filter(x => x.tipo === tipo);
+        l = de(todas);
       }
     }
     return l.sort((a, b) => a.orden - b.orden);
+  }
+
+  async function resumenSeguridad(obraId) {
+    const r = {};
+    (await filasDe("checklist", obraId)).filter(x => x.tipo === "seguridad" && x.dia).forEach(x => { const z = r[x.dia] = r[x.dia] || { hechos: 0, total: 0 }; z.total++; if (x.hecho) z.hechos++; });
+    return r;
   }
 
   async function guardarPunto(obraId, p) {
@@ -171,11 +182,11 @@
     if (!nube) {
       const d = leerC();
       if (p.id) Object.assign(d.checklist.find(x => x.id === p.id), datos);
-      else { const mismos = d.checklist.filter(x => x.obra_id === obraId && x.tipo === p.tipo); d.checklist.push({ id: d.sig.x++, obra_id: obraId, tipo: p.tipo, orden: mismos.length ? Math.max(...mismos.map(x => x.orden)) + 1 : 0, ...datos }); }
+      else { const mismos = d.checklist.filter(x => x.obra_id === obraId && x.tipo === p.tipo); d.checklist.push({ id: d.sig.x++, obra_id: obraId, tipo: p.tipo, orden: mismos.length ? Math.max(...mismos.map(x => x.orden)) + 1 : 0, ...(p.dia ? { dia: p.dia } : {}), ...datos }); }
       escribirEn(CLAVE_C, d); return;
     }
     if (p.id) await ok(await sb.from("obra_checklist").update(datos).eq("id", p.id), "No se pudo guardar el punto.");
-    else { const n = await ok(await sb.from("obra_checklist").select("orden").eq("obra_id", obraId).eq("tipo", p.tipo), ""); await ok(await sb.from("obra_checklist").insert({ ...datos, obra_id: obraId, tipo: p.tipo, orden: n.length ? Math.max(...n.map(x => x.orden)) + 1 : 0 }), "No se pudo agregar el punto."); }
+    else { const n = await ok(await sb.from("obra_checklist").select("orden").eq("obra_id", obraId).eq("tipo", p.tipo), ""); await ok(await sb.from("obra_checklist").insert({ ...datos, ...(p.dia ? { dia: p.dia } : {}), obra_id: obraId, tipo: p.tipo, orden: n.length ? Math.max(...n.map(x => x.orden)) + 1 : 0 }), "No se pudo agregar el punto."); }
   }
 
   async function quitarPunto(id) {
@@ -183,5 +194,5 @@
     await ok(await sb.from("obra_checklist").delete().eq("id", id), "No se pudo quitar el punto.");
   }
 
-  Object.assign(D, { filasCompras: obraId => filasDe("compras", obraId), ESTADOS_COMPRA, TIPOS_CHECK, proveedores, guardarProveedor, quitarProveedor, compras, guardarCompras, instalacion, agregarGrupos, marcarInstalado, quitarGrupo, plantillasCheck, guardarPlantillasCheck, checklist, guardarPunto, quitarPunto });
+  Object.assign(D, { filasCompras: obraId => filasDe("compras", obraId), ESTADOS_COMPRA, TIPOS_CHECK, proveedores, guardarProveedor, quitarProveedor, compras, guardarCompras, instalacion, agregarGrupos, marcarInstalado, quitarGrupo, plantillasCheck, guardarPlantillasCheck, checklist, resumenSeguridad, guardarPunto, quitarPunto });
 })();

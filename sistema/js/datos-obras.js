@@ -11,7 +11,7 @@
     { id: 2, nombre: "Transformador", orden: 2, etapas: ["Visita técnica", "Pedido del transformador", "Trámite con la distribuidora", "Montaje", "Conexión y pruebas de aislamiento", "Energización y entrega"] },
     { id: 3, nombre: "Mantenimiento", orden: 3, etapas: ["Inspección", "Trabajos de mantenimiento", "Pruebas", "Informe al cliente"] }
   ];
-  const hoy = () => new Date().toISOString().slice(0, 10);
+  const hoy = () => (d => new Date(d - d.getTimezoneOffset() * 6e4).toISOString().slice(0, 10))(new Date());
   const t = s => String(s == null ? "" : s).trim();
   const o = s => t(s) || null;
   const fechaO = s => /^\d{4}-\d{2}-\d{2}$/.test(t(s)) ? t(s) : null;
@@ -76,7 +76,7 @@
       const cl = Object.fromEntries((await D.clientes()).map(c => [c.id, c]));
       return d.obras.map(x => ({ ...x, cliente: cl[x.cliente_id] || null, avance: avance(x.etapas), etapa_actual: siguiente(x.etapas) })).sort((a, b) => b.numero.localeCompare(a.numero));
     }
-    const l = await ok(await sb.from("obras").select("*, clientes (id, nombre, nit), obra_etapas (nombre, orden, hecha)").order("numero", { ascending: false }), "No se pudo leer la lista de obras.");
+    const l = await ok(await sb.from("obras").select("*, clientes (id, nombre, nit, razon_social, codigo, telefono), obra_etapas (nombre, orden, hecha)").order("numero", { ascending: false }), "No se pudo leer la lista de obras.");
     return l.map(x => ({ ...x, cliente: x.clientes, avance: avance(x.obra_etapas), etapa_actual: siguiente(x.obra_etapas) }));
   }
 

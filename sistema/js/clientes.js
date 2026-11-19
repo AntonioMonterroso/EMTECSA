@@ -9,6 +9,10 @@ window.EMT_CLIENTES = (() => {
   const telLimpio = t => String(t || "").replace(/[^\d+]/g, "");
   const iniciales = n => (n || "?").trim().split(/\s+/).slice(0, 2).map(p => p[0]).join("").toUpperCase();
   let tipoF = "", buscaC = "";
+  const equipoTxt = q => {
+    const nom = { transformador: "Transformador", tablero: "Tablero", medidor: "Medidor", otro: "Equipo" }[q.tipo] || "Equipo";
+    return [nom + (q.kva ? ` ${A().cant(q.kva)} kVA` : ""), q.fases ? (q.fases === 3 ? "trifásico" : "monofásico") : ""].filter(Boolean).join(" · ");
+  };
 
   async function vista(v, sub) {
     const id = Number(sub);
@@ -26,7 +30,7 @@ window.EMT_CLIENTES = (() => {
         <div class="cab-v"><div><h1 class="t">Clientes</h1><p class="desc">Las empresas que le compran a EMTECSA, con sus plantas, contactos, crédito y equipos instalados.</p></div>${puede ? `<button class="s-btn lleno" type="button" data-nuevo-cli>${ico("plus", 16)}Agregar cliente</button>` : ""}</div>
         ${D.nube ? "" : `<div class="nota-local">${ico("shield", 18)}<span>Modo de prueba: los clientes se guardan en esta computadora y se suben a la base de EMTECSA cuando se conecte.</span></div>`}
         <div class="herr">
-          <div class="chips-f" role="group" aria-label="Tipo de cliente">${[["", "Todos"], ...Object.entries(D.TIPOS)].map(([k, n]) => `<button type="button" data-tipo="${k}" aria-pressed="${tipoF === k}">${esc(n)}</button>`).join("")}</div>
+          <div class="chips-f" role="group" aria-label="Tipo de cliente">${[["", "Todos"], ...Object.entries(D.TIPOS), ...(todos.some(c => c.activo === false) ? [["archivados", "Archivados"]] : [])].map(([k, n]) => `<button type="button" data-tipo="${k}" aria-pressed="${tipoF === k}">${esc(n)}</button>`).join("")}</div>
           <label class="busca-v"><span class="sr">Buscar cliente</span>${ico("search", 16)}<input type="search" placeholder="Buscar por nombre, NIT, contacto o teléfono" value="${esc(buscaC)}" data-busca-cli></label>
         </div>
         <div data-res-cli></div>
@@ -34,15 +38,15 @@ window.EMT_CLIENTES = (() => {
     const res = $("[data-res-cli]", v);
     const pintar = () => {
       const q = buscaC.toLowerCase().trim(), qn = D.normalNit(buscaC), qt = buscaC.replace(/\D/g, "");
-      const l = todos.filter(c => (!tipoF || c.tipo === tipoF) && (!q
+      const l = todos.filter(c => (tipoF === "archivados" ? c.activo === false : c.activo !== false && (!tipoF || c.tipo === tipoF)) && (!q
         || [c.nombre, c.razon_social, c.codigo, c.correo, ...c.contactos.map(k => k.nombre + " " + (k.correo || ""))].join(" ").toLowerCase().includes(q)
         || (qn.length > 2 && D.normalNit(c.nit).includes(qn))
         || (qt.length > 3 && [c.telefono, ...c.contactos.map(k => k.telefono)].some(t => telLimpio(t).includes(qt)))));
       if (!todos.length) { res.innerHTML = `<div class="vacio"><span class="icono azul">${ico("building", 24)}</span><h2>Todavía no hay clientes</h2><p>Agregue la primera empresa con su NIT. Después le pone sus plantas, contactos y los equipos que tiene instalados.</p>${puede ? `<button class="s-btn lleno" type="button" data-nuevo-cli>${ico("plus", 16)}Agregar cliente</button>` : ""}</div>`; return; }
       res.innerHTML = l.length ? `<div class="grupo-t">${l.length} ${l.length === 1 ? "cliente" : "clientes"}</div><div class="lista">${l.map(c => {
         const [i, col] = ICONO[c.tipo] || ICONO.industria;
-        return `<a class="fila" href="#/clientes/${c.id}"><span class="icono ${col}">${ico(i, 18)}</span><span><b>${esc(c.nombre)}</b><small>NIT ${esc(D.nitBonito(c.nit))} · ${esc(D.TIPOS[c.tipo])} · ${c.sitios} ${c.sitios === 1 ? "sitio" : "sitios"} · ${c.contactos.length} ${c.contactos.length === 1 ? "contacto" : "contactos"}</small></span>
-          <span class="der">${c.dias_credito ? `<span class="chip verde">Crédito ${c.dias_credito} días</span>` : '<span class="chip gris">Contado</span>'}</span><span class="chev">${ico("chev", 16, 2.2)}</span></a>`; }).join("")}</div>`
+        return `<a class="fila" href="#/clientes/${c.id}"><span class="icono ${col}">${ico(i, 18)}</span><span><b>${esc(c.nombre)}</b><small>NIT ${esc(D.nitBonito(c.nit))}${D.nitValido(c.nit) ? "" : ' <span class="falta">por revisar</span>'} · ${esc(D.TIPOS[c.tipo])} · ${c.sitios} ${c.sitios === 1 ? "sitio" : "sitios"} · ${c.contactos.length} ${c.contactos.length === 1 ? "contacto" : "contactos"}</small></span>
+          <span class="der">${c.activo === false ? '<span class="chip gris">Archivado</span>' : c.dias_credito ? `<span class="chip verde">Crédito ${c.dias_credito} días</span>` : '<span class="chip gris">Contado</span>'}</span><span class="chev">${ico("chev", 16, 2.2)}</span></a>`; }).join("")}</div>`
         : `<div class="vacio"><h2>Nadie con «${esc(buscaC)}»</h2><p>Busque por nombre, NIT, contacto o teléfono${tipoF ? ", o quite el filtro de tipo" : ""}.</p></div>`;
     };
     pintar();
@@ -59,6 +63,7 @@ window.EMT_CLIENTES = (() => {
     const c = await D.cliente(id);
     const cots = c ? await window.EMT_COTIZACIONES.delCliente(id) : [];
     const obrasC = c ? (await D.obras().catch(() => [])).filter(o => o.cliente_id === id) : [];
+    const ec = c && D.puede(A().sesion().perfil, "verCobros") && D.estadoCuenta ? await D.estadoCuenta(id).catch(() => null) : null;
     if (cliTabDe !== id) { cliTabDe = id; cliTab = "cotizaciones"; }
     const p = A().sesion().perfil;
     const edC = D.puede(p, "editarCliente"), edQ = D.puede(p, "editarEquipo");
@@ -66,22 +71,19 @@ window.EMT_CLIENTES = (() => {
     const [ic, col] = ICONO[c.tipo] || ICONO.industria;
     const nitOk = D.nitValido(c.nit);
     const sitioDe = sid => (c.sitios.find(s => s.id === sid) || {}).nombre;
-    const equipoTxt = q => {
-      const nom = { transformador: "Transformador", tablero: "Tablero", medidor: "Medidor", otro: "Equipo" }[q.tipo] || "Equipo";
-      return [nom + (q.kva ? ` ${A().cant(q.kva)} kVA` : ""), q.fases ? (q.fases === 3 ? "trifásico" : "monofásico") : ""].filter(Boolean).join(" · ");
-    };
     v.innerHTML = `
       <div class="cuerpo">
         <a class="volver" href="#/clientes">${ico("chev", 16, 2.2)}Clientes</a>
         <div class="cab-v">
-          <div class="cab-cli"><span class="icono ${col} grande">${ico(ic, 26)}</span><div><h1 class="t">${esc(c.nombre)}</h1><p>${c.razon_social ? esc(c.razon_social) + " · " : ""}NIT ${esc(D.nitBonito(c.nit))} · ${esc(D.TIPOS[c.tipo])} · ${esc(c.codigo)}</p>${!nitOk ? `<p class="aviso-nit">${ico("alerta", 15)}El dígito verificador del NIT no coincide. Revíselo.</p>` : ""}</div></div>
+          <div class="cab-cli"><span class="icono ${col} grande">${ico(ic, 26)}</span><div><h1 class="t">${esc(c.nombre)}</h1>${c.activo === false ? '<p><span class="chip gris">Archivado</span></p>' : ""}<p>${c.razon_social ? esc(c.razon_social) + " · " : ""}NIT ${esc(D.nitBonito(c.nit))} · ${esc(D.TIPOS[c.tipo])} · ${esc(c.codigo)}</p>${!nitOk ? `<p class="aviso-nit">${ico("alerta", 15)}El dígito verificador del NIT no coincide. Revíselo.</p>` : ""}</div></div>
           <div class="fila-b">${edC ? `<button class="s-btn suave-b" type="button" data-ed-cli>${ico("pen", 15)}Editar</button>` : ""}${D.puede(p, "editarCotizacion") ? `<button class="s-btn lleno" type="button" data-nueva-cot>${ico("plus", 16)}Nueva cotización</button>` : ""}</div>
         </div>
         <div class="datos-cli">
-          <div><small>Dirección fiscal</small><span>${esc(c.direccion || "—")}</span></div>
+          <div><small>Dirección fiscal</small><span>${esc([c.direccion, c.municipio, c.departamento].filter(Boolean).join(", ") || "—")}</span></div>
           <div><small>Teléfono</small><span>${c.telefono ? `<a href="tel:${esc(telLimpio(c.telefono))}">${esc(c.telefono)}</a>` : "—"}</span></div>
           <div><small>Correo</small><span>${c.correo ? `<a href="mailto:${esc(c.correo)}">${esc(c.correo)}</a>` : "—"}</span></div>
           <div><small>Crédito</small><span>${c.dias_credito ? `${c.dias_credito} días` : "Contado"}${c.limite_credito != null ? ` · límite <span class="e-cifra">${esc(Q(c.limite_credito))}</span>` : ""}</span></div>
+          ${ec && (ec.cargos || ec.abonos) ? `<div><small>${ec.saldo < 0 ? "A favor" : "Saldo"}</small><span class="e-cifra"><b>${esc(Q(Math.abs(ec.saldo)))}</b></span></div><div><small>Vencido</small><span class="e-cifra ${ec.vencido ? "falta" : ""}">${esc(Q(ec.vencido))}</span></div><div class="ancho2"><small>Dinero</small><span><a href="#/cobros/clientes/${c.id}">Ver su estado de cuenta</a></span></div>` : ""}
           ${c.notas ? `<div class="ancho2"><small>Notas</small><span>${esc(c.notas)}</span></div>` : ""}
         </div>
 
@@ -107,7 +109,7 @@ window.EMT_CLIENTES = (() => {
         ${cots.length ? `<div class="lista">${cots.map(q => `<a class="fila" href="#/cotizaciones/${q.id}"><span class="icono laton">${ico("file", 18)}</span><span><b>${esc(q.numero)}${q.titulo ? " · " + esc(q.titulo) : ""}</b><small>${esc(window.EMT_COTIZACIONES.fechaCorta(q.fecha))}</small></span><span class="der"><span class="e-cifra">${esc(Q(q.total))}</span><small><span class="chip ${window.EMT_COTIZACIONES.CHIP[q.estado]}">${esc(D.ESTADOS[q.estado])}</span></small></span><span class="chev">${ico("chev", 16, 2.2)}</span></a>`).join("")}</div>` : `<div class="vacio chico"><p>Todavía no tiene cotizaciones.</p></div>`}
         </div>
         <div class="cli-sec" data-cli-sec="obras" ${cliTab === "obras" ? "" : "hidden"}>
-        ${obrasC.length ? `<div class="lista">${obrasC.map(o => `<a class="fila" href="#/obras/${o.id}"><span class="icono azul">${ico("hammer", 18)}</span><span><b>${esc(o.numero)}${o.titulo ? " · " + esc(o.titulo) : ""}</b><small>${esc(D.ESTADOS_OBRA[o.estado] || o.estado)}</small></span><span class="chev">${ico("chev", 16, 2.2)}</span></a>`).join("")}</div>` : `<div class="vacio chico"><p>Todavía no tiene obras.</p></div>`}
+        ${obrasC.length ? `<div class="lista">${obrasC.map(o => `<a class="fila" href="#/obras/${o.id}"><span class="icono mezcla">${ico("hammer", 18)}</span><span><b>${esc(o.numero)}${o.titulo ? " · " + esc(o.titulo) : ""}</b><small>${esc(D.ESTADOS_OBRA[o.estado] || o.estado)}${o.etapa_actual ? " · ahora: " + esc(o.etapa_actual) : ""}</small><i class="mini-av"><span style="transform:scaleX(${(o.avance || 0) / 100})"></span></i></span><span class="der"><b class="e-cifra">${o.avance || 0} %</b></span><span class="chev">${ico("chev", 16, 2.2)}</span></a>`).join("")}</div>` : `<div class="vacio chico"><p>Todavía no tiene obras.</p></div>`}
         </div>
       </div>`;
     v.onclick = e => {
@@ -140,9 +142,12 @@ window.EMT_CLIENTES = (() => {
   async function editarCliente(c) {
     const { modal, esc, campoMonto, formatoAlSalir, numero, cerrarCapas, aviso, ir } = A();
     const nuevo = !c;
-    const c0 = c || { codigo: await D.codigoNuevo(), nombre: "", razon_social: "", nit: "", tipo: tipoF || "industria", direccion: "", telefono: "", correo: "", dias_credito: 0, limite_credito: null, notas: "" };
+    const c0 = c || { codigo: await D.codigoNuevo(), nombre: "", razon_social: "", nit: "", tipo: D.TIPOS[tipoF] ? tipoF : "industria", direccion: "", departamento: "", municipio: "", telefono: "", correo: "", dias_credito: 0, limite_credito: null, notas: "" };
+    let okNombre = "", okNit = "";
+    const archivado = c && c.activo === false;
     modal({
       titulo: nuevo ? "Cliente nuevo" : "Editar cliente",
+      extra: c ? `<button class="s-btn suave-b" type="button" data-archivar>${A().ico(archivado ? "download" : "box", 15)}${archivado ? "Sacar del archivo" : "Archivar"}</button>` : "",
       cuerpo: `
         <div class="f-fila"><label class="f-campo">Código<input name="codigo" value="${esc(c0.codigo)}" autocomplete="off"></label>
         <label class="f-campo">Tipo<select name="tipo">${Object.entries(D.TIPOS).map(([k, n]) => `<option value="${k}" ${c0.tipo === k ? "selected" : ""}>${esc(n)}</option>`).join("")}</select></label></div>
@@ -152,16 +157,24 @@ window.EMT_CLIENTES = (() => {
         <label class="f-campo">Teléfono<input name="telefono" value="${esc(c0.telefono || "")}" inputmode="tel" autocomplete="off"></label></div>
         <label class="f-campo">Correo<input name="correo" type="email" value="${esc(c0.correo || "")}" autocomplete="off"></label>
         <label class="f-campo">Dirección fiscal<input name="direccion" value="${esc(c0.direccion || "")}" autocomplete="off"></label>
+        <div class="f-fila"><label class="f-campo">Departamento<select name="departamento" data-geo-depto="fiscal">${window.EMT_GEO.opcionesDepto(c0.departamento || "", "Sin escoger")}</select></label>
+        <label class="f-campo">Municipio<input name="municipio" data-geo-muni="fiscal" value="${esc(c0.municipio || "")}" autocomplete="off"></label></div>
         <div class="f-fila"><label class="f-campo">Días de crédito<input name="dias" inputmode="numeric" value="${esc(c0.dias_credito || 0)}" autocomplete="off"><small>0 es al contado.</small></label>
         ${campoMonto("limite", "Límite de crédito", c0.limite_credito, "Opcional.")}</div>
         <label class="f-campo">Notas<textarea name="notas" rows="3">${esc(c0.notas || "")}</textarea></label>`,
-      alAbrir: f => {
+      alAbrir: (f, m) => {
         formatoAlSalir(f);
+        const ar = m.querySelector("[data-archivar]");
+        if (ar) ar.addEventListener("click", async () => { ar.disabled = true; try { await D.archivarCliente(c.id, !archivado); cerrarCapas(); aviso(archivado ? "El cliente volvió a la lista." : "Cliente archivado. Lo encuentra en «Archivados»."); await recargar(); } catch (err) { ar.disabled = false; aviso(err.message, "mal"); } });
         const hint = () => { const el = f.querySelector("[data-nit-ok]"); const t = f.nit.value.trim(); if (!t) { el.textContent = ""; return; } const ok = D.nitValido(t); el.textContent = ok ? "NIT con dígito verificador correcto." : "El dígito verificador no coincide; revíselo."; el.className = ok ? "ok" : "mal"; };
         f.nit.addEventListener("input", hint); f.nit.addEventListener("blur", () => { if (f.nit.value.trim()) f.nit.value = D.nitBonito(f.nit.value); hint(); }); hint();
       },
       alGuardar: async f => {
-        const datos = { id: c ? c.id : null, codigo: f.codigo.value, tipo: f.tipo.value, nombre: f.nombre.value, razon_social: f.razon_social.value, nit: f.nit.value, telefono: f.telefono.value, correo: f.correo.value, direccion: f.direccion.value, dias_credito: f.dias.value.trim() === "" ? 0 : Number(f.dias.value), limite_credito: numero(f.limite.value), notas: f.notas.value };
+        const nom = A().normal(f.nombre.value.trim());
+        if (nom && okNombre !== nom) { const otro = (await D.clientes()).find(x => (!c || x.id !== c.id) && A().normal(x.nombre) === nom); if (otro) { okNombre = nom; throw new Error(`Ya hay un cliente llamado «${otro.nombre}» (NIT ${D.nitBonito(otro.nit)}). Si de verdad es otro cliente, toque «Guardar» otra vez.`); } }
+        const nitN = D.normalNit(f.nit.value.trim());
+        if (nitN && !D.nitValido(nitN) && okNit !== nitN) { okNit = nitN; throw new Error("El dígito verificador del NIT no coincide. Revíselo; si está seguro, toque «Guardar» otra vez."); }
+        const datos = { id: c ? c.id : null, codigo: f.codigo.value, tipo: f.tipo.value, nombre: f.nombre.value, razon_social: f.razon_social.value, nit: f.nit.value, telefono: f.telefono.value, correo: f.correo.value, direccion: f.direccion.value, departamento: f.departamento.value, municipio: f.municipio.value, dias_credito: f.dias.value.trim() === "" ? 0 : Number(f.dias.value), limite_credito: numero(f.limite.value), notas: f.notas.value };
         const id = await D.guardarCliente(datos);
         cerrarCapas(); aviso(nuevo ? "Cliente agregado." : "Cliente guardado.");
         if (nuevo) ir("clientes", id); else await recargar();

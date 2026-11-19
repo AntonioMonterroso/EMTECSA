@@ -188,7 +188,7 @@
     if (!cliente_id) throw new Error("Escoja el cliente.");
     const pct = await aumentoDefecto();
     const emp = await empresa();
-    const base = { foto: "torre-luna-2", alcance_incluye: emp.incluye || null, alcance_excluye: emp.excluye || null, condiciones: { forma_pago: emp.forma_pago, tiempo_entrega: emp.tiempo_entrega, garantia: emp.garantia }, cliente_id, sitio_id: sitio_id || null, contacto_id: contacto_id || null, titulo: String(titulo || "").trim(), estado: "borrador", fecha: new Date().toISOString().slice(0, 10), vigencia_dias: 30, aumento_pct: pct, iva: true, imprevistos_pct: null, descuento_tipo: null, descuento: null, notas: null, total: 0 };
+    const base = { foto: "torre-luna-2", alcance_incluye: emp.incluye || null, alcance_excluye: emp.excluye || null, condiciones: { forma_pago: emp.forma_pago, tiempo_entrega: emp.tiempo_entrega, garantia: emp.garantia }, cliente_id, sitio_id: sitio_id || null, contacto_id: contacto_id || null, titulo: String(titulo || "").trim(), estado: "borrador", fecha: (d => new Date(d - d.getTimezoneOffset() * 6e4).toISOString().slice(0, 10))(new Date()), vigencia_dias: 30, aumento_pct: pct, iva: true, imprevistos_pct: null, descuento_tipo: null, descuento: null, notas: null, total: 0 };
     if (!nube) {
       const d = leer();
       const c = { id: d.sig.c++, numero: siguienteNumero(d.cotizaciones), ...base, partidas: [], cargos: [], creado: new Date().toISOString() };

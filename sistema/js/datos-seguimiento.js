@@ -20,7 +20,7 @@
     if (cotId != null) q = q.eq("cotizacion_id", cotId);
     return ok(await q, "No se pudo leer el seguimiento.");
   }
-  async function guardarContacto(k) {
+  async function guardarSeguimiento(k) {
     const cierre = k.medio === "cierre";
     const datos = { cotizacion_id: k.cotizacion_id, fecha: k.fecha || hoy(), medio: k.medio, nota: String(k.nota || "").trim() || null, proximo: cierre ? null : (k.proximo || null), motivo: cierre ? k.motivo : null };
     if (!cierre && !MEDIOS[datos.medio]) throw new Error("Escoja cómo se contactó.");
@@ -79,5 +79,5 @@
     return n.length >= 10 ? n : null;
   }
 
-  Object.assign(D, { MEDIOS_CONTACTO: MEDIOS, MOTIVOS_PERDIDA: MOTIVOS, CLAVE_SEGUIMIENTO: CLAVE, contactosCotizacion: contactos, guardarContacto, quitarContacto, estadoSeguimiento: estado, pendientesSeguimiento, telefonoWa, sumarDias: sumar });
+  Object.assign(D, { MEDIOS_CONTACTO: MEDIOS, MOTIVOS_PERDIDA: MOTIVOS, CLAVE_SEGUIMIENTO: CLAVE, contactosCotizacion: contactos, guardarSeguimiento, quitarContacto, estadoSeguimiento: estado, pendientesSeguimiento, telefonoWa, sumarDias: sumar });
 })();

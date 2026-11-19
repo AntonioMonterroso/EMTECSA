@@ -19,7 +19,7 @@
     return (await ok(l, "No se pudieron leer los días de trabajo.")).map(x => numJ({ ...x, costo_dia: costos[x.id] == null ? null : costos[x.id] }));
   }
   async function guardarJornada(j) {
-    const datos = { obra_id: j.obra_id, fecha: j.fecha || new Date().toISOString().slice(0, 10), cuadrilla: String(j.cuadrilla || "").trim().replace(/\s+/g, " "), personas: Number(j.personas), dias: Number(j.dias), costo_dia: j.costo_dia == null || j.costo_dia === "" ? null : Number(j.costo_dia), nota: String(j.nota || "").trim() || null };
+    const datos = { obra_id: j.obra_id, fecha: j.fecha || (d => new Date(d - d.getTimezoneOffset() * 6e4).toISOString().slice(0, 10))(new Date()), cuadrilla: String(j.cuadrilla || "").trim().replace(/\s+/g, " "), personas: Number(j.personas), dias: Number(j.dias), costo_dia: j.costo_dia == null || j.costo_dia === "" ? null : Number(j.costo_dia), nota: String(j.nota || "").trim() || null };
     if (!datos.cuadrilla) throw new Error("Escriba quién trabajó, por ejemplo «Cuadrilla de Luis».");
     if (!(datos.personas >= 1 && datos.personas <= 50)) throw new Error("Las personas van de 1 a 50.");
     if (!(datos.dias > 0 && datos.dias <= 60)) throw new Error("Los días van de 0.5 a 60.");

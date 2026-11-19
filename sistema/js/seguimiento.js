@@ -23,7 +23,7 @@ window.EMT_SEGUIMIENTO = (() => {
         <div class="f-fila"><label class="f-campo">Fecha<input type="date" name="fecha" max="${h}" value="${esc(k0 ? k0.fecha : h)}"></label>
         <label class="f-campo">Próximo contacto<input type="date" name="proximo" min="${D.sumarDias(h, 1)}" value="${esc(k0 ? k0.proximo || "" : c.estado === "enviada" ? sug : "")}"><small>${c.estado === "enviada" ? `Vence el ${esc(fCorta(s.vence))}. Vacío = el sistema le recuerda.` : "Opcional."}</small></label></div>`,
       alGuardar: async f => {
-        await D.guardarContacto({ id: k0 ? k0.id : null, cotizacion_id: c.id, medio: (f.querySelector("[name=medio]:checked") || {}).value, nota: f.nota.value, fecha: f.fecha.value, proximo: f.proximo.value || null });
+        await D.guardarSeguimiento({ id: k0 ? k0.id : null, cotizacion_id: c.id, medio: (f.querySelector("[name=medio]:checked") || {}).value, nota: f.nota.value, fecha: f.fecha.value, proximo: f.proximo.value || null });
         cerrarCapas(); aviso("Contacto anotado."); await alGuardar();
       }
     });
@@ -39,7 +39,7 @@ window.EMT_SEGUIMIENTO = (() => {
         <label class="f-campo">Nota<textarea name="nota" rows="2" placeholder="Con quién se fue, cuánto le cobraron…">${esc(k0 && k0.nota || "")}</textarea></label>`,
       alGuardar: async f => {
         const mv = f.querySelector("[name=motivo]:checked");
-        await D.guardarContacto({ id: k0 ? k0.id : null, cotizacion_id: c.id, medio: "cierre", motivo: mv ? mv.value : null, nota: f.nota.value, fecha: k0 ? k0.fecha : D.hoyGT() });
+        await D.guardarSeguimiento({ id: k0 ? k0.id : null, cotizacion_id: c.id, medio: "cierre", motivo: mv ? mv.value : null, nota: f.nota.value, fecha: k0 ? k0.fecha : D.hoyGT() });
         cerrarCapas(); await alGuardar();
       }
     });

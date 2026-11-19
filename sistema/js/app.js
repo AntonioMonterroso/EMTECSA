@@ -322,7 +322,7 @@
     const nClientes = (await D.clientes()).length;
     const obrasL = await D.obras();
     const enCurso = obrasL.filter(x => x.estado === "en_curso" || x.estado === "programada"), pausadas = obrasL.filter(x => x.estado === "pausada").length;
-    const mes = new Date().toISOString().slice(0, 7);
+    const mes = (d => new Date(d - d.getTimezoneOffset() * 6e4).toISOString().slice(0, 7))(new Date());
     const delMes = (await D.cotizaciones()).filter(x => String(x.fecha).slice(0, 7) === mes && x.estado !== "rechazada");
     const cotizado = delMes.reduce((a, x) => a + Number(x.total || 0), 0), aprobadas = delMes.filter(x => x.estado === "aprobada").length;
     const verC = D.puede(sesion.perfil, "verCobros");

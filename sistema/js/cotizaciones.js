@@ -51,7 +51,7 @@ window.EMT_COTIZACIONES = (() => {
 
   async function nueva(clienteId) {
     const { modal, esc, ico, cerrarCapas, aviso, ir } = A();
-    const clientes = await D.clientes();
+    const clientes = (await D.clientes()).filter(c => c.activo !== false);
     if (!clientes.length) {
       modal({ titulo: "Primero un cliente", guardarTxt: "Agregar cliente", cuerpo: `<p class="suave" style="font-size:15px">Para cotizar hace falta al menos un cliente con su NIT.</p>`, alGuardar: async () => { cerrarCapas(); ir("clientes"); } });
       return;

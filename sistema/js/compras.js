@@ -5,7 +5,8 @@ window.EMT_COMPRAS = (() => {
   const SUB = [["compras", "Compras"], ["instalacion", "Instalación"], ["seguridad", "Seguridad"], ["entrega", "Entrega"]];
   const CHIP_E = { falta: "ambar", pedido: "azul", recibido: "verde" };
   const SIG = { falta: "pedido", pedido: "recibido" };
-  let sub = "compras", filtroE = "", abiertos = new Set();
+  let sub = "compras", filtroE = "", abiertos = new Set(), diaS = null;
+  const hoyL = () => (d => new Date(d - d.getTimezoneOffset() * 6e4).toISOString().slice(0, 10))(new Date());
   const fCorta = f => { if (!f) return ""; const [y, m, d] = String(f).slice(0, 10).split("-").map(Number); return new Date(y, m - 1, d).toLocaleDateString("es-GT", { day: "numeric", month: "short" }); };
 
   async function tabObra(box, o, recargar) {
@@ -168,21 +169,29 @@ window.EMT_COMPRAS = (() => {
   async function pChecklist(ck, o, tipo, repintar) {
     const { esc, ico, modal, cerrarCapas, aviso } = A();
     const ed = D.puede(A().sesion().perfil, "editarInstalacion");
-    const l = await D.checklist(o.id, tipo);
+    const deDia = tipo === "seguridad", hoy = hoyL();
+    if (deDia && (!diaS || diaS.obra !== o.id)) diaS = { obra: o.id, dia: hoy };
+    const dia = deDia ? diaS.dia : null;
+    const l = await D.checklist(o.id, tipo, dia);
+    const res = deDia ? await D.resumenSeguridad(o.id) : {};
+    const dias = Object.keys(res).sort().reverse().slice(0, 8);
     const n = l.filter(x => x.hecho).length;
     ck.innerHTML = `
-      <div class="ck-sub"><span><b>${n} de ${l.length}</b> listos</span>${ed ? `<button class="s-btn suave-b chico" type="button" data-nuevo-punto>${ico("plus", 14)}Agregar punto</button>` : ""}</div>
+      ${deDia ? `<div class="ck-dia"><label class="f-campo">Día de trabajo<input type="date" data-dia-seg value="${dia}" max="${hoy}"></label>${dias.length ? `<div class="ck-dias" role="group" aria-label="Días revisados">${dias.map(d => `<button type="button" class="chip-b est ${res[d].hechos === res[d].total ? "verde" : "ambar"}" data-dia-ir="${d}" aria-pressed="${d === dia}">${esc(d === hoy ? "Hoy" : fCorta(d))} · ${res[d].hechos}/${res[d].total}</button>`).join("")}</div>` : ""}</div>` : ""}
+      ${deDia && !l.length ? `<div class="vacio chico"><p>Ese día no se revisó la seguridad.</p></div>` : `<div class="ck-sub"><span><b>${n} de ${l.length}</b> listos${deDia ? (dia === hoy ? " hoy" : " el " + esc(fCorta(dia))) : ""}</span>${ed ? `<button class="s-btn suave-b chico" type="button" data-nuevo-punto>${ico("plus", 14)}Agregar punto</button>` : ""}</div>
       ${l.length ? `<div class="lista">${l.map(x => `<div class="fila ck-f punto ${x.hecho ? "hecha" : ""}" style="cursor:default"><button class="chk" type="button" ${ed ? "" : "disabled"} aria-pressed="${x.hecho}" aria-label="${x.hecho ? "Desmarcar" : "Marcar"}: ${esc(x.texto)}" data-punto="${x.id}">${x.hecho ? ico("check", 15) : ""}</button>
         <span class="ck-txt"><b>${esc(x.texto)}</b>${x.hecho || x.nota ? `<small>${[x.hecho && x.fecha ? "listo " + esc(fCorta(x.fecha)) : "", x.nota ? esc(x.nota) : ""].filter(Boolean).join(" · ")}</small>` : ""}</span>
-        ${ed && x.id > 0 ? `<button class="s-ib" type="button" aria-label="Editar: ${esc(x.texto)}" data-ed-punto="${x.id}">${ico("pen", 15)}</button>` : x.pendiente ? '<span class="chip ambar chico-c">Por subir</span>' : "<span></span>"}</div>`).join("")}</div>` : `<div class="vacio chico"><p>Sin puntos. Agréguelos con el botón o póngalos en Empresa para que cada obra los traiga.</p></div>`}`;
+        ${ed && x.id > 0 ? `<button class="s-ib" type="button" aria-label="Editar: ${esc(x.texto)}" data-ed-punto="${x.id}">${ico("pen", 15)}</button>` : x.pendiente ? '<span class="chip ambar chico-c">Por subir</span>' : "<span></span>"}</div>`).join("")}</div>` : `<div class="vacio chico"><p>Sin puntos. Agréguelos con el botón o póngalos en Empresa para que cada obra los traiga.</p></div>`}`}`;
     const quieto = () => A().quieto(repintar);
     const editar = x => modal({
       titulo: x ? "Editar punto" : "Punto nuevo",
       quitar: x ? async () => { try { await D.quitarPunto(x.id); cerrarCapas(); aviso("Punto quitado."); await quieto(); } catch (err) { aviso(err.message, "mal"); } } : null,
       cuerpo: `<label class="f-campo">Punto<input name="texto" value="${esc(x ? x.texto : "")}" autocomplete="off"></label><label class="f-campo">Nota<input name="nota" value="${esc(x && x.nota || "")}" autocomplete="off" placeholder="Quién lo revisó, medida tomada…"></label>`,
-      alGuardar: async f => { await D.guardarPunto(o.id, { ...(x || { tipo, hecho: false }), texto: f.texto.value, nota: f.nota.value }); cerrarCapas(); aviso(x ? "Punto guardado." : "Punto agregado."); await quieto(); }
+      alGuardar: async f => { await D.guardarPunto(o.id, { ...(x || { tipo, hecho: false, dia }), texto: f.texto.value, nota: f.nota.value }); cerrarCapas(); aviso(x ? "Punto guardado." : "Punto agregado."); await quieto(); }
     });
+    ck.onchange = async e => { if (e.target.matches("[data-dia-seg]") && e.target.value && diaS) { diaS.dia = e.target.value > hoy ? hoy : e.target.value; await quieto(); } };
     ck.onclic = async e => {
+      const di = e.target.closest("[data-dia-ir]"); if (di && diaS) { diaS.dia = di.dataset.diaIr; await quieto(); return; }
       const pb = e.target.closest("[data-punto]");
       if (pb && !pb.disabled) { const x = l.find(y => y.id === Number(pb.dataset.punto)); try { await D.guardarPunto(o.id, { ...x, hecho: !x.hecho, fecha: null }); await quieto(); } catch (err) { aviso(err.message, "mal"); } return; }
       if (e.target.closest("[data-nuevo-punto]")) editar(null);

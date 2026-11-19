@@ -15,7 +15,7 @@ window.EMT_COBROS = (() => {
     const el = caja.querySelector("[data-bc-el]"), bus = caja.querySelector("[data-bc-bus]"), res = caja.querySelector("[data-bc-res]"), inp = caja.querySelector("[data-bc-q]");
     const pintar = () => {
       const q = A().normal(inp.value), qn = D.normalNit(inp.value), qt = telDe(inp.value);
-      const l = clientes.filter(c => !q || A().normal([c.nombre, c.razon_social, c.codigo].join(" ")).includes(q) || (qn.length > 2 && D.normalNit(c.nit).includes(qn)) || (qt.length > 3 && [c.telefono, ...(c.contactos || []).map(k => k.telefono)].some(t => telDe(t).includes(qt)))).slice(0, 6);
+      const l = clientes.filter(c => (c.activo !== false || (inicial && c.id === inicial.id)) && (!q || A().normal([c.nombre, c.razon_social, c.codigo].join(" ")).includes(q) || (qn.length > 2 && D.normalNit(c.nit).includes(qn)) || (qt.length > 3 && [c.telefono, ...(c.contactos || []).map(k => k.telefono)].some(t => telDe(t).includes(qt))))).slice(0, 6);
       res.innerHTML = l.length ? l.map(c => `<button type="button" data-bc="${c.id}"><b>${esc(c.nombre)}</b><small>NIT ${esc(D.nitBonito(c.nit))}${c.telefono ? " · " + esc(c.telefono) : ""}</small></button>`).join("") : `<p class="suave">Nadie con «${esc(inp.value)}».</p>`;
     };
     const elegir = c => {

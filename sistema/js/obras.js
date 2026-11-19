@@ -79,7 +79,7 @@ window.EMT_OBRAS = (() => {
 
   async function nueva() {
     const { modal, esc, ico, cerrarCapas, aviso, ir } = A();
-    const [clientes, pl] = await Promise.all([D.clientes(), D.plantillas()]);
+    const [clientes, pl] = await Promise.all([D.clientes().then(l => l.filter(c => c.activo !== false)), D.plantillas()]);
     if (!clientes.length) { modal({ titulo: "Primero un cliente", guardarTxt: "Agregar cliente", cuerpo: `<p class="suave" style="font-size:15px">Para crear una obra hace falta el cliente.</p>`, alGuardar: async () => { cerrarCapas(); ir("clientes"); } }); return; }
     let elegido = null, full = null;
     modal({

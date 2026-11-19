@@ -7,7 +7,7 @@
   const TIPOS_FIANZA = { sostenimiento: "Sostenimiento de oferta", anticipo: "Anticipo", cumplimiento: "Cumplimiento", calidad: "Calidad" };
   const TIPOS_GASTO = { viaticos: "Viáticos", combustible: "Combustible", equipo: "Grúa o equipo", subcontrato: "Subcontrato", materiales: "Materiales extra", otro: "Otro" };
   const r2 = n => Math.round((Number(n) || 0) * 100) / 100;
-  const hoy = () => new Date().toISOString().slice(0, 10);
+  const hoy = () => (d => new Date(d - d.getTimezoneOffset() * 6e4).toISOString().slice(0, 10))(new Date());
   const t = s => String(s == null ? "" : s).trim();
   const o = s => t(s) || null;
   const fechaO = s => /^\d{4}-\d{2}-\d{2}$/.test(t(s)) ? t(s) : null;

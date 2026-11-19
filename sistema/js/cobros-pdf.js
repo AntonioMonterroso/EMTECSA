@@ -71,7 +71,7 @@
 
   async function estadoCuenta({ cli, ec, emp }) {
     const { doc, F, hex, txt, cabeza, pie } = await nuevo(`Estado de cuenta · ${cli ? cli.nombre : ""}`, emp);
-    const hoy = new Date().toISOString().slice(0, 10);
+    const hoy = (d => new Date(d - d.getTimezoneOffset() * 6e4).toISOString().slice(0, 10))(new Date());
     const paginas = [];
     const COLS = [[M, "FECHA"], [M + 78, "CONCEPTO"], [W - M - 170, "COBRO"], [W - M - 85, "PAGO"], [W - M, "SALDO"]];
     const cabTabla = (pg, y) => { pg.drawRectangle({ x: M, y: y - 8, width: W - 2 * M, height: 24, color: hex(COL.marino) }); COLS.forEach(([x, t], i) => txt(pg, t, x + (i < 2 ? 8 : -8), y, { f: F.b, s: 7.5, c: "#FFFFFF", der: i >= 2 })); return y - 26; };
@@ -113,7 +113,7 @@
 
   async function pedido({ prov, obra, cli, sitio, lineas, emp, conPrecio }) {
     const { doc, F, hex, txt, cabeza, pie } = await nuevo(`Pedido ${obra.numero} · ${prov.nombre}`, emp);
-    const hoy = new Date().toISOString().slice(0, 10);
+    const hoy = (d => new Date(d - d.getTimezoneOffset() * 6e4).toISOString().slice(0, 10))(new Date());
     const paginas = [];
     const cant = n => Number(n).toLocaleString("en-US", { maximumFractionDigits: 3 });
     const COLS = conPrecio ? [[M, "CÓDIGO"], [M + 70, "MATERIAL"], [W - M - 190, "CANTIDAD"], [W - M - 95, "PRECIO C/U"], [W - M, "TOTAL"]] : [[M, "CÓDIGO"], [M + 70, "MATERIAL"], [W - M - 60, "UNIDAD"], [W - M, "CANTIDAD"]];

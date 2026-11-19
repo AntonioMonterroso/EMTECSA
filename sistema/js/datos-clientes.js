@@ -64,7 +64,7 @@
     const dias = c.dias_credito == null || c.dias_credito === "" ? 0 : Number(c.dias_credito);
     if (!Number.isInteger(dias) || dias < 0) throw new Error("Los días de crédito van en números enteros.");
     if (c.limite_credito != null && !(c.limite_credito >= 0)) throw new Error("El límite de crédito no puede ser negativo.");
-    return { codigo, nombre, razon_social: o(c.razon_social), nit, tipo: TIPOS[c.tipo] ? c.tipo : "industria", direccion: o(c.direccion), telefono: o(c.telefono), correo: o(c.correo), dias_credito: dias, limite_credito: c.limite_credito == null ? null : Number(c.limite_credito), notas: o(c.notas) };
+    return { codigo, nombre, razon_social: o(c.razon_social), nit, tipo: TIPOS[c.tipo] ? c.tipo : "industria", direccion: o(c.direccion), telefono: o(c.telefono), correo: o(c.correo), dias_credito: dias, limite_credito: c.limite_credito == null ? null : Number(c.limite_credito), notas: o(c.notas), departamento: o(c.departamento), municipio: o(c.municipio) };
   }
   function revisarSitio(s) {
     const nombre = limpio(s.nombre);
@@ -171,6 +171,11 @@
     return (await nubeOk(r, "No se pudo guardar el equipo.")).id;
   }
 
+  async function archivarCliente(id, archivado) {
+    if (!nube) { const d = leer(); const c = d.clientes.find(x => x.id === id); if (!c) throw new Error("Ese cliente ya no existe."); c.activo = !archivado; escribir(d); return; }
+    await nubeOk(await sb.from("clientes").update({ activo: !archivado }).eq("id", id), "No se pudo archivar el cliente.");
+  }
+
   async function quitar(tabla, id) {
     if (!["sitios", "contactos", "equipos"].includes(tabla)) throw new Error("No se puede quitar eso.");
     if (!nube) {
@@ -184,5 +189,5 @@
 
   async function codigoNuevo() { const l = nube ? await nubeOk(await sb.from("clientes").select("codigo"), "") : leer().clientes; return siguienteCodigo(l); }
 
-  Object.assign(D, { TIPOS, DEPARTAMENTOS, normalNit, nitValido, nitBonito, coordsDe, resolverMapa, clientes, cliente, guardarCliente, guardarSitio, guardarContacto, guardarEquipo, quitar, codigoNuevo });
+  Object.assign(D, { TIPOS, DEPARTAMENTOS, normalNit, nitValido, nitBonito, coordsDe, resolverMapa, clientes, cliente, guardarCliente, guardarSitio, guardarContacto, guardarEquipo, quitar, codigoNuevo, archivarCliente });
 })();

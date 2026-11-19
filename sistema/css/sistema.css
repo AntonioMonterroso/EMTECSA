@@ -1512,3 +1512,8 @@ fieldset.empresa[data-grupo-act="obras"] > details[data-grupo-e="obras"] { displ
 @media (max-width: 640px) { .pest-temas { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-radius: 22px; gap: 4px; width: 100%; } .pest-temas button { padding: 0 4px; min-width: 0; } }
 .solo-tel { display: none; }
 @media (max-width: 640px) { .solo-ancho { display: none; } .solo-tel { display: inline; } }
+.pest-cli button, .pest-emp button { grid-auto-flow: column; }
+.datos-cli a { color: var(--accent-texto); font-weight: 600; }
+.datos-cli > div, .datos-cli > div > span { min-width: 0; max-width: 100%; }
+.datos-cli a[href^="mailto:"] { display: block; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 560px) { .pest-cli { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border-radius: 22px; gap: 4px; width: 100%; } .pest-cli button { white-space: nowrap; } .pest-cli .cuenta-t { display: inline; margin-left: 5px; font-size: 11.5px; } }
