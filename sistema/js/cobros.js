@@ -8,14 +8,36 @@ window.EMT_COBROS = (() => {
   const hoyISO = () => new Date().toISOString().slice(0, 10);
   const diasA = f => Math.round((new Date(f) - new Date(hoyISO())) / 864e5);
   const chipVenc = p => p.venc === "vencido" ? '<span class="chip ambar">Vencido</span>' : p.venc === "pronto" ? '<span class="chip azul">Vence pronto</span>' : '<span class="chip gris">Al día</span>';
+  const telDe = t => String(t || "").replace(/\D/g, "");
+  function buscadorCliente(caja, clientes, alElegir, inicial) {
+    const { esc, ico } = A();
+    caja.innerHTML = `<div data-bc-el></div><div data-bc-bus><span class="f-busca">${ico("search", 15)}<input data-bc-q placeholder="Buscar por nombre, NIT o teléfono" autocomplete="off" aria-label="Buscar cliente"></span><div class="f-res" data-bc-res></div></div>`;
+    const el = caja.querySelector("[data-bc-el]"), bus = caja.querySelector("[data-bc-bus]"), res = caja.querySelector("[data-bc-res]"), inp = caja.querySelector("[data-bc-q]");
+    const pintar = () => {
+      const q = A().normal(inp.value), qn = D.normalNit(inp.value), qt = telDe(inp.value);
+      const l = clientes.filter(c => !q || A().normal([c.nombre, c.razon_social, c.codigo].join(" ")).includes(q) || (qn.length > 2 && D.normalNit(c.nit).includes(qn)) || (qt.length > 3 && [c.telefono, ...(c.contactos || []).map(k => k.telefono)].some(t => telDe(t).includes(qt)))).slice(0, 6);
+      res.innerHTML = l.length ? l.map(c => `<button type="button" data-bc="${c.id}"><b>${esc(c.nombre)}</b><small>NIT ${esc(D.nitBonito(c.nit))}${c.telefono ? " · " + esc(c.telefono) : ""}</small></button>`).join("") : `<p class="suave">Nadie con «${esc(inp.value)}».</p>`;
+    };
+    const elegir = c => {
+      el.innerHTML = c ? `<div class="cli-elegido"><span><b>${esc(c.nombre)}</b><small>NIT ${esc(D.nitBonito(c.nit))}</small></span><button class="s-btn suave-b chico" type="button" data-bc-cambiar>Cambiar</button></div>` : "";
+      bus.hidden = !!c;
+      if (!c) { inp.value = ""; pintar(); }
+      alElegir(c || null);
+    };
+    inp.addEventListener("input", pintar);
+    caja.addEventListener("click", ev => { const b = ev.target.closest("[data-bc]"); if (b) { elegir(clientes.find(c => c.id === Number(b.dataset.bc))); return; } if (ev.target.closest("[data-bc-cambiar]")) { elegir(null); inp.focus(); } });
+    pintar();
+    if (inicial) elegir(inicial);
+    return { elegir };
+  }
   const estadoFianza = f => f.liberada ? ["gris", "Liberada"] : !f.vence ? ["gris", "Sin fecha"] : diasA(f.vence) < 0 ? ["ambar", "Vencida"] : diasA(f.vence) <= 30 ? ["azul", `Vence en ${diasA(f.vence)} días`] : ["verde", "Vigente"];
 
   async function vista(v, sub, sub2) {
     const { $, esc, ico, Q } = A();
     const p = A().sesion().perfil;
     if (!D.puede(p, "verCobros")) { v.innerHTML = `<div class="vacio"><h2>Sin acceso a cobros</h2><p>Esta parte la ven gerencia, administración y ventas.</p><a class="s-btn suave-b" href="#/hoy">Regresar a Hoy</a></div>`; return; }
-    const r = await D.resumenCobros();
-    const pestL = [["", "Por cobrar"], ["pagos", "Pagos"], ...(D.puede(p, "verCosto") ? [["costos", "Costos"]] : []), ["fianzas", "Fianzas"], ["clientes", "Estados de cuenta"]];
+    const [r, clientesL] = await Promise.all([D.resumenCobros(), D.clientes()]);
+    const pestL = [["", "Por cobrar"], ["pagos", "Pagos"], ...(D.puede(p, "verCosto") ? [["costos", "Costos"]] : []), ["fianzas", "Fianzas"], ["clientes", `<span class="solo-ancho">Estados de cuenta</span><span class="solo-tel">Cuentas</span>`]];
     const pest = pestL.some(([k]) => k === sub) ? sub : "";
     v.innerHTML = `
       <div class="cuerpo">
@@ -32,7 +54,7 @@ window.EMT_COBROS = (() => {
       </div>`;
     const box = $("[data-cob]", v);
     const recargar = () => A().quieto(() => vista(v, sub, sub2));
-    if (pest === "pagos") pPagos(box, r, recargar);
+    if (pest === "pagos") pPagos(box, r, recargar, clientesL);
     else if (pest === "clientes") await pClientes(box, r, Number(sub2) || null);
     else if (pest === "fianzas") await pFianzas(box, r, recargar);
     else if (pest === "costos") await window.EMT_COSTOS.resumen(box);
@@ -41,7 +63,7 @@ window.EMT_COBROS = (() => {
     filtrarC();
     v.oninput = e => { if (e.target.matches("[data-busca-cob]")) { buscaC = e.target.value; filtrarC(); } };
     v.onclick = e => {
-      if (e.target.closest("[data-reg-pago]")) { elegirCobro(r, recargar); return; }
+      if (e.target.closest("[data-reg-pago]")) { elegirCobro(r, recargar, clientesL); return; }
       if (box.onclic) box.onclic(e);
     };
   }
@@ -58,28 +80,67 @@ window.EMT_COBROS = (() => {
     box.onclic = e => { const b = e.target.closest("[data-cobrar]"); if (b) cobrar(r.pendientes.find(x => x.id === Number(b.dataset.cobrar)), recargar); };
   }
 
-  function elegirCobro(r, recargar) {
-    const { esc, Q, modal, cerrarCapas } = A();
+  function elegirCobro(r, recargar, clientesL) {
+    const { esc, Q, modal, cerrarCapas, ico } = A();
     const l = r.pendientes.slice().sort((a, b) => (a.venc === "vencido" ? 0 : 1) - (b.venc === "vencido" ? 0 : 1));
-    if (!l.length) { A().aviso("No hay nada pendiente de cobrar."); return; }
+    if (!l.length) { pagoSuelto(r, recargar, clientesL); return; }
     modal({
       titulo: "¿Qué se está pagando?", guardarTxt: "Cerrar", soloUno: true,
-      cuerpo: `<label class="busca-v ancho-busca"><span class="sr">Buscar</span>${A().ico("search", 16)}<input type="search" data-rp-busca placeholder="Cliente, obra o cobro" autocomplete="off"></label>
+      cuerpo: `<div class="lista" style="margin-bottom:12px"><button class="fila rp-f" type="button" data-rp-suelto><span class="icono claro chico">${ico("plus", 15)}</span><span><b>Pago sin plan</b><small>Anticipo, venta o abono de un cliente</small></span><span class="chev">${ico("chev", 16, 2.2)}</span></button></div>
+        <label class="busca-v ancho-busca"><span class="sr">Buscar</span>${A().ico("search", 16)}<input type="search" data-rp-busca placeholder="Cliente, obra o cobro" autocomplete="off"></label>
         <div class="lista" data-rp-l>${l.map(x => `<button class="fila rp-f" type="button" data-rp="${x.id}" data-txt="${esc(((x.cliente ? x.cliente.nombre : "") + " " + (x.obra ? x.obra.numero : "") + " " + x.descripcion).toLowerCase())}"><span><b>${esc(x.cliente ? x.cliente.nombre : "")}</b><small>${x.obra ? esc(x.obra.numero) + " · " : ""}${esc(x.descripcion)}${x.venc === "vencido" ? " · vencido" : ""}</small></span><span class="der"><span class="e-cifra">${esc(Q(x.saldo))}</span></span></button>`).join("")}</div>`,
       alAbrir: (f, m) => {
         const lista = m.querySelector("[data-rp-l]");
         m.querySelector("[data-rp-busca]").addEventListener("input", ev => A().filtrar(lista, ".fila", ev.target.value));
         lista.addEventListener("click", ev => { const b = ev.target.closest("[data-rp]"); if (!b) return; const x = l.find(z => z.id === Number(b.dataset.rp)); cerrarCapas(); cobrar(x, recargar); });
+        m.querySelector("[data-rp-suelto]").addEventListener("click", () => { cerrarCapas(); pagoSuelto(r, recargar, clientesL); });
       },
       alGuardar: async () => cerrarCapas()
     });
   }
 
+  async function pagoSuelto(r, recargar, clientesL) {
+    const { modal, esc, campoMonto, formatoAlSalir, numero, cerrarCapas, aviso } = A();
+    const clientes = clientesL || await D.clientes();
+    const obras = Object.values(r.obras);
+    let cli = null;
+    modal({
+      titulo: "Pago sin plan", guardarTxt: "Registrar pago",
+      cuerpo: `<div class="f-campo"><span>Cliente</span><div data-pick-cli></div></div>
+        <label class="f-campo">Obra<select name="obra" disabled><option value="">Escoja primero el cliente</option></select><small>Si escoge una obra, el pago se abona a sus cobros pendientes.</small></label>
+        <div class="f-fila">${campoMonto("monto", "Monto que pagó", null)}<label class="f-campo">Fecha<input type="date" name="fecha" value="${hoyISO()}"></label></div>
+        <div class="f-fila"><label class="f-campo">Forma de pago<select name="forma">${Object.entries(D.FORMAS).map(([k, n]) => `<option value="${k}">${n}</option>`).join("")}</select></label>
+        <label class="f-campo">Banco<input name="banco" autocomplete="off"></label></div>
+        <label class="f-campo">Número de boleta, transferencia o cheque<input name="ref" autocomplete="off"></label>
+        <label class="f-campo">Notas<input name="notas" autocomplete="off" placeholder="Anticipo, venta de material…"></label>`,
+      alAbrir: f => {
+        formatoAlSalir(f);
+        buscadorCliente(f.querySelector("[data-pick-cli]"), clientes, c => {
+          cli = c;
+          const mias = c ? obras.filter(o => o.cliente_id === c.id) : [];
+          f.obra.disabled = !c;
+          f.obra.innerHTML = c ? `<option value="">Sin obra</option>${mias.map(o => `<option value="${o.id}">${esc(o.numero)} · ${esc(o.titulo || "")}</option>`).join("")}` : `<option value="">Escoja primero el cliente</option>`;
+        });
+      },
+      alGuardar: async f => {
+        if (!cli) throw new Error("Escoja el cliente.");
+        const res = await D.registrarPago({ cliente_id: cli.id, obra_id: f.obra.value ? Number(f.obra.value) : null, parte_id: null, monto: numero(f.monto.value), fecha: f.fecha.value, forma: f.forma.value, banco: f.banco.value, referencia: f.ref.value, notas: f.notas.value });
+        cerrarCapas(); aviso(`Pago registrado: recibo ${res.numero}.`);
+        await recargar();
+        ofrecerRecibo(res.id);
+      }
+    });
+  }
+
   async function cobrar(parte, recargar) {
     const { modal, esc, Q, campoMonto, formatoAlSalir, numero, cerrarCapas, aviso } = A();
+    const r = await D.resumenCobros();
+    const otros = parte.obra_id ? r.pendientes.filter(x => x.obra_id === parte.obra_id && x.id !== parte.id) : [];
+    const tope = Math.round((parte.saldo + otros.reduce((a, x) => a + x.saldo, 0)) * 100) / 100;
     modal({
       titulo: "Registrar pago", guardarTxt: "Registrar pago",
       cuerpo: `<div class="cli-elegido"><span><b>${esc(parte.cliente ? parte.cliente.nombre : "")}</b><small>${parte.obra ? esc(parte.obra.numero) + " · " : ""}${esc(parte.descripcion)} · saldo ${esc(Q(parte.saldo))}</small></span></div>
+        ${otros.length ? `<p class="suave" style="font-size:13px;margin:0">Si paga más de ${esc(Q(parte.saldo))}, el resto se abona a los otros cobros de la obra (hasta ${esc(Q(tope))}).</p>` : ""}
         <div class="f-fila">${campoMonto("monto", "Monto que pagó", parte.saldo)}<label class="f-campo">Fecha<input type="date" name="fecha" value="${hoyISO()}"></label></div>
         <div class="f-fila"><label class="f-campo">Forma de pago<select name="forma">${Object.entries(D.FORMAS).map(([k, n]) => `<option value="${k}">${n}</option>`).join("")}</select></label>
         <label class="f-campo">Banco<input name="banco" autocomplete="off"></label></div>
@@ -87,7 +148,7 @@ window.EMT_COBROS = (() => {
         <label class="f-campo">Notas<input name="notas" autocomplete="off"></label>`,
       alAbrir: f => formatoAlSalir(f),
       alGuardar: async f => {
-        const res = await D.registrarPago({ cliente_id: parte.cliente_id, obra_id: parte.obra_id, parte_id: parte.id, monto: numero(f.monto.value), fecha: f.fecha.value, forma: f.forma.value, banco: f.banco.value, referencia: f.ref.value, notas: f.notas.value, tope: parte.saldo });
+        const res = await D.registrarPago({ cliente_id: parte.cliente_id, obra_id: parte.obra_id, parte_id: parte.id, monto: numero(f.monto.value), fecha: f.fecha.value, forma: f.forma.value, banco: f.banco.value, referencia: f.ref.value, notas: f.notas.value, tope });
         cerrarCapas(); aviso(`Pago registrado: recibo ${res.numero}.`);
         await recargar();
         ofrecerRecibo(res.id);
@@ -106,10 +167,9 @@ window.EMT_COBROS = (() => {
   }
   function ofrecerRecibo(pagoId) {
     const { modal, ico, cerrarCapas } = A();
-    modal({ titulo: "Recibo listo", guardarTxt: "Descargar recibo", extra: `<button class="s-btn suave-b" type="button" data-ver-rec>${ico("eye", 15)}Ver recibo</button>`,
-      cuerpo: `<p class="suave" style="font-size:15px">El pago quedó registrado. ¿Quiere el recibo en PDF para mandárselo al cliente?</p>`,
-      alAbrir: (f, m) => m.querySelector("[data-ver-rec]").addEventListener("click", () => abrirRecibo(pagoId, "ver")),
-      alGuardar: async () => { await abrirRecibo(pagoId, "bajar"); cerrarCapas(); } });
+    modal({ titulo: "Recibo listo", guardarTxt: "Ver recibo",
+      cuerpo: `<p class="suave" style="font-size:15px">El pago quedó registrado. Vea el recibo y desde ahí lo descarga para mandárselo al cliente.</p>`,
+      alGuardar: async () => { cerrarCapas(); await abrirRecibo(pagoId, "ver"); } });
   }
   async function abrirRecibo(pagoId, modo) {
     const { aviso } = A();
@@ -121,10 +181,10 @@ window.EMT_COBROS = (() => {
     } catch (err) { aviso(/[áéíóúñ]/i.test(err.message) ? err.message : "No se pudo armar el recibo. Intente otra vez.", "mal"); }
   }
 
-  function pPagos(box, r, recargar) {
+  function pPagos(box, r, recargar, clientesL) {
     const { esc, ico, Q, modal, cerrarCapas, aviso } = A();
     const puede = D.puede(A().sesion().perfil, "registrarPago");
-    const cl = {}; Object.values(r.obras).forEach(o => { if (o.cliente) cl[o.cliente_id] = o.cliente; });
+    const cl = Object.fromEntries((clientesL || []).map(c => [c.id, c])); Object.values(r.obras).forEach(o => { if (o.cliente && !cl[o.cliente_id]) cl[o.cliente_id] = o.cliente; });
     const l = r.pagos.slice().sort((a, b) => String(b.fecha).localeCompare(String(a.fecha)) || b.numero.localeCompare(a.numero));
     box.innerHTML = l.length ? `<div class="lista">${l.map(p => `
       <div class="fila cobro ${p.anulado ? "anulado" : ""}" style="cursor:default"><span class="icono ${p.anulado ? "gris" : "verde"}">${ico("file", 18)}</span>
@@ -153,8 +213,8 @@ window.EMT_COBROS = (() => {
       box.innerHTML = `
         <a class="volver" href="#/cobros/clientes">${ico("chev", 16, 2.2)}Todos los clientes</a>
         <div class="sub"><h2>${esc(cli ? cli.nombre : "Cliente")}</h2><button class="e-btn e-btn-salida" type="button" data-ec-pdf>${ico("download", 16)}Estado de cuenta en PDF</button></div>
-        <div class="datos-cli"><div><small>Cobros</small><span class="e-cifra">${esc(Q(ec.cargos))}</span></div><div><small>Pagado</small><span class="e-cifra">${esc(Q(ec.abonos))}</span></div><div><small>Saldo</small><span class="e-cifra"><b>${esc(Q(ec.saldo))}</b></span></div><div><small>Vencido</small><span class="e-cifra ${ec.vencido ? "falta" : ""}">${esc(Q(ec.vencido))}</span></div></div>
-        ${ec.mov.length ? `<div class="tabla-m ec"><div class="tm-cab"><span>Fecha y concepto</span><span>Cobro</span><span>Pago</span><span>Saldo</span></div>${ec.mov.map(m => `<div class="tm-fila"><span><b>${esc(m.texto)}</b><small>${esc(fCorta(m.fecha) || "Sin fecha")}${m.venc === "vencido" ? ' · <span class="falta">vencido</span>' : ""}</small></span><span data-l="Cobro">${m.cargo ? esc(Q(m.cargo)) : ""}</span><span data-l="Pago">${m.abono ? esc(Q(m.abono)) : ""}</span><span data-l="Saldo"><b>${esc(Q(m.saldo))}</b></span></div>`).join("")}</div>` : `<div class="vacio chico"><p>Sin movimientos.</p></div>`}`;
+        <div class="datos-cli"><div><small>Cobros</small><span class="e-cifra">${esc(Q(ec.cargos))}</span></div><div><small>Pagado</small><span class="e-cifra">${esc(Q(ec.abonos))}</span></div><div><small>${ec.saldo < 0 ? "A favor" : "Saldo"}</small><span class="e-cifra"><b>${esc(Q(Math.abs(ec.saldo)))}</b></span></div><div><small>Vencido</small><span class="e-cifra ${ec.vencido ? "falta" : ""}">${esc(Q(ec.vencido))}</span></div></div>
+        ${ec.mov.length ? `<div class="tabla-m ec"><div class="tm-cab"><span>Fecha y concepto</span><span>Cobro</span><span>Pago</span><span>Saldo</span></div>${ec.mov.map(m => `<div class="tm-fila"><span><b>${esc(m.texto)}</b><small>${esc(fCorta(m.fecha) || "Sin fecha")}${m.venc === "vencido" ? ' · <span class="falta">vencido</span>' : ""}</small><small class="tm-res">${m.cargo ? "Cobro " + esc(Q(m.cargo)) : "Pago " + esc(Q(m.abono))} · saldo <b>${esc(Q(m.saldo))}</b></small></span><span data-l="Cobro">${m.cargo ? esc(Q(m.cargo)) : ""}</span><span data-l="Pago">${m.abono ? esc(Q(m.abono)) : ""}</span><span data-l="Saldo"><b>${esc(Q(m.saldo))}</b></span></div>`).join("")}</div>` : `<div class="vacio chico"><p>Sin movimientos.</p></div>`}`;
       box.onclic = async e => {
         if (!e.target.closest("[data-ec-pdf]")) return;
         try { A().aviso("Armando el estado de cuenta…"); const b = await window.EMT_PDF.estadoCuenta({ cli, ec, emp: await D.empresa() }); window.EMT_PDF.mostrar(b, `Estado de cuenta - ${cli.nombre.replace(/[\\/:*?"<>|]/g, "")}.pdf`); }
@@ -167,7 +227,7 @@ window.EMT_COBROS = (() => {
     filas.sort((a, b) => b.ec.saldo - a.ec.saldo);
     box.innerHTML = filas.length ? `<div class="lista">${filas.map(x => `
       <a class="fila" href="#/cobros/clientes/${x.id}"><span class="icono azul">${ico("building", 18)}</span><span><b>${esc(x.cli ? x.cli.nombre : "Cliente")}</b><small>Cobros ${esc(Q(x.ec.cargos))} · pagado ${esc(Q(x.ec.abonos))}</small></span>
-      <span class="der"><b class="e-cifra">${esc(Q(x.ec.saldo))}</b><small>${x.ec.vencido ? `<span class="chip ambar">Vencido ${esc(Q(x.ec.vencido))}</span>` : '<span class="chip verde">Al día</span>'}</small></span><span class="chev">${ico("chev", 16, 2.2)}</span></a>`).join("")}</div>`
+      <span class="der"><b class="e-cifra">${esc(Q(x.ec.saldo))}</b><small>${x.ec.vencido ? `<span class="chip ambar">Vencido ${esc(Q(x.ec.vencido))}</span>` : x.ec.saldo < 0 ? `<span class="chip azul">A favor ${esc(Q(-x.ec.saldo))}</span>` : '<span class="chip verde">Al día</span>'}</small></span><span class="chev">${ico("chev", 16, 2.2)}</span></a>`).join("")}</div>`
       : `<div class="vacio chico"><p>Todavía ningún cliente tiene cobros.</p></div>`;
     box.onclic = null;
   }
@@ -192,20 +252,24 @@ window.EMT_COBROS = (() => {
     const clientes = await D.clientes();
     const obras = Object.values(r.obras);
     const actual = f0 ? clientes.find(c => c.id === f0.cliente_id) : null;
+    let cliF = actual, bc = null;
     modal({
       titulo: f0 ? "Editar fianza" : "Fianza nueva",
-      cuerpo: `<label class="f-campo">Cliente<input name="cliente" list="lista-cli" value="${esc(actual ? actual.nombre : "")}" autocomplete="off" placeholder="Escriba para buscar"></label>
-        <datalist id="lista-cli">${clientes.map(c => `<option value="${esc(c.nombre)}">`).join("")}</datalist>
+      cuerpo: `<div class="f-campo"><span>Cliente</span><div data-pick-cli></div></div>
         <label class="f-campo">Obra<select name="obra"><option value="">Sin obra</option>${obras.map(o => `<option value="${o.id}" ${f0 && f0.obra_id === o.id ? "selected" : ""}>${esc(o.numero)} · ${esc(o.cliente ? o.cliente.nombre : "")}</option>`).join("")}</select></label>
         <div class="f-fila"><label class="f-campo">Tipo<select name="tipo">${Object.entries(D.TIPOS_FIANZA).map(([k, n]) => `<option value="${k}" ${(f0 ? f0.tipo : "cumplimiento") === k ? "selected" : ""}>${n}</option>`).join("")}</select></label>${campoMonto("monto", "Monto", f0 ? f0.monto : null)}</div>
         <div class="f-fila"><label class="f-campo">Aseguradora<input name="aseg" value="${esc(f0 && f0.aseguradora || "")}" autocomplete="off"></label><label class="f-campo">Número de póliza<input name="num" value="${esc(f0 && f0.numero || "")}" autocomplete="off"></label></div>
         <div class="f-fila"><label class="f-campo">Emitida<input type="date" name="emision" value="${esc(f0 && f0.emision || "")}"></label><label class="f-campo">Vence<input type="date" name="vence" value="${esc(f0 && f0.vence || "")}"></label></div>
         <label class="f-check"><input type="checkbox" name="liberada" ${f0 && f0.liberada ? "checked" : ""}><span>Ya fue liberada</span></label>`,
-      alAbrir: f => formatoAlSalir(f),
+      alAbrir: f => {
+        formatoAlSalir(f);
+        bc = buscadorCliente(f.querySelector("[data-pick-cli]"), clientes, c => { cliF = c; }, actual);
+        f.obra.addEventListener("change", () => { const o = f.obra.value ? r.obras[Number(f.obra.value)] : null; if (o && (!cliF || cliF.id !== o.cliente_id)) { const c = clientes.find(x => x.id === o.cliente_id); if (c) bc.elegir(c); } });
+      },
       alGuardar: async f => {
         const obra = f.obra.value ? r.obras[Number(f.obra.value)] : null;
-        const cli = clientes.find(c => c.nombre === f.cliente.value.trim()) || (obra ? { id: obra.cliente_id } : null);
-        if (!cli) throw new Error("Escoja el cliente de la lista.");
+        const cli = cliF || (obra ? { id: obra.cliente_id } : null);
+        if (!cli) throw new Error("Escoja el cliente.");
         await D.guardarFianza({ id: f0 ? f0.id : null, cliente_id: cli.id, obra_id: obra ? obra.id : null, tipo: f.tipo.value, monto: numero(f.monto.value) || 0, aseguradora: f.aseg.value, numero: f.num.value, emision: f.emision.value, vence: f.vence.value, liberada: f.liberada.checked });
         cerrarCapas(); aviso("Fianza guardada."); await recargar();
       }
@@ -233,8 +297,8 @@ window.EMT_COBROS = (() => {
         : `<div class="vacio chico"><p>Todavía no hay plan de pagos. ${cot ? `El total de la cotización es ${esc(Q(total))}.` : ""}</p></div>`}` : ""}
       ${verG ? `<div class="sub"><h2>Gastos de la obra · ${esc(Q(gastado))}</h2><button class="s-btn suave-b" type="button" data-gasto>${ico("plus", 15)}Agregar gasto</button></div>
       ${gastos.length ? `<div class="lista">${gastos.map(g => `<div class="fila cobro" style="cursor:default"><span class="icono gris">${ico("cart", 18)}</span><span><b>${esc(g.descripcion)}</b><small>${esc(D.TIPOS_GASTO[g.tipo])} · ${esc(fCorta(g.fecha))}</small></span><span class="der"><b class="e-cifra">${esc(Q(g.monto))}</b></span><span class="acc"><button class="s-ib" type="button" aria-label="Editar gasto" data-ed-gasto="${g.id}">${ico("pen", 15)}</button></span></div>`).join("")}</div>` : `<div class="vacio chico"><p>Sin gastos anotados: viáticos, combustible, grúa, subcontratos…</p></div>`}` : ""}
-      ${interno ? `<div class="sub"><h2>Cómo va la obra</h2></div><div class="datos-cli"><div><small>Total con IVA</small><span class="e-cifra">${esc(Q(total))}</span></div><div><small>Cobrado</small><span class="e-cifra">${esc(Q(cobrado))}</span></div><div><small>Gastos</small><span class="e-cifra">${esc(Q(gastado))}</span></div><div><small>Queda (sin IVA)</small><span class="e-cifra"><b>${sinIva != null ? esc(Q(sinIva - costoMat - gastado)) : "—"}</b></span></div>
-        <div class="ancho2"><small>Cómo se calcula</small><span class="suave" style="font-size:13px">${sinIva != null ? `Total sin IVA ${esc(Q(sinIva))} menos costo de materiales ${esc(Q(costoMat))} menos gastos ${esc(Q(gastado))}. Solo lo ve gerencia.` : "Necesita una cotización para calcularlo."}</span></div></div>` : ""}`;
+      ${interno ? `<div class="sub"><h2>Cómo va la obra</h2></div><div class="datos-cli"><div><small>${kc ? "Total con IVA" : "Total del plan"}</small><span class="e-cifra">${esc(Q(total))}</span></div><div><small>Cobrado</small><span class="e-cifra">${esc(Q(cobrado))}</span></div><div><small>Gastos</small><span class="e-cifra">${esc(Q(gastado))}</span></div><div><small>${sinIva != null ? "Queda (sin IVA)" : "Queda"}</small><span class="e-cifra"><b>${esc(Q(sinIva != null ? sinIva - costoMat - gastado : total - gastado))}</b></span></div>
+        <div class="ancho2"><small>Cómo se calcula</small><span class="suave" style="font-size:13px">${sinIva != null ? `Total sin IVA ${esc(Q(sinIva))} menos costo de materiales ${esc(Q(costoMat))} menos gastos ${esc(Q(gastado))}. Solo lo ve gerencia.` : `Total del plan de pagos ${esc(Q(total))} menos gastos ${esc(Q(gastado))}. Sin cotización no se descuentan el IVA ni el costo de materiales. Solo lo ve gerencia.`}</span></div></div>` : ""}`;
     const editarGasto = g0 => modal({
       titulo: g0 ? "Editar gasto" : "Gasto de la obra",
       quitar: g0 ? () => { const m = modal({ titulo: "¿Quitar el gasto?", guardarTxt: "Quitar", cuerpo: `<p class="suave" style="font-size:15px">Se quita «${esc(g0.descripcion)}» por ${esc(Q(g0.monto))}.</p>`, alGuardar: async () => { await D.quitarGasto(g0.id); cerrarCapas(); aviso("Gasto quitado."); await recargar(); } }); m.querySelector("[data-guardar]").classList.add("peligro-b"); } : null,
@@ -267,7 +331,7 @@ window.EMT_COBROS = (() => {
         const caja = f.querySelector("[data-plan-filas]");
         const suma = () => { const s = filas.reduce((a, x) => a + (Number(x.monto) || 0), 0), pct = filas.reduce((a, x) => a + (Number(x.porcentaje) || 0), 0); const el = f.querySelector("[data-plan-suma]"); el.textContent = `Suma ${Q(s)} de ${Q(base)}${Math.abs(s - base) > 0.01 ? ` · ${s < base ? "faltan " + Q(base - s) : "sobran " + Q(s - base)}` : " · completo"}${pct ? ` · ${Math.round(pct * 100) / 100} %` : ""}`; el.style.color = Math.abs(s - base) > 0.01 ? "var(--aviso)" : ""; };
         const pintar = () => {
-          caja.innerHTML = filas.map((x, i) => `<div class="plan-fila"><label class="f-campo">Pago<input data-pd="${i}" value="${esc(x.descripcion)}" autocomplete="off"></label><label class="f-campo">%<input data-pp="${i}" inputmode="decimal" value="${esc(x.porcentaje ?? "")}" autocomplete="off"></label><label class="f-campo">Monto<span class="f-monto"><span>Q</span><input data-pm="${i}" inputmode="decimal" value="${esc(montoTxt(x.monto))}" autocomplete="off"></span></label><label class="f-campo">Vence<input type="date" data-pv="${i}" value="${esc(x.vence || "")}"></label><button class="s-ib" type="button" aria-label="Quitar pago" data-pq="${i}">${ico("x", 14)}</button></div>`).join("");
+          caja.innerHTML = filas.map((x, i) => `<div class="plan-fila"><label class="f-campo">Pago<input data-pd="${i}" value="${esc(x.descripcion)}" autocomplete="off"></label><label class="f-campo">%<input data-pp="${i}" inputmode="decimal" value="${esc(x.porcentaje ?? "")}" autocomplete="off"></label><label class="f-campo">Monto<span class="f-monto"><span>Q</span><input data-pm="${i}" inputmode="decimal" value="${esc(montoTxt(x.monto))}" autocomplete="off"></span></label><label class="f-campo">Vence<input type="date" data-pv="${i}" value="${esc(x.vence || "")}" style="min-width:0;width:100%"></label><button class="s-ib" type="button" aria-label="Opciones del pago ${esc(x.descripcion || i + 1)}" data-pe="${i}">${ico("pen", 14)}</button><div class="fila-b" style="grid-column:1/-1;margin:0" data-pe-acc="${i}" hidden><button class="s-btn suave-b chico" type="button" data-pq="${i}">${ico("trash", 14)}Quitar este pago</button></div></div>`).join("");
           suma();
         };
         pintar();
@@ -281,6 +345,7 @@ window.EMT_COBROS = (() => {
         });
         m.addEventListener("click", ev => {
           if (ev.target.closest("[data-plan-mas]")) { filas.push({ descripcion: "", porcentaje: null, monto: 0, vence: "" }); pintar(); caja.querySelector(`[data-pd="${filas.length - 1}"]`)?.focus(); }
+          const pe = ev.target.closest("[data-pe]"); if (pe) { const acc = caja.querySelector(`[data-pe-acc="${pe.dataset.pe}"]`); if (acc) acc.hidden = !acc.hidden; return; }
           const q = ev.target.closest("[data-pq]"); if (q) { filas.splice(Number(q.dataset.pq), 1); pintar(); }
         });
       },

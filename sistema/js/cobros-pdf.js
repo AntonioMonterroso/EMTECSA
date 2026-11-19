@@ -2,6 +2,7 @@
 (() => {
   const P = window.EMT_PDF;
   const { preparar, svgAPng, partir, COL, W, H, M, PIE, Q } = P.base;
+  const nb = n => { const D = window.EMT_DATOS; return D && D.nitBonito ? D.nitBonito(n) : n; };
   const fLarga = f => { if (!f) return ""; const [y, m, d] = String(f).slice(0, 10).split("-").map(Number); return new Date(y, m - 1, d).toLocaleDateString("es-GT", { day: "numeric", month: "long", year: "numeric" }); };
   const fCorta = f => { if (!f) return "Sin fecha"; const [y, m, d] = String(f).slice(0, 10).split("-").map(Number); return new Date(y, m - 1, d).toLocaleDateString("es-GT", { day: "2-digit", month: "short", year: "numeric" }); };
 
@@ -24,7 +25,7 @@
       pg.drawRectangle({ x: 0, y: H - 121, width: W, height: 3, color: hex(COL.laton) });
     };
     const pie = pg => {
-      const t = [emp.razon_social || emp.nombre, emp.nit ? "NIT " + emp.nit : "", emp.telefono, emp.correo, emp.web].filter(x => String(x || "").trim()).join("  ·  ");
+      const t = [emp.razon_social || emp.nombre, emp.nit ? "NIT " + nb(emp.nit) : "", emp.telefono, emp.correo, emp.web].filter(x => String(x || "").trim()).join("  ·  ");
       pg.drawLine({ start: { x: M, y: PIE + 10 }, end: { x: W - M, y: PIE + 10 }, thickness: 0.5, color: hex(COL.linea) });
       txt(pg, t, M, PIE - 4, { s: 7.5, c: COL.gris });
     };
@@ -38,7 +39,7 @@
     let y = H - 170;
     const campo = (eti, val, x, yy, w) => { txt(pg, eti.toUpperCase(), x, yy, { f: F.b, s: 7.5, c: COL.gris }); partir(val || "—", F.s, 11.5, w).slice(0, 3).forEach((l, i) => txt(pg, l, x, yy - 16 - i * 15, { f: F.s, s: 11.5 })); };
     campo("Recibimos de", (cli && (cli.razon_social || cli.nombre)) || "", M, y, 330);
-    campo("NIT", cli ? (cli.nit || "CF") : "", 420, y, W - M - 420);
+    campo("NIT", cli ? nb(cli.nit || "CF") : "", 420, y, W - M - 420);
     y -= 66;
     pg.drawRectangle({ x: M, y: y - 70, width: W - 2 * M, height: 82, color: hex(COL.fondo) });
     pg.drawRectangle({ x: M, y: y - 70, width: 4, height: 82, color: hex(COL.laton) });
@@ -79,7 +80,7 @@
     let y = H - 162;
     txt(pg, "CLIENTE", M, y, { f: F.b, s: 7.5, c: COL.gris });
     txt(pg, (cli && (cli.razon_social || cli.nombre)) || "", M, y - 16, { f: F.s, s: 11.5 });
-    txt(pg, "NIT " + ((cli && cli.nit) || "CF"), M, y - 31, { s: 9.5, c: COL.gris });
+    txt(pg, "NIT " + nb((cli && cli.nit) || "CF"), M, y - 31, { s: 9.5, c: COL.gris });
     y -= 62;
     const bw = (W - 2 * M - 30) / 4;
     [["Cobros", ec.cargos], ["Pagado", ec.abonos], ["Saldo", ec.saldo], ["Vencido", ec.vencido]].forEach(([t, n], i) => {

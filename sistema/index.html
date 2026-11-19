@@ -21,7 +21,7 @@
 <link rel="stylesheet" href="css/sistema.css">
 <link rel="stylesheet" href="css/temas.css">
 <script>
-  try { const m = localStorage.getItem("emtecsa.sistema.modo"); if (m === "claro" || m === "oscuro") document.documentElement.dataset.modo = m; else if (m === "auto") delete document.documentElement.dataset.modo; const t = localStorage.getItem("emtecsa.sistema.tema"); if (t && t !== "emtecsa" && /^[a-z]{2,20}$/.test(t)) document.documentElement.dataset.tema = t; if (localStorage.getItem("emtecsa.sistema.tema-claro") === "1") document.documentElement.dataset.modo = "claro"; } catch (e) {}
+  try { const m = localStorage.getItem("emtecsa.sistema.modo"); if (m === "claro" || m === "oscuro") document.documentElement.dataset.modo = m; else if (m === "auto") delete document.documentElement.dataset.modo; const t = localStorage.getItem("emtecsa.sistema.tema"); if (t && t !== "emtecsa" && /^[a-z]{2,20}$/.test(t)) document.documentElement.dataset.tema = t; } catch (e) {}
 </script>
 </head>
 <body>

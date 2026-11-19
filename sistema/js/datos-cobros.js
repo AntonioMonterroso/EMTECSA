@@ -28,8 +28,17 @@
   async function resumen() {
     const [b, obras] = await Promise.all([todo(), D.obras()]);
     const porObra = Object.fromEntries(obras.map(x => [x.id, x]));
-    const pagado = {};
-    b.pagos.filter(p => !p.anulado && p.parte_id).forEach(p => { pagado[p.parte_id] = r2((pagado[p.parte_id] || 0) + p.monto); });
+    const pagado = {}, libre = {};
+    b.pagos.filter(p => !p.anulado).forEach(p => {
+      if (p.parte_id) pagado[p.parte_id] = r2((pagado[p.parte_id] || 0) + p.monto);
+      else if (p.obra_id) libre[p.obra_id] = r2((libre[p.obra_id] || 0) + p.monto);
+    });
+    b.partes.forEach(p => { const x = pagado[p.id] || 0; if (x > p.monto) { libre[p.obra_id] = r2((libre[p.obra_id] || 0) + x - p.monto); pagado[p.id] = r2(p.monto); } });
+    b.partes.slice().sort((x, y) => String(x.vence || "9999").localeCompare(String(y.vence || "9999")) || (x.orden || 0) - (y.orden || 0)).forEach(p => {
+      const queda = libre[p.obra_id] || 0; if (!(queda > 0)) return;
+      const toma = Math.min(queda, r2(p.monto - (pagado[p.id] || 0))); if (!(toma > 0)) return;
+      pagado[p.id] = r2((pagado[p.id] || 0) + toma); libre[p.obra_id] = r2(queda - toma);
+    });
     const partes = b.partes.map(p => {
       const ob = porObra[p.obra_id];
       const pag = pagado[p.id] || 0, saldo = r2(p.monto - pag);
@@ -74,7 +83,7 @@
     const datos = { cliente_id: p.cliente_id, obra_id: p.obra_id || null, parte_id: p.parte_id || null, fecha: fechaO(p.fecha) || hoy(), monto: r2(p.monto), forma: FORMAS[p.forma] ? p.forma : "transferencia", referencia: o(p.referencia), banco: o(p.banco), notas: o(p.notas), anulado: false, motivo_anulado: null };
     if (!datos.cliente_id) throw new Error("Falta el cliente del pago.");
     if (!(datos.monto > 0)) throw new Error("Escriba el monto que pagó el cliente.");
-    if (p.tope != null && datos.monto > r2(p.tope) + 0.001) throw new Error(`El pago pasa del saldo de ese cobro (${"Q " + r2(p.tope).toLocaleString("en-US", { minimumFractionDigits: 2 })}).`);
+    if (p.tope != null && datos.monto > r2(p.tope) + 0.001) throw new Error(`El pago pasa de lo que falta cobrar (${"Q " + r2(p.tope).toLocaleString("en-US", { minimumFractionDigits: 2 })}).`);
     if (!nube) { const d = leer(); const id = d.sig.x++; const numero = siguienteNumero(d.pagos); d.pagos.push({ id, numero, creado: new Date().toISOString(), ...datos }); escribir(d); return { id, numero }; }
     const nums = await ok(await sb.from("pagos").select("numero"), "No se pudo registrar el pago.");
     const r = await sb.from("pagos").insert({ ...datos, numero: siguienteNumero(nums) }).select("id, numero").single();
@@ -113,6 +122,8 @@
     const r = await resumen();
     const mov = [];
     r.partes.filter(p => p.cliente_id === clienteId).forEach(p => mov.push({ fecha: p.vence || (p.obra && p.obra.fecha_inicio) || "", tipo: "cargo", texto: `${p.descripcion}${p.obra ? " · " + p.obra.numero : ""}`, cargo: p.monto, abono: 0, vence: p.vence, venc: p.venc }));
+    const ped = D.pedidosTienda ? await D.pedidosTienda().catch(() => []) : [];
+    ped.filter(p => p.clienteId === clienteId && p.pagoId && Number(p.total) > 0).forEach(p => { const h = (p.historia || []).find(x => x.estado === "en-marcha"); mov.push({ fecha: String((h && h.fecha) || p.actualizado || "").slice(0, 10), tipo: "cargo", texto: `Pedido ${p.id} de la tienda`, cargo: r2(p.total), abono: 0 }); });
     r.pagos.filter(p => p.cliente_id === clienteId && !p.anulado).forEach(p => mov.push({ fecha: p.fecha, tipo: "abono", texto: `Pago ${p.numero} · ${FORMAS[p.forma]}${p.referencia ? " " + p.referencia : ""}`, cargo: 0, abono: p.monto }));
     mov.sort((a, b) => String(a.fecha || "9999").localeCompare(String(b.fecha || "9999")) || (a.tipo === "cargo" ? -1 : 1));
     let s = 0; mov.forEach(m => { s = r2(s + m.cargo - m.abono); m.saldo = s; });

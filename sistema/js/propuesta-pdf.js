@@ -11,7 +11,7 @@ window.EMT_PDF = (() => {
   const W = 612, H = 792, M = 56, PIE = 46;
   const COL = { noche: "#07111F", marino: "#102440", laton: "#C8A96A", latonT: "#7A5C22", texto: "#0E1D33", gris: "#4F5B69", linea: "#D5DBE2", fondo: "#EBEEF2", claro: "#D7DFEA" };
   let libs = null, fuentes = null;
-  const Q = n => "Q " + Number(n || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const Q = n => (Number(n || 0) < 0 ? "-" : "") + "Q " + Math.abs(Number(n || 0)).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const cant = n => Number(n).toLocaleString("en-US", { maximumFractionDigits: 3 });
 
   function cargarScript([src, integrity]) {

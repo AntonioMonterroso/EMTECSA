@@ -21,7 +21,7 @@
   const ico = (n, w = 18, g = 1.8) => MAS[n]
     ? `<svg width="${w}" height="${w}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${g}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${MAS[n]}</svg>`
     : window.EMT.ico(n, w);
-  const Q = n => "Q\u00A0" + Number(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const Q = n => (Number(n) < 0 ? "-" : "") + "Q\u00A0" + Math.abs(Number(n)).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const cant = n => Number(n).toLocaleString("en-US", { maximumFractionDigits: 3 });
   const LOGO = '<img class="logo-o" src="../logo/emtecsa-logo-blanco.svg" alt="EMTECSA" width="137" height="22"><img class="logo-c" src="../logo/emtecsa-logo.svg" alt="EMTECSA" width="137" height="22">';
 

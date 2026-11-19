@@ -1508,3 +1508,5 @@ fieldset.empresa[data-grupo-act="obras"] > details[data-grupo-e="obras"] { displ
 .temas-g > h3 { font-size: 13px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--text-muted); padding: 0 4px; }
 .temas-vacio { padding: 12px 4px; color: var(--text-muted); font-size: 14px; }
 @media (max-width: 640px) { .pest-temas { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-radius: 22px; gap: 4px; width: 100%; } .pest-temas button { padding: 0 4px; min-width: 0; } }
+.solo-tel { display: none; }
+@media (max-width: 640px) { .solo-ancho { display: none; } .solo-tel { display: inline; } }

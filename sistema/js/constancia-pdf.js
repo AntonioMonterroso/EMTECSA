@@ -6,7 +6,7 @@ window.EMT_CONSTANCIA = (() => {
   ];
   const COL = { marino: "#102440", laton: "#C8A96A", latonT: "#7A5C22", texto: "#0E1D33", gris: "#4F5B69", linea: "#D5DBE2", fondo: "#F6F7F9" };
   const W = 612, H = 792, M = 56;
-  const Q = n => "Q " + Number(n || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const Q = n => (Number(n || 0) < 0 ? "-" : "") + "Q " + Math.abs(Number(n || 0)).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   let libs = null;
   const cargar = ([src, integrity]) => new Promise((ok, mal) => { if ([...document.scripts].some(s => s.src === src)) { const t = setInterval(() => { if (src.includes("fontkit") ? window.fontkit : window.PDFLib) { clearInterval(t); ok(); } }, 50); return; } const s = document.createElement("script"); s.src = src; s.integrity = integrity; s.crossOrigin = "anonymous"; s.onload = ok; s.onerror = () => mal(new Error("No se pudo cargar la herramienta del PDF. Revise el internet.")); document.head.appendChild(s); });
   async function preparar(base) {
