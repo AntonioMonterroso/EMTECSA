@@ -1552,3 +1552,18 @@ fieldset.empresa[data-grupo-act="obras"] > details[data-grupo-e="obras"] { displ
 .fin-pp .acc { display: flex; gap: 8px; align-items: center; }
 .lista .fila.con-lapiz.fin-pp { grid-template-columns: 38px minmax(0, 1fr) auto auto; }
 @media (max-width: 560px) { .lista .fila.con-lapiz.fin-pp { grid-template-columns: 30px minmax(0, 1fr) auto; } .fin-pp .der { grid-column: 2; grid-row: 2; text-align: left; } .fin-pp .acc { grid-column: 3; grid-row: 1 / span 2; flex-direction: column; } }
+.fin-barra { max-width: none; }
+.fin-barra.casi span { background: var(--aviso); }
+.fin-barra.pasa span { background: var(--peligro); }
+.fin-barra.lista span { background: var(--exito); }
+.fin-pl .pl-cuerpo { display: grid; gap: 12px; }
+.fin-pl .pl-cuerpo > .s-btn { justify-self: start; }
+.lista .fila.fin-pr { grid-template-columns: minmax(0, 1fr) auto; }
+.lista .fila.con-lapiz.fin-meta { grid-template-columns: 38px minmax(0, 1fr) auto; }
+.fin-meta .acc { display: flex; gap: 8px; align-items: center; }
+.fin-flujo { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.fin-flujo > div { display: grid; gap: 2px; padding: 10px 12px; border-radius: 16px; background: var(--seg); }
+.fin-flujo small { font-size: 12px; color: var(--text-muted); }
+.fin-flujo b { font-size: 15px; }
+.fin-presu .f-mat { grid-template-columns: minmax(0, 1fr) 150px; }
+@media (max-width: 560px) { .fin-flujo { grid-template-columns: repeat(2, minmax(0, 1fr)); } .lista .fila.fin-pr { grid-template-columns: minmax(0, 1fr); } .fin-pr .der { text-align: left; } .lista .fila.con-lapiz.fin-meta { grid-template-columns: 30px minmax(0, 1fr) auto; } .fin-meta .acc { flex-direction: column; } .fin-presu .f-mat { grid-template-columns: minmax(0, 1fr) 128px; } }

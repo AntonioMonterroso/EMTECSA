@@ -23,8 +23,8 @@
   const yo = () => { const s = window.EMT_APP && window.EMT_APP.sesion(); return s ? s.perfil : null; };
   const yoId = () => { const p = yo(); return p ? String(p.id) : "local"; };
 
-  const vacio = () => ({ v: 1, sig: 1, cuentas: [], categorias: [], movimientos: [], compromisos: [], cambio: 7.75 });
-  function leer() { try { const d = JSON.parse(localStorage.getItem(CLAVE)); if (d && d.v === 1) { d.compromisos = d.compromisos || []; return d; } } catch (e) {} return vacio(); }
+  const vacio = () => ({ v: 1, sig: 1, cuentas: [], categorias: [], movimientos: [], compromisos: [], presupuestos: [], metas: [], cambio: 7.75 });
+  function leer() { try { const d = JSON.parse(localStorage.getItem(CLAVE)); if (d && d.v === 1) { d.compromisos = d.compromisos || []; d.presupuestos = d.presupuestos || []; d.metas = d.metas || []; return d; } } catch (e) {} return vacio(); }
   const FRECUENCIAS = { semanal: "Cada semana", quincenal: "Cada 15 días", mensual: "Cada mes", bimestral: "Cada 2 meses", trimestral: "Cada 3 meses", semestral: "Cada 6 meses", anual: "Cada año" };
   function siguiente(f, frec) {
     const [y, m, d] = f.split("-").map(Number);
@@ -75,29 +75,34 @@
   }
 
   async function finanzas(ambito) {
-    let cuentas, categorias, movimientos, cambio, compromisos;
+    let cuentas, categorias, movimientos, cambio, compromisos, presupuestos, metas;
     if (!nube) {
       let d = leer();
       if (!delAmbito(d.categorias, ambito).length) { await sembrar(ambito); d = leer(); }
-      cuentas = delAmbito(d.cuentas, ambito); categorias = delAmbito(d.categorias, ambito); movimientos = delAmbito(d.movimientos, ambito); cambio = Number(d.cambio) || 7.75; compromisos = delAmbito(d.compromisos, ambito);
+      cuentas = delAmbito(d.cuentas, ambito); categorias = delAmbito(d.categorias, ambito); movimientos = delAmbito(d.movimientos, ambito); cambio = Number(d.cambio) || 7.75; compromisos = delAmbito(d.compromisos, ambito); presupuestos = delAmbito(d.presupuestos, ambito); metas = delAmbito(d.metas, ambito);
     } else {
       const uid = (await sb.auth.getUser()).data.user?.id;
       const filtro = q => ambito === "personal" ? q.eq("ambito", "personal").eq("dueno", uid) : q.eq("ambito", "empresa");
       let cat = await ok(await filtro(sb.from("fin_categorias").select("*")).order("orden"), "No se pudieron leer las categorías.");
       if (!cat.length) { await sembrar(ambito); cat = await ok(await filtro(sb.from("fin_categorias").select("*")).order("orden"), "No se pudieron leer las categorías."); }
-      const [cu, mv, aj, cm] = await Promise.all([
+      const [cu, mv, aj, cm, pr, mt] = await Promise.all([
         ok(await filtro(sb.from("fin_cuentas").select("*")).order("orden").order("id"), "No se pudieron leer las cuentas."),
         ok(await filtro(sb.from("fin_movimientos").select("*")).order("fecha", { ascending: false }).order("id", { ascending: false }).limit(5000), "No se pudieron leer los movimientos."),
         sb.from("ajustes").select("valor").eq("clave", "tipo_cambio").maybeSingle(),
-        filtro(sb.from("fin_compromisos").select("*")).order("proximo")
+        filtro(sb.from("fin_compromisos").select("*")).order("proximo"),
+        filtro(sb.from("fin_presupuestos").select("*")),
+        filtro(sb.from("fin_metas").select("*")).order("id")
       ]);
+      presupuestos = pr.error ? [] : pr.data; metas = mt.error ? [] : mt.data;
       cuentas = cu; categorias = cat; movimientos = mv; cambio = Number(aj.data && aj.data.valor && aj.data.valor.usd) || 7.75; compromisos = cm.error ? [] : cm.data;
     }
     const num = m => ({ ...m, monto: Number(m.monto), monto_destino: m.monto_destino == null ? null : Number(m.monto_destino) });
     movimientos = movimientos.map(num).sort((a, b) => String(b.fecha).localeCompare(String(a.fecha)) || b.id - a.id);
     cuentas = saldos(cuentas.map(c => ({ ...c, saldo_inicial: Number(c.saldo_inicial) })), movimientos);
     compromisos = compromisos.map(c => ({ ...c, monto: c.monto == null ? null : Number(c.monto) })).sort((a, b) => String(a.proximo).localeCompare(String(b.proximo)));
-    return { compromisos, cuentas, categorias: categorias.sort((a, b) => a.orden - b.orden || a.nombre.localeCompare(b.nombre, "es")), movimientos, cambio };
+    presupuestos = presupuestos.map(p => ({ ...p, monto: Number(p.monto) }));
+    metas = metas.map(m => { const ap = (m.aportes || []).map(a => ({ ...a, monto: Number(a.monto) })); return { ...m, objetivo: Number(m.objetivo), aportes: ap, ahorrado: r2(ap.reduce((s, a) => s + a.monto, 0)) }; });
+    return { presupuestos, metas, compromisos, cuentas, categorias: categorias.sort((a, b) => a.orden - b.orden || a.nombre.localeCompare(b.nombre, "es")), movimientos, cambio };
   }
 
   const enQ = (monto, moneda, cambio) => moneda === "USD" ? r2(monto * cambio) : r2(monto);
@@ -183,6 +188,35 @@
     await ok(await sb.from("ajustes").upsert({ clave: "tipo_cambio", valor: { usd: v } }, { onConflict: "clave" }), "No se pudo guardar el tipo de cambio. Solo lo cambia quien edita los datos de la empresa.");
   }
 
+  async function guardarPresupuestos(ambito, lista) {
+    const limpia = lista.map(x => ({ categoria_id: Number(x.categoria_id), monto: x.monto == null || x.monto === "" ? null : r2(x.monto) }));
+    if (limpia.some(x => x.monto != null && x.monto < 0)) throw new Error("El presupuesto no puede ser negativo.");
+    if (!nube) {
+      const d = leer();
+      limpia.forEach(x => { const i = d.presupuestos.findIndex(p => p.categoria_id === x.categoria_id); if (!(x.monto > 0)) { if (i >= 0) d.presupuestos.splice(i, 1); } else if (i >= 0) d.presupuestos[i].monto = x.monto; else d.presupuestos.push({ id: d.sig++, ambito, dueno: yoId(), ...x }); });
+      escribir(d); return;
+    }
+    const quitar = limpia.filter(x => !(x.monto > 0)).map(x => x.categoria_id), poner = limpia.filter(x => x.monto > 0);
+    if (quitar.length) await ok(await sb.from("fin_presupuestos").delete().in("categoria_id", quitar), "No se pudo guardar el presupuesto.");
+    if (poner.length) await ok(await sb.from("fin_presupuestos").upsert(poner.map(x => ({ ...x, ambito })), { onConflict: "categoria_id" }), "No se pudo guardar el presupuesto.");
+  }
+
+  async function guardarMeta(ambito, m) {
+    const datos = { nombre: t(m.nombre), objetivo: r2(m.objetivo), para: fechaO(m.para), activo: m.activo !== false, aportes: m.aportes || [] };
+    if (!datos.nombre) throw new Error("Escriba el nombre de la meta.");
+    if (!(datos.objetivo > 0)) throw new Error("Escriba cuánto quiere juntar.");
+    if (!nube) { const d = leer(); if (m.id) Object.assign(d.metas.find(x => x.id === m.id), datos); else d.metas.push({ id: d.sig++, ambito, dueno: yoId(), creado: new Date().toISOString(), ...datos }); escribir(d); return; }
+    if (m.id) await ok(await sb.from("fin_metas").update(datos).eq("id", m.id), "No se pudo guardar la meta.");
+    else await ok(await sb.from("fin_metas").insert({ ...datos, ambito }), "No se pudo guardar la meta.");
+  }
+  async function aportarMeta(m, a) {
+    const monto = r2(a.monto);
+    if (!monto) throw new Error("Escriba el monto.");
+    if (monto < 0 && -monto > m.ahorrado + 0.001) throw new Error("No puede sacar más de lo que lleva ahorrado.");
+    const aportes = [...(m.aportes || []).map(x => ({ fecha: x.fecha, monto: x.monto, nota: x.nota || null })), { fecha: fechaO(a.fecha) || hoy(), monto, nota: o(a.nota) }];
+    await guardarMeta(m.ambito, { ...m, aportes });
+  }
+
   async function guardarCompromiso(ambito, c) {
     const datos = { nombre: t(c.nombre), tipo: c.tipo === "unico" ? "unico" : "fijo", a_quien: o(c.a_quien), categoria_id: Number(c.categoria_id) || null, cuenta_id: Number(c.cuenta_id) || null, monto: c.monto == null || c.monto === "" ? null : r2(c.monto), variable: !!c.variable, frecuencia: FRECUENCIAS[c.frecuencia] ? c.frecuencia : "mensual", proximo: fechaO(c.proximo), aviso_dias: Math.max(0, Math.min(60, Number(c.aviso_dias) || 0)), activo: c.activo !== false, pagado_en: c.pagado_en || null, notas: o(c.notas) };
     if (!datos.nombre) throw new Error("Escriba qué se paga.");
@@ -216,6 +250,26 @@
     if (!cambios) return;
     if (!nube) { const d = leer(); Object.assign(d.compromisos.find(x => x.id === cid), cambios); escribir(d); return; }
     await sb.from("fin_compromisos").update(cambios).eq("id", cid);
+  }
+
+  async function presupuestosAlLimite() {
+    const p = yo(); if (!p) return [];
+    const ambs = [D.puede(p, "verFinanzas") ? "empresa" : null, D.puede(p, "finanzasPersonales") ? "personal" : null].filter(Boolean);
+    const mes = hoy().slice(0, 7), out = [];
+    for (const a of ambs) {
+      let pres, movs, cuentas, cats, cambio;
+      if (!nube) { const d = leer(); pres = delAmbito(d.presupuestos, a); if (!pres.length) continue; movs = delAmbito(d.movimientos, a).filter(m => m.tipo === "gasto" && !m.anulado && String(m.fecha).slice(0, 7) === mes); cuentas = delAmbito(d.cuentas, a); cats = delAmbito(d.categorias, a); cambio = Number(d.cambio) || 7.75; }
+      else {
+        const uid = (await sb.auth.getUser()).data.user?.id; const fl = q => a === "personal" ? q.eq("ambito", a).eq("dueno", uid) : q.eq("ambito", a);
+        const pr = await fl(sb.from("fin_presupuestos").select("categoria_id, monto")); pres = pr.error ? [] : pr.data; if (!pres.length) continue;
+        const [mv, cu, ct, aj] = await Promise.all([fl(sb.from("fin_movimientos").select("monto, cuenta_id, categoria_id").eq("tipo", "gasto").eq("anulado", false).gte("fecha", mes + "-01")), fl(sb.from("fin_cuentas").select("id, moneda")), fl(sb.from("fin_categorias").select("id, nombre")), sb.from("ajustes").select("valor").eq("clave", "tipo_cambio").maybeSingle()]);
+        movs = mv.data || []; cuentas = cu.data || []; cats = ct.data || []; cambio = Number(aj.data && aj.data.valor && aj.data.valor.usd) || 7.75;
+      }
+      const mon = Object.fromEntries(cuentas.map(c => [c.id, c.moneda])), nom = Object.fromEntries(cats.map(c => [c.id, c.nombre])), g = {};
+      movs.forEach(m => { if (m.categoria_id) g[m.categoria_id] = (g[m.categoria_id] || 0) + enQ(Number(m.monto), mon[m.cuenta_id], cambio); });
+      pres.forEach(x => { const gas = r2(g[x.categoria_id] || 0), mo = Number(x.monto); if (mo > 0 && gas >= mo * 0.9 && nom[x.categoria_id]) out.push({ ambito: a, nombre: nom[x.categoria_id], gastado: gas, monto: mo, pasa: gas > mo }); });
+    }
+    return out;
   }
 
   async function porPagarPronto() {
@@ -272,5 +326,5 @@
     return l.length;
   }
 
-  Object.assign(D, { FIN_FRECUENCIAS: FRECUENCIAS, guardarCompromiso, pagarCompromiso, revertirCompromiso, porPagarPronto, cuentasFin, ligarMovimiento, anularPorOrigen, actualizarPorOrigen, FIN_TIPOS_CUENTA: TIPOS_CUENTA, FIN_MONEDAS: MONEDAS, finanzas, enQ, guardarCuentaFin, guardarCategoriaFin, guardarMovimientoFin, anularMovimientoFin, guardarTipoCambio, fotoFin });
+  Object.assign(D, { presupuestosAlLimite, finSiguiente: siguiente, guardarPresupuestos, guardarMeta, aportarMeta, FIN_FRECUENCIAS: FRECUENCIAS, guardarCompromiso, pagarCompromiso, revertirCompromiso, porPagarPronto, cuentasFin, ligarMovimiento, anularPorOrigen, actualizarPorOrigen, FIN_TIPOS_CUENTA: TIPOS_CUENTA, FIN_MONEDAS: MONEDAS, finanzas, enQ, guardarCuentaFin, guardarCategoriaFin, guardarMovimientoFin, anularMovimientoFin, guardarTipoCambio, fotoFin });
 })();

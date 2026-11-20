@@ -44,6 +44,8 @@ window.EMT_FINANZAS = (() => {
           <div class="w"><span class="w-cab"><span class="icono gris">${ico("arrowR", 18)}</span></span><span class="l">Salió en ${esc(mesTxt(e.mes).split(" ")[0])}</span><b>${esc(Q(salio))}</b><small>${entro - salio >= 0 ? "Quedan " + esc(Q(entro - salio)) : "Faltan " + esc(Q(salio - entro))}</small></div>
         </div>
         ${pintarPorPagar(f, ambito)}
+        ${pintarPresupuesto(f, e.mes, porId)}
+        ${ambito === "personal" ? pintarMetas(f) : await pintarFlujo(f, porId)}
         <section class="caja"><div class="caja-cab"><h2>Cuentas</h2><button class="s-btn suave-b" type="button" data-nueva-cuenta>${ico("plus", 15)}Agregar cuenta</button></div>
           ${activas.length ? `<div class="lista">${activas.map(filaCuenta).join("")}</div>` : `<div class="vacio chico"><p>${ambito === "personal" ? "Agregue sus cuentas: banco, efectivo y tarjetas." : "Agregue las cuentas de la empresa: bancos, caja chica y tarjetas."} Cada una con lo que tiene hoy.</p></div>`}
           ${conUSD ? `<p class="suave fin-cambio">1 US$ = ${esc(Q(f.cambio))}<button class="s-ib" type="button" aria-label="Cambiar el tipo de cambio" data-cambio>${ico("pen", 14)}</button></p>` : ""}
@@ -93,6 +95,10 @@ window.EMT_FINANZAS = (() => {
       const ecat = ev.target.closest("[data-ed-cat]"); if (ecat) { editarCat(ambito, f.categorias.find(x => x.id === Number(ecat.dataset.edCat)), recargar); return; }
       if (ev.target.closest("[data-cambio]")) { cambio(f, recargar); return; }
       if (ev.target.closest("[data-retiro]")) { retiro(recargar); return; }
+      if (ev.target.closest("[data-presu]")) { presupuesto(ambito, f, e.mes, porId, recargar); return; }
+      if (ev.target.closest("[data-nueva-meta]")) { editarMeta(ambito, null, recargar); return; }
+      const emt = ev.target.closest("[data-ed-meta]"); if (emt) { editarMeta(ambito, f.metas.find(x => x.id === Number(emt.dataset.edMeta)), recargar); return; }
+      const apm = ev.target.closest("[data-aportar]"); if (apm) { aportar(f.metas.find(x => x.id === Number(apm.dataset.aportar)), recargar); return; }
       if (ev.target.closest("[data-nuevo-pp]")) { editarPP(ambito, null, f, recargar); return; }
       const epp = ev.target.closest("[data-ed-pp]"); if (epp) { editarPP(ambito, f.compromisos.find(x => x.id === Number(epp.dataset.edPp)), f, recargar); return; }
       const pg = ev.target.closest("[data-pagar]"); if (pg) { pagar(ambito, f.compromisos.find(x => x.id === Number(pg.dataset.pagar)), f, recargar); return; }
@@ -203,6 +209,106 @@ window.EMT_FINANZAS = (() => {
     return `<section class="caja"><div class="caja-cab"><h2>Por pagar</h2><button class="s-btn suave-b" type="button" data-nuevo-pp>${ico("plus", 15)}Agregar</button></div>
       ${act.length ? `<p class="suave fin-pp-res">${delMes.length ? `Este mes ${delMes.length === 1 ? "falta 1 pago" : `faltan ${delMes.length} pagos`} · ${esc(Q(total))}${delMes.some(c => c.monto == null || c.variable) ? " aprox." : ""}` : "Nada por pagar este mes."}</p><div class="lista">${act.map(fila).join("")}</div>`
         : `<div class="vacio chico"><p>${ambito === "personal" ? "Anote sus pagos fijos (colegio, luz, teléfono, tarjeta) y le avisamos antes de que venzan." : "Anote los gastos fijos (alquiler, luz, planilla) y lo que se le debe a cada proveedor. Le avisamos en Hoy antes de que venzan."}</p></div>`}</section>`;
+  }
+
+  const barra = (p, cls) => `<i class="mini-av fin-barra ${cls || ""}"><span style="transform:scaleX(${Math.max(0, Math.min(1, p))})"></span></i>`;
+  const gastadoMes = (f, mes, porId) => { const g = {}; f.movimientos.filter(m => !m.anulado && m.tipo === "gasto" && String(m.fecha).slice(0, 7) === mes && m.categoria_id).forEach(m => { g[m.categoria_id] = (g[m.categoria_id] || 0) + D.enQ(m.monto, (porId[m.cuenta_id] || {}).moneda, f.cambio); }); return g; };
+
+  function pintarPresupuesto(f, mes, porId) {
+    const { esc, ico, Q } = A();
+    const g = gastadoMes(f, mes, porId), cat = Object.fromEntries(f.categorias.map(c => [c.id, c]));
+    const l = f.presupuestos.filter(p => cat[p.categoria_id]).map(p => ({ ...p, cat: cat[p.categoria_id], gastado: g[p.categoria_id] || 0 })).sort((a, b) => b.gastado / b.monto - a.gastado / a.monto);
+    const tot = l.reduce((a, x) => a + x.monto, 0), gas = l.reduce((a, x) => a + x.gastado, 0), pasadas = l.filter(x => x.gastado > x.monto).length;
+    const res = l.length ? `Lleva ${Q(gas)} de ${Q(tot)}${pasadas ? ` · ${pasadas === 1 ? "1 categoría se pasó" : pasadas + " categorías se pasaron"}` : ""}` : "Sin presupuesto todavía";
+    return `<details class="caja plegable fin-pl"><summary><span class="pl-t"><h2>Presupuesto de ${esc(mesTxt(mes).split(" ")[0])}</h2><span class="suave ${pasadas ? "falta" : ""}">${esc(res)}</span></span><span class="chev">${ico("chev", 16, 2.2)}</span></summary><div class="pl-cuerpo">
+      ${l.length ? `<div class="lista">${l.map(x => { const p = x.gastado / x.monto, pasa = x.gastado > x.monto; return `<div class="fila fin-pr" style="cursor:default"><span><b>${esc(x.cat.nombre)}</b><small>${esc(Q(x.gastado))} de ${esc(Q(x.monto))}</small>${barra(p, pasa ? "pasa" : p >= .9 ? "casi" : "")}</span><span class="der"><span class="chip ${pasa ? "ambar" : p >= .9 ? "laton" : "verde"}">${pasa ? "Se pasó " + esc(Q(x.gastado - x.monto)) : "Le quedan " + esc(Q(x.monto - x.gastado))}</span></span></div>`; }).join("")}</div>` : `<p class="suave" style="margin:0;font-size:14px">Ponga cuánto quiere gastar al mes en cada categoría y aquí verá cuánto lleva.</p>`}
+      <button class="s-btn suave-b chico" type="button" data-presu>${ico("pen", 14)}${l.length ? "Cambiar el presupuesto" : "Poner presupuesto"}</button>
+    </div></details>`;
+  }
+
+  function presupuesto(ambito, f, mes, porId, recargar) {
+    const { modal, esc, Q, numero, montoTxt, cerrarCapas, aviso } = A();
+    const [y, m] = mes.split("-").map(Number), ant = new Date(Date.UTC(y, m - 2, 1)).toISOString().slice(0, 7);
+    const gAnt = gastadoMes(f, ant, porId), pres = Object.fromEntries(f.presupuestos.map(p => [p.categoria_id, p.monto]));
+    const cats = f.categorias.filter(c => c.tipo === "gasto" && c.activo !== false);
+    modal({
+      titulo: "Presupuesto de cada mes", guardarTxt: "Guardar presupuesto",
+      cuerpo: `<p class="suave" style="font-size:13.5px;margin:0">Cuánto quiere gastar al mes en cada categoría. Deje vacío lo que no quiera controlar.</p>
+        <div class="f-mats fin-presu">${cats.map(c => `<div class="f-mat"><span><b>${esc(c.nombre)}</b><small>${gAnt[c.id] ? "El mes pasado: " + esc(Q(gAnt[c.id])) : "El mes pasado: nada"}</small></span><label class="f-cant"><span class="sr">Presupuesto de ${esc(c.nombre)}</span><span class="f-monto"><span>Q</span><input inputmode="decimal" data-pres="${c.id}" value="${esc(montoTxt(pres[c.id]))}" placeholder="0.00" autocomplete="off"></span></label></div>`).join("")}</div>`,
+      alAbrir: fm => fm.querySelectorAll("[data-pres]").forEach(i => i.addEventListener("blur", () => { try { i.value = montoTxt(numero(i.value)); } catch (e) {} })),
+      alGuardar: async fm => {
+        const l = [...fm.querySelectorAll("[data-pres]")].map(i => { let n; try { n = numero(i.value); } catch (e) { throw new Error("Revise los montos: solo números."); } return { categoria_id: Number(i.dataset.pres), monto: n }; });
+        await D.guardarPresupuestos(ambito, l); cerrarCapas(); aviso("Presupuesto guardado."); await recargar();
+      }
+    });
+  }
+
+  function pintarMetas(f) {
+    const { esc, ico, Q } = A();
+    const l = f.metas.filter(m => m.activo !== false);
+    const mesesA = para => { const [y, m] = hoy().split("-").map(Number), [y2, m2] = String(para).split("-").map(Number); return Math.max(1, (y2 - y) * 12 + (m2 - m)); };
+    const res = l.length ? `${l.length === 1 ? "1 meta" : l.length + " metas"} · ${Q(l.reduce((a, m) => a + m.ahorrado, 0))} ahorrado` : "Ninguna todavía";
+    return `<details class="caja plegable fin-pl"><summary><span class="pl-t"><h2>Metas de ahorro</h2><span class="suave">${esc(res)}</span></span><span class="chev">${ico("chev", 16, 2.2)}</span></summary><div class="pl-cuerpo">
+      ${l.length ? `<div class="lista">${l.map(m => { const p = m.ahorrado / m.objetivo, falta = Math.max(0, m.objetivo - m.ahorrado); return `<div class="fila con-lapiz fin-meta" style="cursor:default"><span class="icono ${p >= 1 ? "verde" : "mezcla"} chico">${ico(p >= 1 ? "check" : "chart", 15)}</span><span><b>${esc(m.nombre)}</b><small>${esc(Q(m.ahorrado))} de ${esc(Q(m.objetivo))}${p >= 1 ? " · ¡Lograda!" : ` · faltan ${esc(Q(falta))}`}${m.para && p < 1 ? ` · para ${esc(fCorta(m.para))}: ${esc(Q(falta / mesesA(m.para)))} al mes` : ""}</small>${barra(p, p >= 1 ? "lista" : "")}</span><span class="acc"><button class="s-btn suave-b chico" type="button" data-aportar="${m.id}">Aportar</button><button class="s-ib" type="button" aria-label="Editar ${esc(m.nombre)}" data-ed-meta="${m.id}">${ico("pen", 15)}</button></span></div>`; }).join("")}</div>` : `<p class="suave" style="margin:0;font-size:14px">Por ejemplo: fondo de emergencia, el carro o un viaje. Ponga cuánto quiere juntar y para cuándo, y le decimos cuánto apartar al mes.</p>`}
+      <button class="s-btn suave-b chico" type="button" data-nueva-meta>${ico("plus", 14)}Agregar meta</button>
+    </div></details>`;
+  }
+
+  function editarMeta(ambito, m0, recargar) {
+    const { modal, esc, campoMonto, formatoAlSalir, numero, cerrarCapas, aviso, ico } = A();
+    modal({
+      titulo: m0 ? "Editar meta" : "Meta nueva",
+      extra: m0 ? `<button class="s-btn suave-b" type="button" data-arch-meta>${ico("box", 15)}Archivar</button>` : "",
+      cuerpo: `<label class="f-campo">Para qué<input name="nombre" value="${esc(m0 ? m0.nombre : "")}" placeholder="Ej. Fondo de emergencia" autocomplete="off"></label>
+        <div class="f-fila">${campoMonto("objetivo", "Cuánto quiere juntar", m0 ? m0.objetivo : null)}<label class="f-campo">Para cuándo <small class="suave">opcional</small><input type="date" name="para" value="${esc(m0 && m0.para || "")}"></label></div>
+        ${m0 ? "" : campoMonto("ya", "Ya tiene ahorrado", null, "Opcional.")}`,
+      alAbrir: (fm, mm) => { formatoAlSalir(fm); mm.addEventListener("click", async ev => { if (!ev.target.closest("[data-arch-meta]")) return; try { await D.guardarMeta(ambito, { ...m0, activo: false }); cerrarCapas(); aviso("Meta archivada."); await recargar(); } catch (err) { aviso(err.message, "mal"); } }); },
+      alGuardar: async fm => {
+        const ya = m0 ? null : numero(fm.ya.value);
+        await D.guardarMeta(ambito, { ...(m0 || {}), nombre: fm.nombre.value, objetivo: numero(fm.objetivo.value), para: fm.para.value, aportes: m0 ? m0.aportes : (ya > 0 ? [{ fecha: hoy(), monto: ya, nota: "Lo que ya tenía" }] : []) });
+        cerrarCapas(); aviso(m0 ? "Meta guardada." : "Meta agregada."); await recargar();
+      }
+    });
+  }
+
+  function aportar(m, recargar) {
+    const { modal, esc, Q, campoMonto, formatoAlSalir, numero, cerrarCapas, aviso } = A();
+    let sacar = false;
+    modal({
+      titulo: m.nombre, guardarTxt: "Anotar",
+      cuerpo: `<p class="suave" style="font-size:13.5px;margin:0">Lleva ${esc(Q(m.ahorrado))} de ${esc(Q(m.objetivo))}.</p>
+        <div class="seg ancho" role="group" aria-label="Qué hace">${[["no", "Aportar"], ["si", "Sacar"]].map(([k, n]) => `<button type="button" data-sacar="${k}" aria-pressed="${k === "no"}">${n}</button>`).join("")}</div>
+        <div class="f-fila">${campoMonto("monto", "Monto", null)}<label class="f-campo">Fecha<input type="date" name="fecha" value="${hoy()}" max="${hoy()}"></label></div>
+        <label class="f-campo">Nota<input name="nota" autocomplete="off"></label>
+        ${m.aportes.length ? `<details class="plegable-l"><summary>Lo anotado · ${m.aportes.length}</summary><div class="lista">${m.aportes.slice().reverse().map(a => `<div class="fila" style="cursor:default"><span><b>${esc(fCorta(a.fecha))}</b><small>${esc(a.nota || "")}</small></span><span class="der"><span class="e-cifra ${a.monto < 0 ? "falta" : "fin-mas"}">${a.monto < 0 ? "−" : "+"}${esc(Q(Math.abs(a.monto)))}</span></span></div>`).join("")}</div></details>` : ""}`,
+      alAbrir: (fm, mm) => { formatoAlSalir(fm); mm.addEventListener("click", ev => { const b = ev.target.closest("[data-sacar]"); if (!b) return; sacar = b.dataset.sacar === "si"; mm.querySelectorAll("[data-sacar]").forEach(x => x.setAttribute("aria-pressed", String(x === b))); }); },
+      alGuardar: async fm => { const n = numero(fm.monto.value); if (!(n > 0)) throw new Error("Escriba el monto."); await D.aportarMeta(m, { monto: sacar ? -n : n, fecha: fm.fecha.value, nota: fm.nota.value }); cerrarCapas(); aviso(sacar ? "Anotado lo que sacó." : "Aporte anotado."); await recargar(); }
+    });
+  }
+
+  async function pintarFlujo(f, porId) {
+    const { esc, ico, Q } = A();
+    const p = A().sesion().perfil, h = hoy(), lim = (() => { const x = new Date(Date.UTC(...h.split("-").map((n, i) => i === 1 ? n - 1 : Number(n)))); x.setUTCDate(x.getUTCDate() + 90); return x.toISOString().slice(0, 10); })();
+    const inicio = f.cuentas.filter(c => c.activo !== false && c.tipo !== "tarjeta").reduce((a, c) => a + D.enQ(c.saldo, c.moneda, f.cambio), 0);
+    const ev = [], sinFecha = { cobro: 0, n: 0 };
+    if (D.puede(p, "verCobros") && D.resumenCobros) { try { const r = await D.resumenCobros(); r.pendientes.forEach(x => { if (!x.vence) { sinFecha.cobro += x.saldo; sinFecha.n++; return; } if (x.vence <= lim) ev.push({ f: x.vence < h ? h : x.vence, m: x.saldo, t: `Cobro: ${x.cliente ? x.cliente.nombre : ""} · ${x.descripcion}` }); }); } catch (e) {} }
+    let variables = 0;
+    f.compromisos.filter(c => c.activo !== false).forEach(c => {
+      if (c.monto == null) { variables++; return; }
+      let d = c.proximo, k = 0;
+      while (d <= lim && k < 60) { ev.push({ f: d < h ? h : d, m: -c.monto, t: `Pago: ${c.nombre}` }); if (c.tipo === "unico") break; d = D.finSiguiente(d, c.frecuencia); k++; }
+    });
+    ev.sort((a, b) => a.f.localeCompare(b.f) || b.m - a.m);
+    let s = inicio, bajo = { s: inicio, f: h }, negativo = null;
+    ev.forEach(x => { s += x.m; x.s = s; if (s < bajo.s) bajo = { s, f: x.f }; if (s < 0 && !negativo) negativo = x; });
+    const en = dias => { const x = new Date(Date.UTC(...h.split("-").map((n, i) => i === 1 ? n - 1 : Number(n)))); x.setUTCDate(x.getUTCDate() + dias); const lf = x.toISOString().slice(0, 10); const u = ev.filter(e => e.f <= lf).pop(); return u ? u.s : inicio; };
+    const res = negativo ? `El ${fCorta(negativo.f)} faltarían ${Q(-negativo.s)}` : `El punto más bajo: ${Q(bajo.s)}${bajo.f !== h ? " el " + fCorta(bajo.f) : ""}`;
+    return `<details class="caja plegable fin-pl"><summary><span class="pl-t"><h2>Flujo de los próximos 90 días</h2><span class="suave ${negativo ? "falta" : ""}">${esc(res)}</span></span><span class="chev">${ico("chev", 16, 2.2)}</span></summary><div class="pl-cuerpo">
+      <div class="fin-flujo">${[["Hoy", inicio], ["En 30 días", en(30)], ["En 60 días", en(60)], ["En 90 días", en(90)]].map(([t2, n]) => `<div><small>${t2}</small><b class="e-cifra ${n < 0 ? "falta" : ""}">${esc(Q(n))}</b></div>`).join("")}</div>
+      ${negativo ? `<p class="aviso-cot">${ico("alerta", 15)}<span>El ${esc(fCorta(negativo.f))} no alcanzaría: faltarían ${esc(Q(-negativo.s))}. Adelante un cobro o mueva un pago.</span></p>` : ""}
+      ${ev.length ? `<div class="lista">${ev.slice(0, 20).map(x => `<div class="fila" style="cursor:default"><span><b>${esc(x.t)}</b><small>${esc(fCorta(x.f))} · queda ${esc(Q(x.s))}</small></span><span class="der"><span class="e-cifra ${x.m > 0 ? "fin-mas" : ""}">${x.m > 0 ? "+" : "−"}${esc(Q(Math.abs(x.m)))}</span></span></div>`).join("")}</div>${ev.length > 20 ? `<p class="suave" style="font-size:13px;margin:0">y ${ev.length - 20} más</p>` : ""}` : `<p class="suave" style="margin:0;font-size:14px">No hay cobros ni pagos con fecha en los próximos 90 días.</p>`}
+      <p class="suave" style="font-size:12.5px;margin:0">Sale de lo que hay hoy en las cuentas (sin tarjetas), más los cobros de obras con fecha, menos lo que está en Por pagar.${sinFecha.n ? ` Hay ${esc(Q(sinFecha.cobro))} por cobrar sin fecha que no se cuentan.` : ""}${variables ? ` ${variables === 1 ? "1 pago" : variables + " pagos"} sin monto fijo no se cuentan.` : ""}</p>
+    </div></details>`;
   }
 
   function pagar(ambito, c, f, recargar) {
