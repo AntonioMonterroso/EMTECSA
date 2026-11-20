@@ -10,6 +10,9 @@ window.EMT_FINANZAS = (() => {
   const fLarga = f => { const [y, m, d] = String(f).slice(0, 10).split("-").map(Number); return new Date(y, m - 1, d).toLocaleDateString("es-GT", { weekday: "long", day: "numeric", month: "long" }); };
   const mesTxt = m => { const [y, n] = m.split("-").map(Number); return new Date(y, n - 1, 1).toLocaleDateString("es-GT", { month: "long", year: "numeric" }); };
   const ORIGEN = { pago: "viene de Cobros", gasto_obra: "gasto de obra", retiro: "sacado de la empresa" };
+  const fCorta = f => { const [y, m, d] = String(f).slice(0, 10).split("-").map(Number); return new Date(y, m - 1, d).toLocaleDateString("es-GT", { day: "numeric", month: "short" }); };
+  const diasA = f => Math.round((Date.UTC(...String(f).split("-").map((n, i) => i === 1 ? n - 1 : Number(n))) - Date.UTC(...hoy().split("-").map((n, i) => i === 1 ? n - 1 : Number(n)))) / 864e5);
+  const venceTxt = f => { const n = diasA(f); return n < 0 ? (n === -1 ? "Venció ayer" : `Venció hace ${-n} días`) : n === 0 ? "Vence hoy" : n === 1 ? "Vence mañana" : `En ${n} días`; };
   const dinero = (n, moneda) => moneda === "USD" ? "US$ " + Number(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : A().Q(n);
 
   async function vista(v, ambito) {
@@ -40,6 +43,7 @@ window.EMT_FINANZAS = (() => {
           <div class="w"><span class="w-cab"><span class="icono verde">${ico("download", 18)}</span></span><span class="l">Entró en ${esc(mesTxt(e.mes).split(" ")[0])}</span><b>${esc(Q(entro))}</b><small>${(n => n + (n === 1 ? " ingreso" : " ingresos"))(delMes.filter(m => m.tipo === "ingreso").length)}</small></div>
           <div class="w"><span class="w-cab"><span class="icono gris">${ico("arrowR", 18)}</span></span><span class="l">Salió en ${esc(mesTxt(e.mes).split(" ")[0])}</span><b>${esc(Q(salio))}</b><small>${entro - salio >= 0 ? "Quedan " + esc(Q(entro - salio)) : "Faltan " + esc(Q(salio - entro))}</small></div>
         </div>
+        ${pintarPorPagar(f, ambito)}
         <section class="caja"><div class="caja-cab"><h2>Cuentas</h2><button class="s-btn suave-b" type="button" data-nueva-cuenta>${ico("plus", 15)}Agregar cuenta</button></div>
           ${activas.length ? `<div class="lista">${activas.map(filaCuenta).join("")}</div>` : `<div class="vacio chico"><p>${ambito === "personal" ? "Agregue sus cuentas: banco, efectivo y tarjetas." : "Agregue las cuentas de la empresa: bancos, caja chica y tarjetas."} Cada una con lo que tiene hoy.</p></div>`}
           ${conUSD ? `<p class="suave fin-cambio">1 US$ = ${esc(Q(f.cambio))}<button class="s-ib" type="button" aria-label="Cambiar el tipo de cambio" data-cambio>${ico("pen", 14)}</button></p>` : ""}
@@ -89,6 +93,9 @@ window.EMT_FINANZAS = (() => {
       const ecat = ev.target.closest("[data-ed-cat]"); if (ecat) { editarCat(ambito, f.categorias.find(x => x.id === Number(ecat.dataset.edCat)), recargar); return; }
       if (ev.target.closest("[data-cambio]")) { cambio(f, recargar); return; }
       if (ev.target.closest("[data-retiro]")) { retiro(recargar); return; }
+      if (ev.target.closest("[data-nuevo-pp]")) { editarPP(ambito, null, f, recargar); return; }
+      const epp = ev.target.closest("[data-ed-pp]"); if (epp) { editarPP(ambito, f.compromisos.find(x => x.id === Number(epp.dataset.edPp)), f, recargar); return; }
+      const pg = ev.target.closest("[data-pagar]"); if (pg) { pagar(ambito, f.compromisos.find(x => x.id === Number(pg.dataset.pagar)), f, recargar); return; }
     };
   }
 
@@ -167,7 +174,7 @@ window.EMT_FINANZAS = (() => {
           if (ev.target.closest("[data-ver-foto]")) { const u = await D.fotoFin(m0.foto); if (!u) { aviso("No se encontró el recibo.", "mal"); return; } const w = window.open(u, "_blank"); if (w) w.opener = null; return; }
           if (ev.target.closest("[data-anular]")) {
             const c2 = modal({ titulo: "¿Anular el movimiento?", guardarTxt: "Anular", cuerpo: `<p class="suave" style="font-size:14.5px">No se borra: queda anulado y deja de contar en el saldo. Si tenía un error, anúlelo y regístrelo otra vez.</p><label class="f-campo">Motivo<input name="motivo" autocomplete="off"></label>`,
-              alGuardar: async f2 => { if (ret) await D.anularPorOrigen("retiro", m0.origen_id, f2.motivo.value); else await D.anularMovimientoFin(m0.id, f2.motivo.value); cerrarCapas(); aviso(ret ? "Anulado en la empresa y en lo personal." : "Movimiento anulado."); await recargar(); } });
+              alGuardar: async f2 => { if (ret) await D.anularPorOrigen("retiro", m0.origen_id, f2.motivo.value); else await D.anularMovimientoFin(m0.id, f2.motivo.value); if (m0.origen === "compromiso") await D.revertirCompromiso(m0.origen_id).catch(() => {}); cerrarCapas(); aviso(ret ? "Anulado en la empresa y en lo personal." : "Movimiento anulado."); await recargar(); } });
             c2.querySelector("[data-guardar]").classList.add("peligro-b");
           }
         });
@@ -184,6 +191,70 @@ window.EMT_FINANZAS = (() => {
       }
     });
     return m;
+  }
+
+  function pintarPorPagar(f, ambito) {
+    const { esc, ico, Q } = A();
+    const act = f.compromisos.filter(c => c.activo !== false);
+    const porCuenta = Object.fromEntries(f.cuentas.map(c => [c.id, c]));
+    const mes = hoy().slice(0, 7), delMes = act.filter(c => String(c.proximo).slice(0, 7) <= mes);
+    const total = delMes.reduce((a, c) => a + (c.monto || 0), 0);
+    const fila = c => { const n = diasA(c.proximo), cu = porCuenta[c.cuenta_id]; return `<div class="fila con-lapiz fin-pp" style="cursor:default"><span class="icono ${n < 0 ? "ambar" : n <= (c.aviso_dias || 0) ? "laton" : "gris"} chico">${ico("clock", 15)}</span><span><b>${esc(c.nombre)}</b><small>${esc([c.a_quien, c.tipo === "unico" ? "Una sola vez" : D.FIN_FRECUENCIAS[c.frecuencia], cu ? cu.nombre : ""].filter(Boolean).join(" · "))}</small></span><span class="der"><b class="e-cifra">${c.monto != null ? esc((c.variable ? "≈ " : "") + Q(c.monto)) : "Variable"}</b><small><span class="chip ${n < 0 ? "ambar" : n <= (c.aviso_dias || 0) ? "laton" : "gris"}">${esc(venceTxt(c.proximo))} · ${esc(fCorta(c.proximo))}</span></small></span><span class="acc"><button class="s-btn suave-b chico" type="button" data-pagar="${c.id}">Pagar</button><button class="s-ib" type="button" aria-label="Editar ${esc(c.nombre)}" data-ed-pp="${c.id}">${ico("pen", 15)}</button></span></div>`; };
+    return `<section class="caja"><div class="caja-cab"><h2>Por pagar</h2><button class="s-btn suave-b" type="button" data-nuevo-pp>${ico("plus", 15)}Agregar</button></div>
+      ${act.length ? `<p class="suave fin-pp-res">${delMes.length ? `Este mes ${delMes.length === 1 ? "falta 1 pago" : `faltan ${delMes.length} pagos`} · ${esc(Q(total))}${delMes.some(c => c.monto == null || c.variable) ? " aprox." : ""}` : "Nada por pagar este mes."}</p><div class="lista">${act.map(fila).join("")}</div>`
+        : `<div class="vacio chico"><p>${ambito === "personal" ? "Anote sus pagos fijos (colegio, luz, teléfono, tarjeta) y le avisamos antes de que venzan." : "Anote los gastos fijos (alquiler, luz, planilla) y lo que se le debe a cada proveedor. Le avisamos en Hoy antes de que venzan."}</p></div>`}</section>`;
+  }
+
+  function pagar(ambito, c, f, recargar) {
+    const { modal, esc, campoMonto, formatoAlSalir, numero, cerrarCapas, aviso, ico } = A();
+    const cuentas = f.cuentas.filter(x => x.activo !== false);
+    if (!cuentas.length) { aviso("Primero agregue una cuenta.", "mal"); return; }
+    let archivo = null;
+    modal({
+      titulo: `Pagar ${c.nombre}`, guardarTxt: "Anotar el pago",
+      cuerpo: `<p class="suave" style="font-size:13.5px;margin:0">${esc(c.a_quien || "")}${c.a_quien ? " · " : ""}${esc(venceTxt(c.proximo))} (${esc(fCorta(c.proximo))})${c.tipo === "fijo" ? ` · el próximo queda para el ${esc(fCorta(siguienteTxt(c)))}` : ""}</p>
+        <div class="f-fila">${campoMonto("monto", "Monto pagado", c.monto)}<label class="f-campo">Fecha<input type="date" name="fecha" value="${hoy()}" max="${hoy()}"></label></div>
+        <label class="f-campo">Sale de la cuenta<select name="cuenta">${cuentas.map(x => `<option value="${x.id}" ${x.id === c.cuenta_id ? "selected" : ""}>${esc(x.nombre)}${x.moneda === "USD" ? " (US$)" : ""}</option>`).join("")}</select></label>
+        <label class="f-campo">Referencia<input name="ref" autocomplete="off" placeholder="No. de boleta, cheque o transferencia"></label>
+        <div class="f-campo"><span>Recibo <small class="suave">opcional</small></span><div class="ficha-fila"><span data-foto-est><small>Sin recibo</small></span><span class="acc"><label class="s-btn suave-b chico">${ico("plus", 14)}Foto<input type="file" accept="image/*,application/pdf" hidden data-foto></label></span></div></div>`,
+      alAbrir: fm => { formatoAlSalir(fm); fm.addEventListener("change", ev => { if (ev.target.matches("[data-foto]") && ev.target.files[0]) { archivo = ev.target.files[0]; fm.querySelector("[data-foto-est]").innerHTML = `${ico("file", 15)}<b>${esc(archivo.name)}</b>`; } }); },
+      alGuardar: async fm => { await D.pagarCompromiso(ambito, c, { monto: numero(fm.monto.value), fecha: fm.fecha.value, cuenta_id: fm.cuenta.value, referencia: fm.ref.value }, archivo); cerrarCapas(); aviso(c.tipo === "fijo" ? "Pago anotado. El próximo ya quedó en su fecha." : "Pago anotado."); await recargar(); }
+    });
+  }
+  const siguienteTxt = c => { const [y, m, d] = c.proximo.split("-").map(Number); if (c.frecuencia === "semanal" || c.frecuencia === "quincenal") return new Date(Date.UTC(y, m - 1, d + (c.frecuencia === "semanal" ? 7 : 15))).toISOString().slice(0, 10); const k = { mensual: 1, bimestral: 2, trimestral: 3, semestral: 6, anual: 12 }[c.frecuencia] || 1; const ult = new Date(Date.UTC(y, m - 1 + k + 1, 0)).getUTCDate(); return new Date(Date.UTC(y, m - 1 + k, Math.min(d, ult))).toISOString().slice(0, 10); };
+
+  async function editarPP(ambito, c0, f, recargar) {
+    const { modal, esc, campoMonto, formatoAlSalir, numero, cerrarCapas, aviso, ico } = A();
+    const c = c0 || { tipo: "fijo", frecuencia: "mensual", proximo: hoy(), aviso_dias: 3 };
+    let tipo = c.tipo;
+    const provs = ambito === "empresa" && D.proveedores ? ((await D.proveedores().catch(() => ({ proveedores: [] }))).proveedores || []) : [];
+    const cats = f.categorias.filter(x => x.tipo === "gasto" && (x.activo !== false || x.id === c.categoria_id));
+    const cuentas = f.cuentas.filter(x => x.activo !== false || x.id === c.cuenta_id);
+    modal({
+      titulo: c0 ? "Editar pago" : "Agregar a Por pagar",
+      extra: c0 ? `<button class="s-btn suave-b" type="button" data-pp-fin>${ico("box", 15)}Ya no se paga</button>` : "",
+      cuerpo: `<div class="seg ancho" role="group" aria-label="Cada cuánto">${[["fijo", "Se repite"], ["unico", "Una sola vez"]].map(([k, n]) => `<button type="button" data-ppt="${k}" aria-pressed="${tipo === k}">${n}</button>`).join("")}</div>
+        <label class="f-campo">Qué se paga<input name="nombre" value="${esc(c.nombre || "")}" placeholder="${ambito === "personal" ? "Ej. Colegio de los niños" : "Ej. Alquiler de la bodega"}" autocomplete="off"></label>
+        <label class="f-campo">A quién<input name="a_quien" list="pp-provs" value="${esc(c.a_quien || "")}" autocomplete="off"></label>${provs.length ? `<datalist id="pp-provs">${provs.map(p => `<option value="${esc(p.nombre)}">`).join("")}</datalist>` : ""}
+        <div class="f-fila">${campoMonto("monto", "Monto", c.monto)}<label class="f-campo"><span data-et-fecha>${tipo === "unico" ? "Vence el" : "Próximo pago"}</span><input type="date" name="proximo" value="${esc(c.proximo || hoy())}"></label></div>
+        <label class="f-check"><input type="checkbox" name="variable" ${c.variable ? "checked" : ""}><span>El monto cambia cada vez (luz, agua, teléfono…)</span></label>
+        <div class="f-fila"><label class="f-campo" data-frec ${tipo === "unico" ? "hidden" : ""}>Cada cuánto<select name="frecuencia">${Object.entries(D.FIN_FRECUENCIAS).map(([k, n]) => `<option value="${k}" ${c.frecuencia === k ? "selected" : ""}>${n}</option>`).join("")}</select></label>
+        <label class="f-campo">Avisar antes<select name="aviso">${[0, 1, 2, 3, 5, 7, 10, 15].map(n => `<option value="${n}" ${Number(c.aviso_dias) === n ? "selected" : ""}>${n === 0 ? "El mismo día" : n === 1 ? "1 día antes" : n + " días antes"}</option>`).join("")}</select></label></div>
+        <div class="f-fila"><label class="f-campo">Categoría<select name="categoria"><option value="">Sin categoría</option>${cats.map(x => `<option value="${x.id}" ${x.id === c.categoria_id ? "selected" : ""}>${esc(x.nombre)}</option>`).join("")}</select></label>
+        <label class="f-campo">Se paga de<select name="cuenta"><option value="">Escoger al pagar</option>${cuentas.map(x => `<option value="${x.id}" ${x.id === c.cuenta_id ? "selected" : ""}>${esc(x.nombre)}</option>`).join("")}</select></label></div>
+        <label class="f-campo">Notas<input name="notas" value="${esc(c.notas || "")}" autocomplete="off"></label>`,
+      alAbrir: (fm, mm) => {
+        formatoAlSalir(fm);
+        mm.addEventListener("click", async ev => {
+          const b = ev.target.closest("[data-ppt]"); if (b) { tipo = b.dataset.ppt; mm.querySelectorAll("[data-ppt]").forEach(x => x.setAttribute("aria-pressed", String(x === b))); fm.querySelector("[data-frec]").hidden = tipo === "unico"; fm.querySelector("[data-et-fecha]").textContent = tipo === "unico" ? "Vence el" : "Próximo pago"; return; }
+          if (ev.target.closest("[data-pp-fin]")) { try { await D.guardarCompromiso(ambito, { ...c0, activo: false }); cerrarCapas(); aviso("Quitado de Por pagar. Los pagos ya anotados se quedan."); await recargar(); } catch (err) { aviso(err.message, "mal"); } }
+        });
+      },
+      alGuardar: async fm => {
+        await D.guardarCompromiso(ambito, { ...c0, tipo, nombre: fm.nombre.value, a_quien: fm.a_quien.value, monto: numero(fm.monto.value), variable: fm.variable.checked, frecuencia: fm.frecuencia.value, proximo: fm.proximo.value, aviso_dias: fm.aviso.value, categoria_id: fm.categoria.value, cuenta_id: fm.cuenta.value, notas: fm.notas.value });
+        cerrarCapas(); aviso(c0 ? "Guardado." : "Agregado a Por pagar."); await recargar();
+      }
+    });
   }
 
   async function retiro(recargar) {

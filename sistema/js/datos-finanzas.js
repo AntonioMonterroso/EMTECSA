@@ -23,8 +23,16 @@
   const yo = () => { const s = window.EMT_APP && window.EMT_APP.sesion(); return s ? s.perfil : null; };
   const yoId = () => { const p = yo(); return p ? String(p.id) : "local"; };
 
-  const vacio = () => ({ v: 1, sig: 1, cuentas: [], categorias: [], movimientos: [], cambio: 7.75 });
-  function leer() { try { const d = JSON.parse(localStorage.getItem(CLAVE)); if (d && d.v === 1) return d; } catch (e) {} return vacio(); }
+  const vacio = () => ({ v: 1, sig: 1, cuentas: [], categorias: [], movimientos: [], compromisos: [], cambio: 7.75 });
+  function leer() { try { const d = JSON.parse(localStorage.getItem(CLAVE)); if (d && d.v === 1) { d.compromisos = d.compromisos || []; return d; } } catch (e) {} return vacio(); }
+  const FRECUENCIAS = { semanal: "Cada semana", quincenal: "Cada 15 días", mensual: "Cada mes", bimestral: "Cada 2 meses", trimestral: "Cada 3 meses", semestral: "Cada 6 meses", anual: "Cada año" };
+  function siguiente(f, frec) {
+    const [y, m, d] = f.split("-").map(Number);
+    if (frec === "semanal" || frec === "quincenal") { const x = new Date(Date.UTC(y, m - 1, d + (frec === "semanal" ? 7 : 15))); return x.toISOString().slice(0, 10); }
+    const meses = { mensual: 1, bimestral: 2, trimestral: 3, semestral: 6, anual: 12 }[frec] || 1;
+    const ult = new Date(Date.UTC(y, m - 1 + meses + 1, 0)).getUTCDate();
+    return new Date(Date.UTC(y, m - 1 + meses, Math.min(d, ult))).toISOString().slice(0, 10);
+  }
   function escribir(d) { try { localStorage.setItem(CLAVE, JSON.stringify(d)); } catch (e) { throw new Error("No se pudo guardar en este equipo. Revise el espacio libre."); } }
   async function ok(r, msg) { if (r.error) throw new Error(msg); return r.data; }
   const delAmbito = (l, ambito) => l.filter(x => x.ambito === ambito && (ambito === "empresa" || String(x.dueno) === yoId()));
@@ -67,27 +75,29 @@
   }
 
   async function finanzas(ambito) {
-    let cuentas, categorias, movimientos, cambio;
+    let cuentas, categorias, movimientos, cambio, compromisos;
     if (!nube) {
       let d = leer();
       if (!delAmbito(d.categorias, ambito).length) { await sembrar(ambito); d = leer(); }
-      cuentas = delAmbito(d.cuentas, ambito); categorias = delAmbito(d.categorias, ambito); movimientos = delAmbito(d.movimientos, ambito); cambio = Number(d.cambio) || 7.75;
+      cuentas = delAmbito(d.cuentas, ambito); categorias = delAmbito(d.categorias, ambito); movimientos = delAmbito(d.movimientos, ambito); cambio = Number(d.cambio) || 7.75; compromisos = delAmbito(d.compromisos, ambito);
     } else {
       const uid = (await sb.auth.getUser()).data.user?.id;
       const filtro = q => ambito === "personal" ? q.eq("ambito", "personal").eq("dueno", uid) : q.eq("ambito", "empresa");
       let cat = await ok(await filtro(sb.from("fin_categorias").select("*")).order("orden"), "No se pudieron leer las categorías.");
       if (!cat.length) { await sembrar(ambito); cat = await ok(await filtro(sb.from("fin_categorias").select("*")).order("orden"), "No se pudieron leer las categorías."); }
-      const [cu, mv, aj] = await Promise.all([
+      const [cu, mv, aj, cm] = await Promise.all([
         ok(await filtro(sb.from("fin_cuentas").select("*")).order("orden").order("id"), "No se pudieron leer las cuentas."),
         ok(await filtro(sb.from("fin_movimientos").select("*")).order("fecha", { ascending: false }).order("id", { ascending: false }).limit(5000), "No se pudieron leer los movimientos."),
-        sb.from("ajustes").select("valor").eq("clave", "tipo_cambio").maybeSingle()
+        sb.from("ajustes").select("valor").eq("clave", "tipo_cambio").maybeSingle(),
+        filtro(sb.from("fin_compromisos").select("*")).order("proximo")
       ]);
-      cuentas = cu; categorias = cat; movimientos = mv; cambio = Number(aj.data && aj.data.valor && aj.data.valor.usd) || 7.75;
+      cuentas = cu; categorias = cat; movimientos = mv; cambio = Number(aj.data && aj.data.valor && aj.data.valor.usd) || 7.75; compromisos = cm.error ? [] : cm.data;
     }
     const num = m => ({ ...m, monto: Number(m.monto), monto_destino: m.monto_destino == null ? null : Number(m.monto_destino) });
     movimientos = movimientos.map(num).sort((a, b) => String(b.fecha).localeCompare(String(a.fecha)) || b.id - a.id);
     cuentas = saldos(cuentas.map(c => ({ ...c, saldo_inicial: Number(c.saldo_inicial) })), movimientos);
-    return { cuentas, categorias: categorias.sort((a, b) => a.orden - b.orden || a.nombre.localeCompare(b.nombre, "es")), movimientos, cambio };
+    compromisos = compromisos.map(c => ({ ...c, monto: c.monto == null ? null : Number(c.monto) })).sort((a, b) => String(a.proximo).localeCompare(String(b.proximo)));
+    return { compromisos, cuentas, categorias: categorias.sort((a, b) => a.orden - b.orden || a.nombre.localeCompare(b.nombre, "es")), movimientos, cambio };
   }
 
   const enQ = (monto, moneda, cambio) => moneda === "USD" ? r2(monto * cambio) : r2(monto);
@@ -173,6 +183,52 @@
     await ok(await sb.from("ajustes").upsert({ clave: "tipo_cambio", valor: { usd: v } }, { onConflict: "clave" }), "No se pudo guardar el tipo de cambio. Solo lo cambia quien edita los datos de la empresa.");
   }
 
+  async function guardarCompromiso(ambito, c) {
+    const datos = { nombre: t(c.nombre), tipo: c.tipo === "unico" ? "unico" : "fijo", a_quien: o(c.a_quien), categoria_id: Number(c.categoria_id) || null, cuenta_id: Number(c.cuenta_id) || null, monto: c.monto == null || c.monto === "" ? null : r2(c.monto), variable: !!c.variable, frecuencia: FRECUENCIAS[c.frecuencia] ? c.frecuencia : "mensual", proximo: fechaO(c.proximo), aviso_dias: Math.max(0, Math.min(60, Number(c.aviso_dias) || 0)), activo: c.activo !== false, pagado_en: c.pagado_en || null, notas: o(c.notas) };
+    if (!datos.nombre) throw new Error("Escriba qué se paga.");
+    if (!datos.proximo) throw new Error(datos.tipo === "unico" ? "Escriba la fecha en que vence." : "Escriba la fecha del próximo pago.");
+    if (!datos.variable && !(datos.monto > 0)) throw new Error("Escriba el monto, o marque que cambia cada vez.");
+    if (!nube) {
+      const d = leer();
+      if (c.id) Object.assign(d.compromisos.find(x => x.id === c.id), datos);
+      else d.compromisos.push({ id: d.sig++, ambito, dueno: yoId(), creado: new Date().toISOString(), ...datos });
+      escribir(d); return;
+    }
+    if (c.id) await ok(await sb.from("fin_compromisos").update(datos).eq("id", c.id), "No se pudo guardar.");
+    else await ok(await sb.from("fin_compromisos").insert({ ...datos, ambito }), "No se pudo guardar.");
+  }
+
+  async function pagarCompromiso(ambito, c, p, archivo) {
+    await guardarMovimientoFin(ambito, { tipo: "gasto", monto: p.monto, fecha: p.fecha, cuenta_id: p.cuenta_id, categoria_id: c.categoria_id, descripcion: c.nombre + (c.a_quien ? " · " + c.a_quien : ""), referencia: p.referencia, origen: "compromiso", origen_id: `${c.id}:${c.proximo}` }, archivo);
+    const cambios = c.tipo === "unico" ? { activo: false, pagado_en: fechaO(p.fecha) || hoy() } : { proximo: siguiente(c.proximo, c.frecuencia) };
+    if (!nube) { const d = leer(); Object.assign(d.compromisos.find(x => x.id === c.id), cambios); escribir(d); return; }
+    await ok(await sb.from("fin_compromisos").update(cambios).eq("id", c.id), "Se anotó el pago, pero no se pudo mover la fecha del próximo.");
+  }
+
+  async function revertirCompromiso(origen_id) {
+    const [id, vence] = String(origen_id || "").split(":"); if (!id || !vence) return;
+    const cid = Number(id);
+    let c;
+    if (!nube) c = leer().compromisos.find(x => x.id === cid);
+    else { const r = await sb.from("fin_compromisos").select("*").eq("id", cid).maybeSingle(); c = r.data; }
+    if (!c) return;
+    const cambios = c.tipo === "unico" ? { activo: true, pagado_en: null } : (String(c.proximo) > vence ? { proximo: vence } : null);
+    if (!cambios) return;
+    if (!nube) { const d = leer(); Object.assign(d.compromisos.find(x => x.id === cid), cambios); escribir(d); return; }
+    await sb.from("fin_compromisos").update(cambios).eq("id", cid);
+  }
+
+  async function porPagarPronto() {
+    const p = yo(); if (!p) return [];
+    const ambs = [D.puede(p, "verFinanzas") ? "empresa" : null, D.puede(p, "finanzasPersonales") ? "personal" : null].filter(Boolean);
+    if (!ambs.length) return [];
+    let l;
+    if (!nube) l = ambs.flatMap(a => delAmbito(leer().compromisos, a));
+    else { const uid = (await sb.auth.getUser()).data.user?.id; const r = await sb.from("fin_compromisos").select("*").eq("activo", true).lte("proximo", siguiente(hoy(), "bimestral")); l = r.error ? [] : r.data.filter(c => ambs.includes(c.ambito) && (c.ambito === "empresa" || c.dueno === uid)); }
+    const h = hoy();
+    return l.filter(c => c.activo !== false).filter(c => { const lim = new Date(Date.UTC(...c.proximo.split("-").map((n, i) => i === 1 ? n - 1 : Number(n)))); lim.setUTCDate(lim.getUTCDate() - (Number(c.aviso_dias) || 0)); return lim.toISOString().slice(0, 10) <= h; }).map(c => ({ ...c, monto: c.monto == null ? null : Number(c.monto), vencido: c.proximo < h }));
+  }
+
   async function cuentasFin(ambito) {
     const p = yo();
     if (!p || (ambito === "personal" ? !D.puede(p, "finanzasPersonales") : !D.puede(p, "verFinanzas"))) return [];
@@ -216,5 +272,5 @@
     return l.length;
   }
 
-  Object.assign(D, { cuentasFin, ligarMovimiento, anularPorOrigen, actualizarPorOrigen, FIN_TIPOS_CUENTA: TIPOS_CUENTA, FIN_MONEDAS: MONEDAS, finanzas, enQ, guardarCuentaFin, guardarCategoriaFin, guardarMovimientoFin, anularMovimientoFin, guardarTipoCambio, fotoFin });
+  Object.assign(D, { FIN_FRECUENCIAS: FRECUENCIAS, guardarCompromiso, pagarCompromiso, revertirCompromiso, porPagarPronto, cuentasFin, ligarMovimiento, anularPorOrigen, actualizarPorOrigen, FIN_TIPOS_CUENTA: TIPOS_CUENTA, FIN_MONEDAS: MONEDAS, finanzas, enQ, guardarCuentaFin, guardarCategoriaFin, guardarMovimientoFin, anularMovimientoFin, guardarTipoCambio, fotoFin });
 })();
