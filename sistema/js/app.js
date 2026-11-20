@@ -38,12 +38,12 @@
     { id: "hoy", n: "Hoy", i: "home", c: "marino" },
     { id: "ventas", n: "Ventas", i: "file", c: "laton", ir: "cotizaciones", grupo: ["cotizaciones", "clientes", "tienda"] },
     { id: "obras", n: "Obras", i: "hammer", c: "mezcla" },
-    { id: "dinero", n: "Dinero", i: "wallet", c: "claro", ir: "cobros", grupo: ["cobros"] },
+    { id: "dinero", n: "Finanzas", i: "wallet", c: "claro", ir: "cobros", grupo: ["cobros", "finanzas", "personal"] },
     { id: "catalogo", n: "Catálogo", i: "box", c: "gris" }
   ];
-  const PESTANAS_GRUPO = { ventas: [["cotizaciones", "Cotizaciones"], ["clientes", "Clientes"], ["tienda", "Tienda", "verTienda"]] };
+  const PESTANAS_GRUPO = { ventas: [["cotizaciones", "Cotizaciones"], ["clientes", "Clientes"], ["tienda", "Tienda", "verTienda"]], dinero: [["cobros", "Cobros", "verCobros"], ["finanzas", "Empresa", "verFinanzas"], ["personal", "Personal", "finanzasPersonales"]] };
   const menuDe = s => MENU.find(m => m.id === s || (m.grupo || []).includes(s));
-  const menuVisible = () => MENU.filter(m => m.id !== "dinero" || !sesion || D.puede(sesion.perfil, "verCobros") || D.puede(sesion.perfil, "verCosto"));
+  const menuVisible = () => MENU.filter(m => m.id !== "dinero" || !sesion || D.puede(sesion.perfil, "verCobros") || D.puede(sesion.perfil, "verCosto") || D.puede(sesion.perfil, "verFinanzas"));
   const conteos = {};
   const ponerInsignia = (a, n, txt) => { let b = a.querySelector(".insignia"); if (!n) { if (b) b.parentNode.removeChild(b); return; } if (!b) { b = document.createElement("span"); b.className = "insignia"; a.appendChild(b); } b.textContent = n; b.setAttribute("aria-label", `${n} ${txt || "por atender"}`); };
   function pintarInsignias() {
@@ -280,7 +280,7 @@
     if (guardiaAct && location.hash !== rutaActual && !guardiaAct.limpio()) { const destino = location.hash; ignorarHash = true; location.hash = rutaActual; preguntarSalida(destino); return; }
     guardiaAct = null;
     const [sec = "hoy", sub = "", sub2 = ""] = location.hash.replace(/^#\/?/, "").split("/");
-    const s = SECCIONES.find(x => x.id === sec) || sec === "empresa" || sec === "plano" || sec === "equipo" || sec === "perfil" || sec === "errores" ? sec : "hoy";
+    const s = SECCIONES.find(x => x.id === sec) || sec === "empresa" || sec === "plano" || sec === "equipo" || sec === "perfil" || sec === "errores" || sec === "finanzas" || sec === "personal" ? sec : "hoy";
     const mActual = menuDe(s);
     $$("[data-sec]").forEach(a => { if (mActual && a.dataset.sec === mActual.id) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current"); });
     const v = $("#vista");
@@ -300,6 +300,7 @@
       else if (s === "empresa") await window.EMT_EMPRESA.vista(v);
       else if (s === "obras") await window.EMT_OBRAS.vista(v, sub, sub2);
       else if (s === "cobros") await window.EMT_COBROS.vista(v, sub, sub2);
+      else if (s === "finanzas" || s === "personal") await window.EMT_FINANZAS.vista(v, s === "personal" ? "personal" : "empresa");
       else if (s === "plano") await window.EMT_PLANOS.vista(v, sub, sub2);
       else if (s === "tienda") await window.EMT_TIENDA.vista(v, sub);
       else if (s === "equipo") await window.EMT_EQUIPO.vista(v, sub);

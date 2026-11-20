@@ -7,7 +7,7 @@
     ["Catálogo", [["verCosto", "Ver el costo de compra"], ["editarMaterial", "Editar materiales y costos"], ["editarEstructura", "Editar lo que se vende y sus materiales"], ["editarProveedor", "Editar proveedores"], ["verAumento", "Ver y poner el aumento y la ganancia"]]],
     ["Clientes y ventas", [["editarCliente", "Editar clientes, sitios y contactos"], ["editarCotizacion", "Hacer y cambiar cotizaciones"], ["verEnlaces", "Ver los avisos del enlace del cliente"], ["editarPlano", "Dibujar planos"], ["verTienda", "Ver la tienda"], ["editarTienda", "Confirmar pagos de la tienda"]]],
     ["Obras", [["editarObra", "Llevar las obras (etapas, bitácora, trámites)"], ["editarEquipo", "Editar los equipos de los clientes"], ["moverMaterial", "Sacar y devolver material"], ["editarCompras", "Pedir y recibir compras"], ["editarInstalacion", "Marcar lo instalado y los checklists"], ["editarEnerguate", "Documentos de Energuate"], ["subirDocumentos", "Subir documentos y fichas"]]],
-    ["Dinero", [["verCobros", "Ver cobros, pagos y fianzas"], ["registrarPago", "Registrar pagos y fianzas"], ["verGastos", "Ver y anotar gastos de obra"]]],
+    ["Dinero", [["verCobros", "Ver cobros, pagos y fianzas"], ["registrarPago", "Registrar pagos y fianzas"], ["verGastos", "Ver y anotar gastos de obra"], ["verFinanzas", "Ver y llevar las finanzas de la empresa (cuentas y saldos)"]]],
     ["Empresa", [["editarEmpresa", "Datos de la empresa y ajustes"]]]
   ];
   const ROLES_EDIT = Object.keys(D.ROLES).filter(r => r !== "gerencia");

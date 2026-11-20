@@ -1536,3 +1536,15 @@ fieldset.empresa[data-grupo-act="obras"] > details[data-grupo-e="obras"] { displ
 .guardar-emp { position: sticky; bottom: 12px; z-index: 6; padding: 10px 12px; border-radius: 22px; background: color-mix(in srgb, var(--card) 92%, transparent); border: 1px solid var(--capa-borde); box-shadow: var(--sombra-2); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); width: fit-content; max-width: 100%; }
 @media (max-width: 560px) { .pest-emp { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border-radius: 22px; gap: 4px; width: 100%; } .pest-emp button { white-space: nowrap; } }
 @media (max-width: 560px) { .caja-cab:has(> [data-opciones]) { flex-wrap: wrap; row-gap: 10px; } .caja-cab > [data-opciones] { flex-basis: 100%; justify-content: center; } }
+.fin-cambio { display: flex; align-items: center; gap: 6px; margin: 8px 4px 0; font-size: 13.5px; }
+.fin-herr { flex-wrap: wrap; }
+.fin-sel { margin: 0; min-width: 160px; }
+.fin-mas { color: var(--exito); }
+.plegable-l { margin-top: 10px; }
+.plegable-l > summary { cursor: pointer; font-size: 13.5px; font-weight: 650; color: var(--text-muted); padding: 6px 4px; list-style: none; }
+.plegable-l > summary::-webkit-details-marker { display: none; }
+.fin-cats { display: grid; gap: 8px; }
+.fin-cats + .fin-cats { margin-top: 10px; }
+.fin-cats h3 { font-size: 15px; font-weight: 750; }
+.fin-sel input, .fin-sel select { width: 100%; min-width: 0; }
+@media (max-width: 640px) { .fin-herr .fin-sel { flex: 1 1 calc(50% - 6px); min-width: 0; } .fin-herr .busca-v { flex: 1 1 100%; } }
