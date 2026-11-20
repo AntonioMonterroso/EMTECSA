@@ -99,9 +99,15 @@ window.EMT_COBROS = (() => {
     });
   }
 
+  const cuentasCobro = async () => D.cuentasFin ? (await D.cuentasFin("empresa").catch(() => [])).filter(c => c.moneda === "GTQ" && c.tipo !== "tarjeta") : [];
+  const campoCobro = cu => window.EMT_FINANZAS ? window.EMT_FINANZAS.campoCuenta(cu, "Entra a la cuenta", "cobro") : "";
+  const ligarCobro = (f, res, nombre) => window.EMT_FINANZAS ? window.EMT_FINANZAS.ligar(f, "cobro", { tipo: "ingreso", monto: A().numero(f.monto.value), fecha: f.fecha.value, categoria: "Cobros de obras", descripcion: `Recibo ${res.numero}${nombre ? " · " + nombre : ""}`, referencia: f.ref.value, origen: "pago", origen_id: res.id }) : null;
+  const CAT_GASTO = { viaticos: "Viáticos", combustible: "Combustible", equipo: "Herramienta y equipo", subcontrato: "Otros gastos", materiales: "Materiales y compras", otro: "Otros gastos" };
+
   async function pagoSuelto(r, recargar, clientesL) {
     const { modal, esc, campoMonto, formatoAlSalir, numero, cerrarCapas, aviso } = A();
     const clientes = clientesL || await D.clientes();
+    const cuF = await cuentasCobro();
     const obras = Object.values(r.obras);
     let cli = null;
     modal({
@@ -112,7 +118,8 @@ window.EMT_COBROS = (() => {
         <div class="f-fila"><label class="f-campo">Forma de pago<select name="forma">${Object.entries(D.FORMAS).map(([k, n]) => `<option value="${k}">${n}</option>`).join("")}</select></label>
         <label class="f-campo">Banco<input name="banco" autocomplete="off"></label></div>
         <label class="f-campo">Número de boleta, transferencia o cheque<input name="ref" autocomplete="off"></label>
-        <label class="f-campo">Notas<input name="notas" autocomplete="off" placeholder="Anticipo, venta de material…"></label>`,
+        <label class="f-campo">Notas<input name="notas" autocomplete="off" placeholder="Anticipo, venta de material…"></label>
+        ${campoCobro(cuF)}`,
       alAbrir: f => {
         formatoAlSalir(f);
         buscadorCliente(f.querySelector("[data-pick-cli]"), clientes, c => {
@@ -125,6 +132,7 @@ window.EMT_COBROS = (() => {
       alGuardar: async f => {
         if (!cli) throw new Error("Escoja el cliente.");
         const res = await D.registrarPago({ cliente_id: cli.id, obra_id: f.obra.value ? Number(f.obra.value) : null, parte_id: null, monto: numero(f.monto.value), fecha: f.fecha.value, forma: f.forma.value, banco: f.banco.value, referencia: f.ref.value, notas: f.notas.value });
+        await ligarCobro(f, res, cli.nombre);
         cerrarCapas(); aviso(`Pago registrado: recibo ${res.numero}.`);
         await recargar();
         ofrecerRecibo(res.id);
@@ -137,6 +145,7 @@ window.EMT_COBROS = (() => {
     const r = await D.resumenCobros();
     const otros = parte.obra_id ? r.pendientes.filter(x => x.obra_id === parte.obra_id && x.id !== parte.id) : [];
     const tope = Math.round((parte.saldo + otros.reduce((a, x) => a + x.saldo, 0)) * 100) / 100;
+    const cuF = await cuentasCobro();
     modal({
       titulo: "Registrar pago", guardarTxt: "Registrar pago",
       cuerpo: `<div class="cli-elegido"><span><b>${esc(parte.cliente ? parte.cliente.nombre : "")}</b><small>${parte.obra ? esc(parte.obra.numero) + " · " : ""}${esc(parte.descripcion)} · saldo ${esc(Q(parte.saldo))}</small></span></div>
@@ -145,10 +154,12 @@ window.EMT_COBROS = (() => {
         <div class="f-fila"><label class="f-campo">Forma de pago<select name="forma">${Object.entries(D.FORMAS).map(([k, n]) => `<option value="${k}">${n}</option>`).join("")}</select></label>
         <label class="f-campo">Banco<input name="banco" autocomplete="off"></label></div>
         <label class="f-campo">Número de boleta, transferencia o cheque<input name="ref" autocomplete="off"></label>
-        <label class="f-campo">Notas<input name="notas" autocomplete="off"></label>`,
+        <label class="f-campo">Notas<input name="notas" autocomplete="off"></label>
+        ${campoCobro(cuF)}`,
       alAbrir: f => formatoAlSalir(f),
       alGuardar: async f => {
         const res = await D.registrarPago({ cliente_id: parte.cliente_id, obra_id: parte.obra_id, parte_id: parte.id, monto: numero(f.monto.value), fecha: f.fecha.value, forma: f.forma.value, banco: f.banco.value, referencia: f.ref.value, notas: f.notas.value, tope });
+        await ligarCobro(f, res, parte.cliente ? parte.cliente.nombre : "");
         cerrarCapas(); aviso(`Pago registrado: recibo ${res.numero}.`);
         await recargar();
         ofrecerRecibo(res.id);
@@ -197,7 +208,7 @@ window.EMT_COBROS = (() => {
       const an = e.target.closest("[data-anular]");
       if (an) {
         const p = l.find(x => x.id === Number(an.dataset.anular));
-        const anular = () => { const m = modal({ titulo: `¿Anular el recibo ${p.numero}?`, guardarTxt: "Anular", cuerpo: `<p class="suave" style="font-size:14.5px">El recibo no se borra: queda anulado y el monto vuelve a quedar pendiente de cobro.</p><label class="f-campo">Motivo<input name="motivo" autocomplete="off"></label>`, alGuardar: async f => { await D.anularPago(p.id, f.motivo.value); cerrarCapas(); aviso("Recibo anulado."); await recargar(); } }); m.querySelector("[data-guardar]").classList.add("peligro-b"); };
+        const anular = () => { const m = modal({ titulo: `¿Anular el recibo ${p.numero}?`, guardarTxt: "Anular", cuerpo: `<p class="suave" style="font-size:14.5px">El recibo no se borra: queda anulado y el monto vuelve a quedar pendiente de cobro.</p><label class="f-campo">Motivo<input name="motivo" autocomplete="off"></label>`, alGuardar: async f => { await D.anularPago(p.id, f.motivo.value); if (D.anularPorOrigen) await D.anularPorOrigen("pago", p.id, "Recibo anulado: " + f.motivo.value).catch(() => {}); cerrarCapas(); aviso("Recibo anulado."); await recargar(); } }); m.querySelector("[data-guardar]").classList.add("peligro-b"); };
         modal({ titulo: `Recibo ${p.numero}`, guardarTxt: "Ver recibo", quitar: anular, quitarTxt: "Anular",
           cuerpo: `<div class="vm-prev"><div><span>Cliente</span><b>${esc(cl[p.cliente_id] ? cl[p.cliente_id].nombre : "")}</b></div><div><span>Fecha</span><b>${esc(fCorta(p.fecha))}</b></div><div class="g"><span>Monto</span><b>${esc(Q(p.monto))}</b></div><div><span>Forma de pago</span><b>${esc(D.FORMAS[p.forma])}${p.banco ? " · " + esc(p.banco) : ""}</b></div>${p.referencia ? `<div><span>Boleta o referencia</span><b>${esc(p.referencia)}</b></div>` : ""}${p.notas ? `<div><span>Notas</span><b>${esc(p.notas)}</b></div>` : ""}</div>
             <p class="suave" style="font-size:13px;margin:0">Un recibo no se cambia ni se borra. Si tiene un error, se anula y se registra el pago otra vez.</p>`,
@@ -281,6 +292,7 @@ window.EMT_COBROS = (() => {
     const p = A().sesion().perfil;
     const verC = D.puede(p, "verCobros"), edC = D.puede(p, "registrarPago"), verG = D.puede(p, "verGastos"), interno = D.puede(p, "verAumento");
     const r = await D.resumenCobros();
+    const cuG = verG && D.cuentasFin ? (await D.cuentasFin("empresa").catch(() => [])).filter(c => c.moneda === "GTQ") : [];
     const partes = r.partes.filter(x => x.obra_id === o.id).sort((a, b) => a.orden - b.orden);
     const pagos = r.pagos.filter(x => x.obra_id === o.id && !x.anulado);
     const gastos = r.gastos.filter(x => x.obra_id === o.id).sort((a, b) => String(b.fecha).localeCompare(String(a.fecha)));
@@ -301,12 +313,19 @@ window.EMT_COBROS = (() => {
         <div class="ancho2"><small>Cómo se calcula</small><span class="suave" style="font-size:13px">${sinIva != null ? `Total sin IVA ${esc(Q(sinIva))} menos costo de materiales ${esc(Q(costoMat))} menos gastos ${esc(Q(gastado))}. Solo lo ve gerencia.` : `Total del plan de pagos ${esc(Q(total))} menos gastos ${esc(Q(gastado))}. Sin cotización no se descuentan el IVA ni el costo de materiales. Solo lo ve gerencia.`}</span></div></div>` : ""}`;
     const editarGasto = g0 => modal({
       titulo: g0 ? "Editar gasto" : "Gasto de la obra",
-      quitar: g0 ? () => { const m = modal({ titulo: "¿Quitar el gasto?", guardarTxt: "Quitar", cuerpo: `<p class="suave" style="font-size:15px">Se quita «${esc(g0.descripcion)}» por ${esc(Q(g0.monto))}.</p>`, alGuardar: async () => { await D.quitarGasto(g0.id); cerrarCapas(); aviso("Gasto quitado."); await recargar(); } }); m.querySelector("[data-guardar]").classList.add("peligro-b"); } : null,
+      quitar: g0 ? () => { const m = modal({ titulo: "¿Quitar el gasto?", guardarTxt: "Quitar", cuerpo: `<p class="suave" style="font-size:15px">Se quita «${esc(g0.descripcion)}» por ${esc(Q(g0.monto))}.</p>`, alGuardar: async () => { await D.quitarGasto(g0.id); if (D.anularPorOrigen) await D.anularPorOrigen("gasto_obra", g0.id, "Se quitó el gasto de la obra").catch(() => {}); cerrarCapas(); aviso("Gasto quitado."); await recargar(); } }); m.querySelector("[data-guardar]").classList.add("peligro-b"); } : null,
       cuerpo: `<label class="f-campo">En qué se gastó<input name="desc" value="${esc(g0 ? g0.descripcion : "")}" autocomplete="off"></label>
         <div class="f-fila"><label class="f-campo">Tipo<select name="tipo">${Object.entries(D.TIPOS_GASTO).map(([k, n]) => `<option value="${k}" ${(g0 ? g0.tipo : "otro") === k ? "selected" : ""}>${n}</option>`).join("")}</select></label>${A().campoMonto("monto", "Monto", g0 ? g0.monto : null)}</div>
-        <label class="f-campo">Fecha<input type="date" name="fecha" value="${esc(g0 ? g0.fecha : hoyISO())}"></label>`,
+        <label class="f-campo">Fecha<input type="date" name="fecha" value="${esc(g0 ? g0.fecha : hoyISO())}"></label>
+        ${!g0 && window.EMT_FINANZAS ? window.EMT_FINANZAS.campoCuenta(cuG, "Sale de la cuenta", "gasto").replace("Queda anotado en Finanzas › Empresa.", "Queda anotado como gasto en Finanzas › Empresa.") : ""}`,
       alAbrir: f => A().formatoAlSalir(f),
-      alGuardar: async f => { await D.guardarGasto({ id: g0 ? g0.id : null, obra_id: o.id, descripcion: f.desc.value, tipo: f.tipo.value, monto: A().numero(f.monto.value), fecha: f.fecha.value }); cerrarCapas(); aviso("Gasto guardado."); await recargar(); }
+      alGuardar: async f => {
+        const monto = A().numero(f.monto.value);
+        const gid = await D.guardarGasto({ id: g0 ? g0.id : null, obra_id: o.id, descripcion: f.desc.value, tipo: f.tipo.value, monto, fecha: f.fecha.value });
+        if (!g0 && window.EMT_FINANZAS) await window.EMT_FINANZAS.ligar(f, "gasto", { tipo: "gasto", monto, fecha: f.fecha.value, categoria: CAT_GASTO[f.tipo.value] || "Otros gastos", descripcion: `${o.numero} · ${f.desc.value}`, origen: "gasto_obra", origen_id: gid });
+        else if (g0 && D.actualizarPorOrigen) await D.actualizarPorOrigen("gasto_obra", g0.id, { monto, fecha: f.fecha.value, descripcion: `${o.numero} · ${f.desc.value}` }).catch(() => {});
+        cerrarCapas(); aviso("Gasto guardado."); await recargar();
+      }
     });
     box.onclic = async e => {
       if (e.target.closest("[data-plan]")) armarPlan(o, partes, total, !!cot, recargar);

@@ -109,8 +109,10 @@
     const datos = { obra_id: g.obra_id, fecha: fechaO(g.fecha) || hoy(), tipo: TIPOS_GASTO[g.tipo] ? g.tipo : "otro", descripcion: t(g.descripcion), monto: r2(g.monto) };
     if (!datos.descripcion) throw new Error("Escriba en qué se gastó.");
     if (!(datos.monto > 0)) throw new Error("Escriba el monto del gasto.");
-    if (!nube) { const d = leer(); if (g.id) Object.assign(d.gastos.find(x => x.id === g.id), datos); else d.gastos.push({ id: d.sig.x++, ...datos }); escribir(d); return; }
-    await ok(g.id ? await sb.from("gastos_obra").update(datos).eq("id", g.id) : await sb.from("gastos_obra").insert(datos), "No se pudo guardar el gasto.");
+    if (!nube) { const d = leer(); if (g.id) { Object.assign(d.gastos.find(x => x.id === g.id), datos); escribir(d); return g.id; } const id = d.sig.x++; d.gastos.push({ id, ...datos }); escribir(d); return id; }
+    if (g.id) { await ok(await sb.from("gastos_obra").update(datos).eq("id", g.id), "No se pudo guardar el gasto."); return g.id; }
+    const r = await ok(await sb.from("gastos_obra").insert(datos).select("id").single(), "No se pudo guardar el gasto.");
+    return r.id;
   }
 
   async function quitarGasto(id) {

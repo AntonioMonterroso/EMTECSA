@@ -122,11 +122,12 @@ window.EMT_TIENDA = (() => {
       if (ev.target.closest("[data-ver-comp]") && urlFoto) { const m = modal({ titulo: `Comprobante de ${p.id}`, guardarTxt: "Cerrar", cuerpo: /pdf/.test((await D.comprobanteTienda(p.id)).type) ? `<p><a class="s-btn suave-b" href="${urlFoto}" target="_blank" rel="noopener">${ico("eye", 15)}Abrir el PDF</a></p>` : `<img class="foto-grande" src="${urlFoto}" alt="Comprobante de ${esc(p.id)}">`, alGuardar: async () => cerrarCapas() }); m.classList.add("modal-foto"); return; }
       if (ev.target.closest("[data-confirmar]")) {
         const monto = l.monto != null && l.monto > 0 ? Number(l.monto) : Number(p.total || 0);
-        modal({ titulo: `¿Confirmar el pago de ${p.id}?`, guardarTxt: "Confirmar y arrancar", cuerpo: `<p class="suave" style="font-size:15px">${esc(Q(monto))} de ${esc(c.nombre || "")}.</p><ul class="lista-simple suave" style="font-size:14px;margin:8px 0 0;padding-left:18px"><li>El cliente queda en Clientes.</li>${cobrar ? "<li>El pago queda en Dinero con su recibo.</li>" : ""}<li>Lo vendido pasa a «Por comprar».</li><li>El cliente ve «Arrancamos» en su pedido.</li></ul>`,
-          alGuardar: async () => {
+        const cuF = cobrar && D.cuentasFin ? (await D.cuentasFin("empresa").catch(() => [])).filter(x => x.moneda === "GTQ" && x.tipo !== "tarjeta") : [];
+        modal({ titulo: `¿Confirmar el pago de ${p.id}?`, guardarTxt: "Confirmar y arrancar", cuerpo: `<p class="suave" style="font-size:15px">${esc(Q(monto))} de ${esc(c.nombre || "")}.</p><ul class="lista-simple suave" style="font-size:14px;margin:8px 0 0;padding-left:18px"><li>El cliente queda en Clientes.</li>${cobrar ? "<li>El pago queda en Dinero con su recibo.</li>" : ""}<li>Lo vendido pasa a «Por comprar».</li><li>El cliente ve «Arrancamos» en su pedido.</li></ul>${window.EMT_FINANZAS ? window.EMT_FINANZAS.campoCuenta(cuF, "Entra a la cuenta", "cobro") : ""}`,
+          alGuardar: async fm => {
             const clienteId = p.clienteId || await clienteDe(p);
             let pagoId = p.pagoId || null, numero = null;
-            if (!pagoId && cobrar && monto > 0) { const r = await D.registrarPago({ cliente_id: clienteId, monto, forma: "transferencia", banco: l.banco || null, referencia: l.referencia || null, fecha: null, notas: `Pedido ${p.id} de la tienda en línea` }); pagoId = r.id; numero = r.numero; }
+            if (!pagoId && cobrar && monto > 0) { const r = await D.registrarPago({ cliente_id: clienteId, monto, forma: "transferencia", banco: l.banco || null, referencia: l.referencia || null, fecha: null, notas: `Pedido ${p.id} de la tienda en línea` }); pagoId = r.id; numero = r.numero; if (window.EMT_FINANZAS) await window.EMT_FINANZAS.ligar(fm, "cobro", { tipo: "ingreso", monto, fecha: null, categoria: "Ventas de la tienda", descripcion: `Recibo ${r.numero} · ${p.id} · ${c.nombre || ""}`, referencia: l.referencia || null, origen: "pago", origen_id: r.id }); }
             await cambiar("en-marcha", null, numero ? `${p.id} quedó en marcha. Recibo ${numero}.` : `${p.id} quedó en marcha.`, { clienteId, pagoId, porComprar: p.porComprar || {} });
           } });
         return;

@@ -173,5 +173,48 @@
     await ok(await sb.from("ajustes").upsert({ clave: "tipo_cambio", valor: { usd: v } }, { onConflict: "clave" }), "No se pudo guardar el tipo de cambio. Solo lo cambia quien edita los datos de la empresa.");
   }
 
-  Object.assign(D, { FIN_TIPOS_CUENTA: TIPOS_CUENTA, FIN_MONEDAS: MONEDAS, finanzas, enQ, guardarCuentaFin, guardarCategoriaFin, guardarMovimientoFin, anularMovimientoFin, guardarTipoCambio, fotoFin });
+  async function cuentasFin(ambito) {
+    const p = yo();
+    if (!p || (ambito === "personal" ? !D.puede(p, "finanzasPersonales") : !D.puede(p, "verFinanzas"))) return [];
+    if (!nube) return delAmbito(leer().cuentas, ambito).filter(c => c.activo !== false);
+    const uid = (await sb.auth.getUser()).data.user?.id;
+    let q = sb.from("fin_cuentas").select("id, nombre, tipo, moneda, activo, ambito, dueno").eq("ambito", ambito).eq("activo", true);
+    if (ambito === "personal") q = q.eq("dueno", uid);
+    const r = await q.order("orden").order("id");
+    return r.error ? [] : r.data;
+  }
+
+  async function categoriaPorNombre(ambito, nombre, tipo) {
+    if (!nombre) return null;
+    let l;
+    if (!nube) l = delAmbito(leer().categorias, ambito);
+    else { const uid = (await sb.auth.getUser()).data.user?.id; let q = sb.from("fin_categorias").select("id, nombre, tipo").eq("ambito", ambito); if (ambito === "personal") q = q.eq("dueno", uid); const r = await q; l = r.error ? [] : r.data; }
+    const x = l.find(c => c.tipo === tipo && c.nombre.toLowerCase() === nombre.toLowerCase());
+    return x ? x.id : null;
+  }
+
+  async function ligarMovimiento(m) {
+    const categoria_id = m.categoria_id || await categoriaPorNombre(m.ambito, m.categoria, m.tipo);
+    return guardarMovimientoFin(m.ambito, { ...m, categoria_id }, null);
+  }
+
+  async function porOrigen(origen, origen_id) {
+    if (!nube) return leer().movimientos.filter(x => x.origen === origen && String(x.origen_id) === String(origen_id) && !x.anulado);
+    const r = await sb.from("fin_movimientos").select("id, ambito, monto, fecha, descripcion, cuenta_id").eq("origen", origen).eq("origen_id", String(origen_id)).eq("anulado", false);
+    return r.error ? [] : r.data;
+  }
+  async function anularPorOrigen(origen, origen_id, motivo) {
+    for (const x of await porOrigen(origen, origen_id)) await anularMovimientoFin(x.id, motivo);
+  }
+  async function actualizarPorOrigen(origen, origen_id, cambios) {
+    const l = await porOrigen(origen, origen_id);
+    const datos = {}; if (cambios.monto != null) datos.monto = r2(cambios.monto); if (cambios.fecha) datos.fecha = fechaO(cambios.fecha) || hoy(); if (cambios.descripcion != null) datos.descripcion = o(cambios.descripcion);
+    for (const x of l) {
+      if (!nube) { const d = leer(); Object.assign(d.movimientos.find(z => z.id === x.id), datos); escribir(d); }
+      else await ok(await sb.from("fin_movimientos").update(datos).eq("id", x.id), "No se pudo actualizar el movimiento en Finanzas.");
+    }
+    return l.length;
+  }
+
+  Object.assign(D, { cuentasFin, ligarMovimiento, anularPorOrigen, actualizarPorOrigen, FIN_TIPOS_CUENTA: TIPOS_CUENTA, FIN_MONEDAS: MONEDAS, finanzas, enQ, guardarCuentaFin, guardarCategoriaFin, guardarMovimientoFin, anularMovimientoFin, guardarTipoCambio, fotoFin });
 })();
