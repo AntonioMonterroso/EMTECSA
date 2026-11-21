@@ -100,7 +100,31 @@
       },
       async verTramite(t) { const { e } = buscar(t); return e && e.tramite || null; },
       async descarga(t, cual) { if (verEquipo) return; const { d, e } = buscar(t); if (!e) return; e.descargas = e.descargas || {}; e.descargas[cual] = (e.descargas[cual] || 0) + 1; poner(CE, d); },
-      archivo: a => idb(a.ref)
+      archivo: a => idb(a.ref),
+      async estimaciones(t) {
+        const { e } = buscar(t); if (!e || !e.aprobado) return [];
+        const ob = (leer("emtecsa.sistema.obras") || { obras: [] }).obras.find(o => o.cotizacion_id === e.cotizacion_id); if (!ob) return [];
+        return ((leer("emtecsa.sistema.estimaciones") || { est: [] }).est).filter(s => s.obra_id === ob.id && (s.estado === "enviada" || s.estado === "aprobada")).sort((a, b) => a.correlativo - b.correlativo)
+          .map(s => ({ id: s.id, numero: s.numero, estado: s.estado, datos: s.datos, aprobado: s.aprobado ? { ...s.aprobado, firma: undefined } : null }));
+      },
+      async aprobarEst(t, id, nombre, puesto, firma) {
+        const { d, e } = buscar(t); if (!e) throw new Error("no_existe"); if (!e.aprobado) throw new Error("no_aprobada");
+        const ob = (leer("emtecsa.sistema.obras") || { obras: [] }).obras.find(o => o.cotizacion_id === e.cotizacion_id);
+        const de = leer("emtecsa.sistema.estimaciones"); const s = ob && de && de.est.find(x => x.id === id && x.obra_id === ob.id); if (!s) throw new Error("no_existe");
+        if (s.estado === "aprobada") return { ...s.aprobado, firma: undefined };
+        if (s.estado !== "enviada") throw new Error("no_disponible");
+        const n = nombre.replace(/\s+/g, " ").trim(), pu = puesto.replace(/\s+/g, " ").trim() || null;
+        if (n.length < 3 || n.length > 120) throw new Error("nombre");
+        if (!/^data:image\/png;base64,/.test(firma) || firma.length < 200 || firma.length > 400000) throw new Error("firma");
+        const cl = ((leer("emtecsa.sistema.clientes") || { clientes: [] }).clientes).find(c => c.id === ob.cliente_id);
+        const [y, m, dd] = hoyGT().split("-").map(Number); const v = new Date(y, m - 1, dd + (Number(cl && cl.dias_credito) || 0));
+        let pid = null;
+        if (Number(s.neto) > 0) { const dc = leer("emtecsa.sistema.cobros") || { v: 1, cambios: false, sig: { x: 1 }, partes: [], pagos: [], fianzas: [], gastos: [] }; pid = dc.sig.x++; dc.partes.push({ id: pid, obra_id: ob.id, descripcion: `Estimación ${s.correlativo} · ${s.numero}`, porcentaje: null, monto: Number(s.neto), vence: `${v.getFullYear()}-${String(v.getMonth() + 1).padStart(2, "0")}-${String(v.getDate()).padStart(2, "0")}`, orden: 100 + s.correlativo }); dc.cambios = true; poner("emtecsa.sistema.cobros", dc); }
+        s.estado = "aprobada"; s.parte_id = pid; s.aprobado = { nombre: n, puesto: pu, firma, fecha: ahora(), en: "enlace" }; s.actualizado = ahora();
+        poner("emtecsa.sistema.estimaciones", de);
+        const ev = evento(d, e, "estimacion", `${s.numero} · ${n}${pu ? " · " + pu : ""}`); poner(CE, d); avisar(ev);
+        return { ...s.aprobado, firma: undefined };
+      }
     };
   })();
 
@@ -111,7 +135,9 @@
     async tramite(t, datos) { const r = await sb.rpc("enlace_tramite", { p_token: t, p_datos: datos }); if (r.error) throw new Error((r.error.message || "").match(/no_existe|no_aprobada|datos/)?.[0] || "red"); return r.data; },
     async verTramite(t) { const r = await sb.rpc("enlace_ver_tramite", { p_token: t }); return r.error ? null : r.data; },
     async descarga(t, cual) { try { await sb.rpc("enlace_descarga", { p_token: t, p_cual: cual }); } catch (e) {} },
-    async archivo(a) { try { const r = await fetch(a.url); return r.ok ? await r.blob() : null; } catch (e) { return null; } }
+    async archivo(a) { try { const r = await fetch(a.url); return r.ok ? await r.blob() : null; } catch (e) { return null; } },
+    async estimaciones(t) { const r = await sb.rpc("enlace_estimaciones", { p_token: t }); return r.error ? [] : r.data || []; },
+    async aprobarEst(t, id, nombre, puesto, firma) { const r = await sb.rpc("enlace_aprobar_estimacion", { p_token: t, p_id: id, p_nombre: nombre, p_puesto: puesto, p_firma: firma }); if (r.error) throw new Error((r.error.message || "").match(/no_existe|no_aprobada|no_disponible|nombre|puesto|firma/)?.[0] || "red"); return r.data; }
   };
   const API = nube ? N : L;
   const ERR = {
@@ -163,8 +189,10 @@
   function estadoHTML() {
     const ap = R.aprobado;
     if (R.equipo) return `<div class="banda azul">${ico("eye", 17)}<span><b>Así la ve su cliente.</b> Esta visita no se cuenta.</span></div>`;
-    if (ap) return "";
+    if (ap && !(R.est || []).some(s => s.estado === "enviada")) return "";
     if (R.estado === "borrador") return `<div class="banda ambar">${ico("alerta", 17)}<span><b>EMTECSA está ajustando esta propuesta.</b> Por ahora no se puede aprobar; le avisarán cuando esté lista.</span></div>`;
+    const pe = ap && (R.est || []).find(s => s.estado === "enviada");
+    if (pe) return `<div class="banda azul est-banda">${ico("firma", 17)}<span><b>Tiene una estimación de avance por aprobar.</b> Estimación ${esc(pe.datos.correlativo)} por ${esc(Q(pe.datos.neto))}.</span><button class="e-btn e-btn-p" type="button" data-est="${pe.id}">Revisar</button></div>`;
     if (R.estado === "rechazada") return `<div class="banda gris">${ico("alerta", 17)}<span><b>Esta propuesta quedó cerrada.</b> Escríbanos si quiere retomarla.</span></div>`;
     return "";
   }
@@ -179,6 +207,18 @@
     if (!d.opciones) return d.partidas.map(fila).join("");
     const gs = Object.keys(d.opciones.grupos);
     return gs.map(g => { const l = d.partidas.filter(p => (p.g || "") === g); if (!l.length) return ""; return `<p class="gr-t ${g ? (g[0] === "o" ? "op" : "ex") : ""}"><span>${esc(d.opciones.grupos[g])}</span><small>${esc(Q(l.reduce((a, p) => a + p.t, 0)))}</small></p>` + l.map(fila).join(""); }).join("");
+  }
+
+  const pctT = n => `${(Math.round((Number(n) || 0) * 100) / 100).toLocaleString("en-US", { maximumFractionDigits: 2 })}\u00a0%`;
+  const periodoT = d => [d.desde && fecha(d.desde), d.hasta && fecha(d.hasta)].filter(Boolean).join(" al ") || fecha(d.fecha);
+  function cuentaEst(d) {
+    const l = (k, v, cl = "") => `<div class="${cl}"><span>${k}</span><b>${v}</b></div>`;
+    return `<div class="tots est-cu">${l("Avance de la obra a la fecha", esc(pctT(d.pct_acum)) + (d.correlativo > 1 ? ` <small>(antes ${esc(pctT(d.pct_ant))})</small>` : ""))}${l("Esta estimación", esc(Q(d.bruto)))}${d.anticipo ? l("Menos anticipo", "− " + esc(Q(d.anticipo))) : ""}${d.garantia ? l(`Menos garantía retenida ${esc(pctT(d.garantia_pct))}`, "− " + esc(Q(d.garantia))) : ""}${l("A pagar", esc(Q(d.neto)), "g")}</div>`;
+  }
+  function estimacionesHTML() {
+    const l = R.est || []; if (!R.aprobado || !l.length) return "";
+    return `<section class="pc-caja est-c" id="estimaciones"><h2>Estimaciones de avance</h2><p class="suave chico">Cobro según lo avanzado de la obra. Revise cada una y apruébela con su firma.</p>
+      ${l.slice().reverse().map(s => { const d = s.datos || {}; return `<div class="est-f"><span class="pr-d"><b>Estimación ${esc(d.correlativo)} · ${esc(s.numero)}</b><small>${esc(periodoT(d))} · avance ${esc(pctT(d.pct_acum))}</small>${s.estado === "aprobada" && s.aprobado ? `<small class="ok">Aprobada por ${esc(s.aprobado.nombre)} · ${esc(fechaHora(s.aprobado.fecha))}</small>` : ""}</span><span class="est-der"><b class="e-cifra">${esc(Q(d.neto))}</b>${s.estado === "enviada" ? `<button class="e-btn e-btn-p" type="button" data-est="${s.id}">${ico("firma", 17)}Revisar y aprobar</button>` : `<button class="e-btn" type="button" data-est="${s.id}">Ver</button>`}</span></div>`; }).join("")}</section>`;
   }
 
   function pintar() {
@@ -230,6 +270,7 @@
             ${d.incluye.length ? `<div class="alc"><h3>Incluye</h3>${lista(d.incluye)}</div>` : ""}${d.excluye.length ? `<div class="alc no"><h3>No incluye</h3>${lista(d.excluye)}</div>` : ""}</details>` : ""}
           ${cond.length || d.notas ? `<details class="pc-caja plg"><summary><span><h2>Condiciones</h2><small>${cond.map(x => x[0]).join(" · ") || "Notas"}</small></span><span class="chev">${ico("chev", 18)}</span></summary>
             <dl class="cond">${cond.map(([k, v]) => `<div><dt>${k}</dt><dd>${esc(v)}</dd></div>`).join("")}${d.notas ? `<div><dt>Notas</dt><dd>${esc(d.notas)}</dd></div>` : ""}</dl></details>` : ""}
+          ${estimacionesHTML()}
           ${ap ? `<section class="pc-caja tramite-c"><h2>Para los trámites con Energuate</h2><p class="suave chico">${R.tramite && R.tramite.fecha ? "Ya mandó sus datos. Puede corregirlos si hace falta." : "Para pedir la licencia de construcción hacen falta sus datos y los de cada terreno por donde pasará la línea."}</p><button class="e-btn ${R.tramite && R.tramite.fecha ? "" : "e-btn-p"} ancho" type="button" data-tramite>${ico("pen", 17)}${R.tramite && R.tramite.fecha ? "Corregir mis datos" : "Llenar mis datos"}</button></section>` : ""}
           ${mensajesHTML()}
           ${contactoHTML(emp, d.numero)}
@@ -393,6 +434,49 @@
     });
   }
 
+  function verEst(id) {
+    const s = (R.est || []).find(x => x.id === id); if (!s) return;
+    const d = s.datos || {}, filas = (d.filas || []).filter(f => f.per > 0);
+    const puede = s.estado === "enviada" && !R.equipo;
+    let firma = null;
+    abrirHoja(`
+      <div class="hoja-cab"><h2>Estimación ${esc(d.correlativo)} · ${esc(s.numero)}</h2><button class="x" type="button" aria-label="Cerrar" data-cerrar>${ico("x", 18)}</button></div>
+      <p class="suave chico">${esc(d.obra ? [d.obra.numero, d.obra.titulo].filter(Boolean).join(" · ") : "")}<br>Período: ${esc(periodoT(d))}</p>
+      ${cuentaEst(d)}
+      ${filas.length ? `<details class="pc-caja plg est-det"><summary><span><h2>Lo hecho en este período</h2><small>${filas.length} ${filas.length === 1 ? "renglón" : "renglones"}</small></span><span class="chev">${ico("chev", 18)}</span></summary><div class="part">${filas.map(f => `<div class="pr"><span class="pr-d"><b>${esc(f.d)}</b><small>${esc(cant(f.per))} en este período · ${esc(cant(f.acum))} de ${esc(cant(f.c))} a la fecha</small></span></div>`).join("")}</div></details>` : ""}
+      ${d.notas ? `<p class="suave chico">${esc(d.notas)}</p>` : ""}
+      ${s.estado === "aprobada" && s.aprobado ? `<p class="escogio"><span>Aprobada</span><b>${esc(s.aprobado.nombre)}${s.aprobado.puesto ? ", " + esc(s.aprobado.puesto) : ""} · ${esc(fechaHora(s.aprobado.fecha))}</b></p>` : ""}
+      ${puede ? `<form data-f-est novalidate>
+        <label class="campo">Su nombre completo<input name="nombre" autocomplete="name" value="${esc(R.datos.contacto ? R.datos.contacto.nombre : "")}" required></label>
+        <label class="campo"><span>Puesto <small>opcional</small></span><input name="puesto" autocomplete="organization-title" value="${esc(R.datos.contacto && R.datos.contacto.puesto || "")}"></label>
+        <div class="campo"><span class="firma-t">Su firma<button class="lnk" type="button" data-borrar>Borrar</button></span><div class="firma-c"><canvas data-lienzo aria-label="Recuadro para firmar con el dedo o el mouse"></canvas><span class="firma-g" data-guia>Firme aquí con el dedo o el mouse</span></div></div>
+        <label class="chk"><input type="checkbox" name="acepto"><span>Apruebo la estimación ${esc(d.correlativo)} (${esc(s.numero)}) por ${esc(Q(d.neto))}${d.con_iva ? " con IVA" : ""}.</span></label>
+        <p class="err" data-err hidden></p>
+        <button class="e-btn e-btn-p ancho" type="submit" data-enviar>${ico("check", 18)}Aprobar y firmar</button>
+      </form>` : ""}`, h => {
+      const f = h.querySelector("[data-f-est]"); if (!f) return;
+      firma = lienzo(h.querySelector("[data-lienzo]"));
+      const guia = h.querySelector("[data-guia]");
+      h.querySelector("[data-lienzo]").addEventListener("firma", () => { guia.hidden = firma.tinta(); });
+      h.querySelector("[data-borrar]").addEventListener("click", () => firma.borrar());
+      const err = h.querySelector("[data-err]");
+      const mal = m => { err.textContent = m; err.hidden = false; };
+      f.addEventListener("submit", async ev => {
+        ev.preventDefault(); err.hidden = true;
+        if (f.nombre.value.trim().length < 3) { mal(ERR.nombre); f.nombre.focus(); return; }
+        if (firma.vacia()) { mal(ERR.firma); return; }
+        if (!f.acepto.checked) { mal("Marque la casilla de aprobación."); return; }
+        const b = h.querySelector("[data-enviar]"); b.disabled = true; b.lastChild.textContent = "Aprobando…";
+        try {
+          await API.aprobarEst(token, s.id, f.nombre.value, f.puesto.value, firma.png());
+          firma.soltar(); cerrarHoja(true);
+          R.est = await API.estimaciones(token).catch(() => R.est);
+          pintar(); aviso(`Estimación ${d.correlativo} aprobada. Gracias.`);
+        } catch (e) { mal(ERR[e.message] || ERR.red); b.disabled = false; b.lastChild.textContent = "Aprobar y firmar"; if (e.message === "no_disponible") { R.est = await API.estimaciones(token).catch(() => R.est); } }
+      });
+    });
+  }
+
   function gracias() {
     const ap = R.aprobado;
     abrirHoja(`<div class="hecho"><span class="ic-c verde">${ico("check", 28)}</span><h2>Propuesta aprobada</h2><p><b>Firmada por ${esc(ap.nombre)}</b><br>${esc(fechaHora(ap.fecha))}</p>${ap.eleccion_txt ? `<p class="escogio"><span>Escogió</span><b>${esc(ap.eleccion_txt)} · ${esc(Q(ap.total))}</b></p>` : ""}<p>${esc(R.datos.empresa.nombre || "EMTECSA")} ya recibió el aviso y le contactará para programar el trabajo.</p>
@@ -449,6 +533,7 @@
     if (e.target.closest("[data-tramite]")) tramite();
     const bj = e.target.closest("[data-bajar]"); if (bj) descargar(bj.dataset.bajar, bj);
     const cs = e.target.closest("[data-constancia]"); if (cs) constancia(cs);
+    const es = e.target.closest("[data-est]"); if (es) verEst(Number(es.dataset.est));
   });
 
   async function cargar() {
@@ -456,7 +541,7 @@
     try { R = await API.ver(token); }
     catch (e) { raiz.innerHTML = `<section class="vacio-c"><span class="ic-c ambar">${ico("alerta", 26)}</span><h1>No se pudo abrir la propuesta</h1><p>${esc(ERR.red)}</p><div class="btns"><button class="e-btn e-btn-p" type="button" onclick="location.reload()">Intentar otra vez</button></div></section>`; return; }
     if (!R) { pintarNoHay(); return; }
-    if (R.aprobado) R.tramite = await API.verTramite(token).catch(() => null);
+    if (R.aprobado) { R.tramite = await API.verTramite(token).catch(() => null); R.est = await API.estimaciones(token).catch(() => []); }
     if (R.vencido) pintarVencido(); else pintar();
   }
   window.addEventListener("hashchange", () => location.reload());

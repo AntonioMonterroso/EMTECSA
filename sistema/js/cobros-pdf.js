@@ -200,5 +200,71 @@
     return doc.save();
   }
 
-  Object.assign(P, { recibo, estadoCuenta, pedido, reporteFinanzas });
+  async function estimacion({ est, emp }) {
+    const d = est.datos || {};
+    const { doc, F, hex, txt, cabeza, pie } = await nuevo(`${est.numero} · Estimación ${est.correlativo}`, emp);
+    const cant = n => Number(n || 0).toLocaleString("en-US", { maximumFractionDigits: 3 });
+    const pct = n => `${(Math.round((Number(n) || 0) * 100) / 100).toLocaleString("en-US", { maximumFractionDigits: 2 })} %`;
+    const paginas = [];
+    let pg = doc.addPage([W, H]); paginas.push(pg);
+    cabeza(pg, "ESTIMACIÓN DE AVANCE", est.numero, (emp.ciudad ? emp.ciudad + ", " : "") + fLarga(est.fecha));
+    if (est.estado === "borrador") txt(pg, "BORRADOR", W / 2, H / 2 - 40, { f: F.x, s: 80, c: "#EEF1F4", centro: true });
+    let y = H - 162;
+    const dato = (eti, val, x, yy, w) => { txt(pg, eti.toUpperCase(), x, yy, { f: F.b, s: 7.5, c: COL.gris }); partir(val || "—", F.s, 11, w).slice(0, 2).forEach((l, i) => txt(pg, l, x, yy - 15 - i * 14, { f: F.s, s: 11 })); };
+    dato("Cliente", d.cliente || "", M, y, 300);
+    dato("Estimación", `No. ${est.correlativo}`, 400, y, W - M - 400);
+    y -= 52;
+    dato("Obra", [d.obra && d.obra.numero, d.obra && d.obra.titulo].filter(Boolean).join(" · "), M, y, 300);
+    dato("Período", [d.desde && fCorta(d.desde), d.hasta && fCorta(d.hasta)].filter(Boolean).join(" al ") || fCorta(est.fecha), 400, y, W - M - 400);
+    y -= 60;
+    const filas = d.filas || [];
+    if (filas.length) {
+      const COLS = [[M, "DESCRIPCIÓN"], [W - M - 250, "CONTRATADO"], [W - M - 185, "ANTERIOR"], [W - M - 120, "ESTE PERÍODO"], [W - M - 50, "A LA FECHA"], [W - M, "%"]];
+      const cabTabla = (p2, yy) => { p2.drawRectangle({ x: M, y: yy - 8, width: W - 2 * M, height: 24, color: hex(COL.marino) }); COLS.forEach(([x, t], i) => txt(p2, t, x + (i < 1 ? 8 : -6), yy, { f: F.b, s: 7, c: "#FFFFFF", der: i >= 1 })); return yy - 26; };
+      y = cabTabla(pg, y);
+      filas.forEach((f, i) => {
+        const l = partir(f.d, F.r, 9, W - M - 250 - M - 70).slice(0, 3);
+        const alto = 10 + l.length * 12;
+        if (y - alto < PIE + 40) { pg = doc.addPage([W, H]); paginas.push(pg); y = cabTabla(pg, H - M - 10); }
+        if (i % 2 === 1) pg.drawRectangle({ x: M, y: y - alto + 12, width: W - 2 * M, height: alto, color: hex("#F5F7F9") });
+        l.forEach((t, j) => txt(pg, t, M + 8, y - j * 12, { s: 9, f: F.s }));
+        txt(pg, cant(f.c), W - M - 256, y, { s: 9, der: true, c: COL.gris });
+        txt(pg, cant(f.ant), W - M - 191, y, { s: 9, der: true, c: COL.gris });
+        txt(pg, cant(f.per), W - M - 126, y, { s: 9, der: true, f: f.per > 0 ? F.b : F.r });
+        txt(pg, cant(f.acum), W - M - 56, y, { s: 9, der: true });
+        txt(pg, pct(f.c ? f.acum / f.c * 100 : 0), W - M - 6, y, { s: 8.5, der: true, c: COL.gris });
+        y -= alto;
+      });
+      y -= 14;
+    }
+    const lineas = [["Total del contrato", Q(d.contrato)], [`Avance a la fecha: ${pct(d.pct_acum)}${est.correlativo > 1 ? ` (antes ${pct(d.pct_ant)})` : ""}`, Q(d.bruto_acum)]];
+    if (est.correlativo > 1) lineas.push(["Menos lo estimado antes", "− " + Q(d.bruto_prev)]);
+    lineas.push(["Esta estimación", Q(est.bruto), 1]);
+    if (est.anticipo) lineas.push([`Menos anticipo (${Q(d.anticipo_total)} en total)`, "− " + Q(est.anticipo)]);
+    if (est.garantia) lineas.push([`Menos garantía retenida ${pct(d.garantia_pct)}`, "− " + Q(est.garantia)]);
+    const altoRes = lineas.length * 18 + 60;
+    if (y - altoRes < PIE + 150) { pg = doc.addPage([W, H]); paginas.push(pg); y = H - M - 10; }
+    const rx = W - M - 300;
+    lineas.forEach(([t, v, neg]) => { txt(pg, t, rx, y, { s: 9.5, f: neg ? F.b : F.r, c: neg ? COL.texto : COL.gris }); txt(pg, v, W - M, y, { s: 9.5, f: neg ? F.b : F.s, der: true }); y -= 18; });
+    pg.drawRectangle({ x: rx - 12, y: y - 34, width: W - M - rx + 12, height: 44, color: hex(COL.noche) });
+    txt(pg, "A COBRAR", rx, y - 12, { f: F.b, s: 8, c: COL.laton });
+    txt(pg, Q(est.neto), W - M - 10, y - 18, { f: F.x, s: 16, c: "#FFFFFF", der: true });
+    y -= 50;
+    txt(pg, d.con_iva ? "Montos con IVA, en la misma proporción del contrato." : "Montos en la misma proporción del contrato.", rx, y, { s: 8, c: COL.gris });
+    if (d.notas) { y -= 22; partir("Notas: " + d.notas, F.r, 9, W - 2 * M).slice(0, 4).forEach((l, i) => txt(pg, l, M, y - i * 12, { s: 9, c: COL.gris })); y -= 48; }
+    y -= 60;
+    if (y < PIE + 70) { pg = doc.addPage([W, H]); paginas.push(pg); y = H - M - 90; }
+    const ap = est.aprobado;
+    const firmaX = (x, nombre, rol) => { pg.drawLine({ start: { x, y }, end: { x: x + 210, y }, thickness: 0.8, color: hex(COL.texto) }); txt(pg, nombre || "", x + 105, y - 16, { f: F.b, s: 10, centro: true }); txt(pg, rol, x + 105, y - 30, { s: 8.5, c: COL.gris, centro: true }); };
+    firmaX(M, emp.firma_nombre || emp.nombre || "EMTECSA", ["Elaboró", emp.firma_puesto].filter(Boolean).join(" · "));
+    if (ap && ap.firma && /^data:image\/png;base64,/.test(ap.firma)) {
+      try { const img = await doc.embedPng(Uint8Array.from(atob(ap.firma.split(",")[1]), c => c.charCodeAt(0))); const hF = 46, wF = Math.min(200, hF * img.width / img.height); pg.drawImage(img, { x: W - M - 105 - wF / 2, y: y + 4, width: wF, height: hF }); } catch (e) {}
+    }
+    firmaX(W - M - 210, ap ? ap.nombre : "", ap ? [ap.puesto, "Aprobó · " + new Date(ap.fecha).toLocaleString("es-GT", { timeZone: "America/Guatemala", day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })].filter(Boolean).join(" · ") : "Aprobó por el cliente");
+    if (est.estado === "anulada") { txt(pg, "ANULADA", W / 2, H / 2 - 40, { f: F.x, s: 80, c: "#B3261E", centro: true }); txt(pg, est.motivo_anulado || "", W / 2, H / 2 - 66, { f: F.s, s: 11, c: "#B3261E", centro: true }); }
+    paginas.forEach((p, i) => { pie(p); txt(p, `Página ${i + 1} de ${paginas.length}`, W - M, PIE - 4, { s: 7.5, c: COL.gris, der: true }); });
+    return doc.save();
+  }
+
+  Object.assign(P, { recibo, estadoCuenta, pedido, reporteFinanzas, estimacion });
 })();

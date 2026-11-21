@@ -44,7 +44,7 @@ window.EMT_ENLACES = (() => {
     let en = await D.enlaceDe(c.id).catch(() => null);
     vivo = { id: c.id, refrescar: o.alAprobar, pintar: () => panel(o) };
     if (en) {
-      const ids = en.eventos.filter(x => !x.atendido && x.tipo !== "mensaje").map(x => x.id);
+      const ids = en.eventos.filter(x => !x.atendido && x.tipo !== "mensaje" && x.tipo !== "estimacion").map(x => x.id);
       if (ids.length) { await D.atenderEventos(ids).catch(() => {}); insignia(); }
     }
     o.hayEnlace = !!en;
@@ -146,21 +146,24 @@ window.EMT_ENLACES = (() => {
     mensaje: x => ({ c: "laton", i: "chat", t: `Pregunta de ${x.cliente}`, d: `${x.numero} · «${String(x.texto || "").slice(0, 90)}${String(x.texto || "").length > 90 ? "…" : ""}»`, chip: "Responder" }),
     abrio: x => ({ c: "azul", i: "eye", t: `Abrió la propuesta: ${x.cliente}`, d: `${x.numero} · ${cuando(x.fecha)}`, chip: "Visto" }),
     volvio: x => ({ c: "azul", i: "eye", t: `Volvió a verla: ${x.cliente}`, d: `${x.numero} · ${cuando(x.fecha)}`, chip: "Otra vez" }),
-    datos: x => ({ c: "verde", i: "file", t: `Mandó sus datos para Energuate: ${x.cliente}`, d: `${x.numero} · ${cuando(x.fecha)}`, chip: "Datos" })
+    datos: x => ({ c: "verde", i: "file", t: `Mandó sus datos para Energuate: ${x.cliente}`, d: `${x.numero} · ${cuando(x.fecha)}`, chip: "Datos" }),
+    estimacion: x => ({ c: "verde", i: "check", t: `Aprobó una estimación: ${x.cliente}`, d: `${String(x.texto || "").split(" · ")[0]} · ${cuando(x.fecha)} · ya está en Por cobrar`, chip: "Aprobada", accion: "Ver" })
   };
-  const ORDEN = { aprobo: 0, mensaje: 1, datos: 2, volvio: 3, abrio: 4 };
+  const ORDEN = { aprobo: 0, estimacion: 1, mensaje: 2, datos: 3, volvio: 4, abrio: 5 };
   async function porAtender() {
     if (!D.puede(A().sesion().perfil, "verEnlaces")) return [];
     const l = await D.pendientesEnlace().catch(() => []);
     const vistos = new Set();
-    return l.filter(x => { const k = x.tipo === "mensaje" ? "m" + x.id : x.tipo + x.cotizacion_id; if (vistos.has(k)) return false; vistos.add(k); return true; })
+    const obraDe = {};
+    for (const x of l) if (x.tipo === "estimacion" && !(x.cotizacion_id in obraDe)) obraDe[x.cotizacion_id] = await D.obraDeCotizacion(x.cotizacion_id).catch(() => null);
+    return l.filter(x => TXT[x.tipo]).filter(x => { const k = x.tipo === "mensaje" || x.tipo === "estimacion" ? x.tipo[0] + x.id : x.tipo + x.cotizacion_id; if (vistos.has(k)) return false; vistos.add(k); return true; })
       .sort((a, b) => ORDEN[a.tipo] - ORDEN[b.tipo])
-      .map(x => ({ ...TXT[x.tipo]({ cliente: x.cotizacion && x.cotizacion.cliente ? x.cotizacion.cliente.nombre : "Cliente", numero: x.cotizacion ? x.cotizacion.numero : "", texto: x.texto, fecha: x.fecha }), h: `#/cotizaciones/${x.cotizacion_id}`, tipo: x.tipo }));
+      .map(x => ({ ...TXT[x.tipo]({ cliente: x.cotizacion && x.cotizacion.cliente ? x.cotizacion.cliente.nombre : "Cliente", numero: x.cotizacion ? x.cotizacion.numero : "", texto: x.texto, fecha: x.fecha }), h: x.tipo === "estimacion" && obraDe[x.cotizacion_id] ? `#/obras/${obraDe[x.cotizacion_id]}/dinero` : `#/cotizaciones/${x.cotizacion_id}`, tipo: x.tipo }));
   }
 
   async function insignia() {
     let n = 0;
-    try { if (D.puede(A().sesion().perfil, "verEnlaces")) n = (await D.pendientesEnlace()).filter(x => x.tipo === "aprobo" || x.tipo === "mensaje").length; } catch (e) {}
+    try { if (D.puede(A().sesion().perfil, "verEnlaces")) n = (await D.pendientesEnlace()).filter(x => x.tipo === "aprobo" || x.tipo === "mensaje" || x.tipo === "estimacion").length; } catch (e) {}
     const m = document.querySelector(".barra [data-menu]"); if (m) { m.dataset.pCot = n; m.classList.toggle("con-punto", Number(m.dataset.pCot || 0) + Number(m.dataset.pTienda || 0) + Number(m.dataset.pEq || 0) > 0); }
     if (A().marcarInsignia) A().marcarInsignia("cotizaciones", n);
   }
@@ -179,7 +182,7 @@ window.EMT_ENLACES = (() => {
     x = x || l.find(y => y.cotizacion_id === m.cotizacion_id && y.tipo === m.tipo);
     const cliN = x && x.cotizacion && x.cotizacion.cliente ? x.cotizacion.cliente.nombre : "El cliente";
     const num = x && x.cotizacion ? x.cotizacion.numero : "";
-    const T = { aprobo: [`${cliN} aprobó ${num}`, x && x.texto ? "Firmó " + x.texto : "Con su firma"], mensaje: [`Pregunta de ${cliN}`, x ? String(x.texto || "").slice(0, 120) : ""], abrio: [`${cliN} abrió la propuesta`, num], volvio: [`${cliN} volvió a ver la propuesta`, num], datos: [`${cliN} mandó sus datos para Energuate`, num] }[m.tipo];
+    const T = { aprobo: [`${cliN} aprobó ${num}`, x && x.texto ? "Firmó " + x.texto : "Con su firma"], mensaje: [`Pregunta de ${cliN}`, x ? String(x.texto || "").slice(0, 120) : ""], abrio: [`${cliN} abrió la propuesta`, num], volvio: [`${cliN} volvió a ver la propuesta`, num], datos: [`${cliN} mandó sus datos para Energuate`, num], estimacion: [`${cliN} aprobó una estimación`, x && x.texto ? String(x.texto) : num] }[m.tipo];
     if (!T) return;
     A().aviso(T[0] + (m.tipo === "mensaje" ? "" : ""));
     notificar(T[0], T[1], m.cotizacion_id);

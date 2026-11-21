@@ -1569,3 +1569,44 @@ fieldset.empresa[data-grupo-act="obras"] > details[data-grupo-e="obras"] { displ
 @media (max-width: 560px) { .fin-flujo { grid-template-columns: repeat(2, minmax(0, 1fr)); } .lista .fila.fin-pr { grid-template-columns: minmax(0, 1fr); } .fin-pr .der { text-align: left; } .lista .fila.con-lapiz.fin-meta { grid-template-columns: 30px minmax(0, 1fr) auto; } .fin-meta .acc { flex-direction: column; } .fin-presu .f-mat { grid-template-columns: minmax(0, 1fr) 128px; } }
 .fin-sub { font-size: 15px; font-weight: 750; margin: 6px 0 0; }
 @media (min-width: 720px) { .modal.modal-ancho { width: min(760px, calc(100vw - 32px)); max-width: none; } }
+.est-caja { display: grid; gap: 12px; }
+.est-caja .sub { margin-top: 8px; }
+.est-acc { display: flex; gap: 8px; align-items: center; margin: 0; }
+.est-vacio { display: grid; gap: 12px; justify-items: start; text-align: left; }
+.est-res-o .ancho2 { gap: 8px; }
+.est-barra { max-width: none; height: 6px; margin-top: 0; }
+.est-f { cursor: pointer; }
+.est-anulada b, .est-anulada .e-cifra { text-decoration: line-through; color: var(--text-muted); }
+.est-fechas { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.est-fechas input { width: 100%; min-width: 0; }
+.est-rs { display: grid; gap: 8px; }
+.est-r { display: grid; grid-template-columns: minmax(0, 1fr) 150px auto; gap: 12px; align-items: end; padding: 12px 14px; border-radius: 16px; background: var(--capa); border: 1px solid var(--capa-borde); }
+.est-d { display: grid; gap: 2px; min-width: 0; align-self: center; }
+.est-d b { font-size: 14.5px; overflow-wrap: anywhere; }
+.est-d small { font-size: 12.5px; color: var(--text-muted); }
+.est-in { margin: 0; }
+.est-in span { font-size: 12px; }
+.est-in input { width: 100%; min-width: 0; text-align: right; }
+.est-r .s-btn.chico { margin: 0; min-height: 44px; }
+.est-cuenta { display: grid; gap: 6px; padding: 14px 16px; border-radius: 16px; background: var(--capa); border: 1px solid var(--capa-borde); }
+.est-cuenta > div { display: flex; justify-content: space-between; gap: 12px; font-size: 14px; }
+.est-cuenta > div span { color: var(--text-muted); min-width: 0; }
+.est-cuenta > div b { white-space: nowrap; }
+.est-cuenta small { font-weight: 500; color: var(--text-muted); }
+.est-cuenta .est-sub { padding-top: 6px; border-top: 1px solid var(--linea-s); }
+.est-cuenta .est-sub span, .est-cuenta .est-total span { color: var(--text); font-weight: 650; }
+.est-cuenta .est-total { padding-top: 8px; border-top: 1px solid var(--linea-s); font-size: 16px; }
+.est-cuenta.mal p { margin: 0; color: var(--aviso); font-size: 14px; }
+.est-estado { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 0; font-size: 13.5px; }
+.est-det summary { cursor: pointer; font-size: 14px; font-weight: 650; padding: 4px 0; }
+.est-det .lista { margin-top: 8px; }
+.est-quitar { display: grid; gap: 8px; border: 1px solid var(--capa-borde); border-radius: 16px; padding: 12px 14px; margin: 0; }
+.est-quitar legend { font-size: 13.5px; font-weight: 650; padding: 0 4px; }
+.est-quitar .chk-f { display: flex; gap: 10px; align-items: center; font-size: 14px; min-height: 36px; }
+@media (max-width: 640px) {
+  .est-fechas { grid-template-columns: 1fr 1fr; }
+  .est-fechas > :first-child { grid-column: 1 / -1; }
+  .est-r { grid-template-columns: minmax(0, 1fr) auto; }
+  .est-d { grid-column: 1 / -1; }
+}
+.nw { white-space: nowrap; }

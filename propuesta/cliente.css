@@ -210,3 +210,18 @@ form { display: grid; gap: 14px; }
 .ter { display: grid; gap: 10px; margin: 0 0 12px; padding: 14px; border: 1px solid var(--border); border-radius: var(--radio-md); }
 .ter legend { padding: 0 6px; font-size: var(--t-sm); font-weight: 700; }
 .ter .lnk { justify-self: start; color: var(--peligro); }
+.est-c { display: grid; gap: 10px; }
+.est-f { display: flex; justify-content: space-between; align-items: center; gap: 14px; padding: 12px 0; border-top: 1px solid var(--hairline); }
+.est-f .ok { color: var(--exito, #1F6B4C); font-weight: 600; }
+.est-der { display: grid; gap: 8px; justify-items: end; flex: none; }
+.est-der .e-cifra { font-size: var(--t-md); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.est-cu small { font-weight: 500; color: var(--text-muted); }
+.est-det { box-shadow: none; }
+@media (max-width: 520px) {
+  .est-f { flex-direction: column; align-items: stretch; }
+  .est-der { grid-template-columns: 1fr auto; align-items: center; justify-items: stretch; }
+  .est-der .e-btn { justify-content: center; }
+}
+.est-banda { align-items: center; }
+.est-banda > span { flex: 1; min-width: 0; }
+.est-banda .e-btn { flex: none; min-height: 44px; }

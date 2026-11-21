@@ -62,11 +62,11 @@
     if (l.some(p => !(p.monto >= 0))) throw new Error("Revise los montos del plan de pagos.");
     const b = await todo();
     const conPagos = new Set(b.pagos.filter(x => !x.anulado && x.parte_id).map(x => x.parte_id));
-    const quitadas = b.partes.filter(p => p.obra_id === obraId && !l.some(x => x.id === p.id));
+    const quitadas = b.partes.filter(p => p.obra_id === obraId && (p.orden || 0) < 100 && !l.some(x => x.id === p.id));
     if (quitadas.some(p => conPagos.has(p.id))) throw new Error("No se puede quitar un pago del plan que ya tiene cobros registrados.");
     if (!nube) {
       const d = leer();
-      d.partes = d.partes.filter(p => p.obra_id !== obraId || l.some(x => x.id === p.id));
+      d.partes = d.partes.filter(p => p.obra_id !== obraId || (p.orden || 0) >= 100 || l.some(x => x.id === p.id));
       l.forEach(p => { if (p.id) Object.assign(d.partes.find(x => x.id === p.id), p); else d.partes.push({ ...p, id: d.sig.x++, obra_id: obraId }); });
       escribir(d); return;
     }
@@ -75,6 +75,16 @@
       const { id, ...datos } = p;
       await ok(id ? await sb.from("cobros_partes").update(datos).eq("id", id) : await sb.from("cobros_partes").insert({ ...datos, obra_id: obraId }), "No se pudo guardar el plan de pagos.");
     }
+  }
+
+  async function agregarParte(obraId, p) {
+    const datos = { obra_id: obraId, descripcion: t(p.descripcion), porcentaje: null, monto: r2(p.monto), vence: fechaO(p.vence), orden: Number(p.orden) || 100 };
+    if (!nube) { const d = leer(); const id = d.sig.x++; d.partes.push({ id, ...datos }); escribir(d); return id; }
+    return (await ok(await sb.from("cobros_partes").insert(datos).select("id").single(), "No se pudo agregar el cobro.")).id;
+  }
+  async function quitarParte(id) {
+    if (!nube) { const d = leer(); d.partes = d.partes.filter(p => p.id !== id); escribir(d); return; }
+    await ok(await sb.from("cobros_partes").delete().eq("id", id), "No se pudo quitar el cobro.");
   }
 
   function siguienteNumero(l) { const n = l.map(x => Number((String(x.numero).match(/^REC-(\d+)$/) || [])[1] || 0)).reduce((a, b) => Math.max(a, b), 0); return "REC-" + String(n + 1).padStart(4, "0"); }
@@ -149,5 +159,5 @@
     return txt.charAt(0).toUpperCase() + txt.slice(1);
   }
 
-  Object.assign(D, { FORMAS, TIPOS_FIANZA, TIPOS_GASTO, resumenCobros: resumen, guardarPlan, registrarPago, anularPago, guardarFianza, guardarGasto, quitarGasto, estadoCuenta, enLetras });
+  Object.assign(D, { FORMAS, TIPOS_FIANZA, TIPOS_GASTO, resumenCobros: resumen, guardarPlan, agregarParte, quitarParte, registrarPago, anularPago, guardarFianza, guardarGasto, quitarGasto, estadoCuenta, enLetras });
 })();
