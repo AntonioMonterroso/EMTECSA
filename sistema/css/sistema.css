@@ -1567,3 +1567,5 @@ fieldset.empresa[data-grupo-act="obras"] > details[data-grupo-e="obras"] { displ
 .fin-flujo b { font-size: 15px; }
 .fin-presu .f-mat { grid-template-columns: minmax(0, 1fr) 150px; }
 @media (max-width: 560px) { .fin-flujo { grid-template-columns: repeat(2, minmax(0, 1fr)); } .lista .fila.fin-pr { grid-template-columns: minmax(0, 1fr); } .fin-pr .der { text-align: left; } .lista .fila.con-lapiz.fin-meta { grid-template-columns: 30px minmax(0, 1fr) auto; } .fin-meta .acc { flex-direction: column; } .fin-presu .f-mat { grid-template-columns: minmax(0, 1fr) 128px; } }
+.fin-sub { font-size: 15px; font-weight: 750; margin: 6px 0 0; }
+@media (min-width: 720px) { .modal.modal-ancho { width: min(760px, calc(100vw - 32px)); max-width: none; } }

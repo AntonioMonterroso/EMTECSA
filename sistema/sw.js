@@ -1,5 +1,5 @@
 "use strict";
-const VERSION = "emtecsa-2026-11-18-28";
+const VERSION = "emtecsa-2026-11-18-29";
 const BASE = [
   "./", "./index.html", "./manifest.webmanifest", "./css/sistema.css", "./css/temas.css", "./js/temas.js",
   "./js/config.js", "./js/semilla.js", "./js/datos.js", "./js/datos-clientes.js", "./js/datos-cotizaciones.js", "./js/datos-obras.js", "./js/datos-cobros.js", "./js/simbolos.js", "./js/datos-compras.js", "./js/datos-planos.js", "./js/cola.js", "./js/rapido.js", "./js/planos.js", "./js/datos-tienda.js", "./js/tienda.js", "./js/datos-docs.js", "./js/expediente.js", "./js/datos-enlaces.js", "./js/datos-conteo.js", "./js/conteo.js", "./js/datos-energuate.js", "./js/energuate-docs.js", "./js/energuate.js", "./js/datos-equipo.js", "./js/equipo.js", "./js/datos-costos.js", "./js/costos.js", "./js/datos-seguimiento.js", "./js/seguimiento.js", "./js/perfil.js", "./js/dev.js", "./js/vista-previa.js", "./plantillas/dictamen-capacidad.xlsx", "./plantillas/dictamen-medida-centralizacion.xlsx", "./plantillas/derecho-de-paso.docx", "./plantillas/boleta-solicitante.pdf", "./plantillas/requisitos-licencia.pdf", "./js/constancia-pdf.js", "./js/enlaces.js", "./marcas/energuate.png", "./marcas/eegsa.png",

@@ -162,5 +162,43 @@
     return doc.save();
   }
 
-  Object.assign(P, { recibo, estadoCuenta, pedido });
+  async function reporteFinanzas({ titulo, ambito, etRes, ti, tg, res, ing, gas, emp }) {
+    const { doc, F, hex, txt, cabeza, pie } = await nuevo(`Finanzas · ${titulo}`, emp);
+    const hoy = (d => new Date(d - d.getTimezoneOffset() * 6e4).toISOString().slice(0, 10))(new Date());
+    const paginas = [];
+    let pg = doc.addPage([W, H]); paginas.push(pg);
+    cabeza(pg, ambito === "empresa" ? "FINANZAS DE LA EMPRESA" : "FINANZAS PERSONALES", titulo.charAt(0).toUpperCase() + titulo.slice(1), "Hecho el " + fLarga(hoy));
+    let y = H - 160;
+    const bw = (W - 2 * M - 20) / 3;
+    [["Ingresos", ti], ["Gastos", tg], [etRes, res]].forEach(([t, n], i) => {
+      const x = M + i * (bw + 10);
+      pg.drawRectangle({ x, y: y - 46, width: bw, height: 54, color: hex(i === 2 ? COL.noche : COL.fondo) });
+      txt(pg, t.toUpperCase(), x + 12, y - 8, { f: F.b, s: 7.5, c: i === 2 ? COL.laton : COL.gris });
+      txt(pg, Q(n), x + 12, y - 32, { f: F.x, s: 13, c: i === 2 ? "#FFFFFF" : i === 0 ? "#1F6B4C" : COL.marino });
+    });
+    y -= 84;
+    const bloque = (t, l, tot) => {
+      if (y < PIE + 90) { pg = doc.addPage([W, H]); paginas.push(pg); y = H - M - 10; }
+      pg.drawRectangle({ x: M, y: y - 8, width: W - 2 * M, height: 24, color: hex(COL.marino) });
+      txt(pg, t.toUpperCase(), M + 8, y, { f: F.b, s: 7.5, c: "#FFFFFF" }); txt(pg, "MONTO", W - M - 60, y, { f: F.b, s: 7.5, c: "#FFFFFF", der: true }); txt(pg, "%", W - M - 8, y, { f: F.b, s: 7.5, c: "#FFFFFF", der: true });
+      y -= 26;
+      if (!l.length) { txt(pg, "Nada.", M + 8, y, { s: 9.5, c: COL.gris }); y -= 22; return; }
+      l.forEach((x, i) => {
+        if (y < PIE + 40) { pg = doc.addPage([W, H]); paginas.push(pg); y = H - M - 10; }
+        if (i % 2 === 1) pg.drawRectangle({ x: M, y: y - 6, width: W - 2 * M, height: 20, color: hex("#F5F7F9") });
+        txt(pg, partir(x.n, F.r, 9.5, W - 2 * M - 160)[0], M + 8, y, { s: 9.5 });
+        txt(pg, Q(x.v), W - M - 60, y, { s: 9.5, der: true });
+        txt(pg, (tot ? Math.round(x.v / tot * 100) : 0) + " %", W - M - 8, y, { s: 9.5, c: COL.gris, der: true });
+        y -= 20;
+      });
+      y -= 16;
+    };
+    bloque("Gastos por categoría", gas, tg);
+    bloque("Ingresos por categoría", ing, ti);
+    if (arguments[0].prest) { if (y < PIE + 40) { pg = doc.addPage([W, H]); paginas.push(pg); y = H - M - 10; } txt(pg, `Préstamos recibidos: ${Q(arguments[0].prest)} (no se cuentan como ingreso porque se tienen que devolver).`, M, y, { s: 9, c: COL.gris }); }
+    paginas.forEach((p, i) => { pie(p); txt(p, `Página ${i + 1} de ${paginas.length}`, W - M, PIE - 4, { s: 7.5, c: COL.gris, der: true }); });
+    return doc.save();
+  }
+
+  Object.assign(P, { recibo, estadoCuenta, pedido, reporteFinanzas });
 })();
