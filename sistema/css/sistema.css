@@ -1631,3 +1631,5 @@ fieldset.empresa[data-grupo-act="obras"] > details[data-grupo-e="obras"] { displ
   .oc-r .oc-d { grid-column: 1 / -1; }
 }
 [data-oc-cuerpo] { display: grid; gap: 12px; }
+.lista .fila.num-f { grid-template-columns: 40px minmax(0, 1fr) auto; }
+.enl-vers .lista { margin-top: 8px; }

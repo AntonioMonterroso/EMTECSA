@@ -4,7 +4,7 @@
   const { nube, sb } = D;
   const CLAVE = "emtecsa.sistema.enlaces";
   const ANIO = 365 * 86400;
-  const vacio = () => ({ v: 1, sig: { e: 1, ev: 1 }, enlaces: [], eventos: [] });
+  const vacio = () => ({ v: 1, sig: { e: 1, ev: 1, ve: 1 }, enlaces: [], eventos: [], versiones: [] });
   const CLAVE_AT = "emtecsa.sistema.enlaces-atendidos";
   const atendidos = () => { try { return JSON.parse(localStorage.getItem(CLAVE_AT)) || {}; } catch (e) { return {}; } };
   const leer = () => {
@@ -63,12 +63,52 @@
     return { ...e, eventos: ev };
   }
 
+  function cambiosEntre(a, b) {
+    const rs = d => [...(d.partidas || []).map(p => ({ d: p.d, c: Number(p.c), u: Number(p.u), t: Number(p.t) })), ...(d.cargos || []).map(g => ({ d: g.d, c: 1, u: Number(g.m), t: Number(g.m) }))];
+    const A = rs(a), B = rs(b), key = x => String(x.d || "").trim().toLowerCase(), usados = new Set();
+    const agregados = [], quitados = [], cambiados = [];
+    B.forEach(x => { const i = A.findIndex((y, j) => !usados.has(j) && key(y) === key(x)); if (i < 0) { agregados.push(x); return; } usados.add(i); const y = A[i]; if (y.c !== x.c || y.u !== x.u) cambiados.push({ d: x.d, antes: { c: y.c, u: y.u, t: y.t }, ahora: { c: x.c, u: x.u, t: x.t } }); });
+    A.forEach((y, j) => { if (!usados.has(j)) quitados.push(y); });
+    const igual = (p, q) => JSON.stringify(p == null ? null : p) === JSON.stringify(q == null ? null : q);
+    const otros = [];
+    if (!igual(a.titulo, b.titulo)) otros.push("El nombre del trabajo");
+    if (!igual(a.opciones, b.opciones)) otros.push("Las opciones para escoger");
+    if (!igual(a.incluye, b.incluye) || !igual(a.excluye, b.excluye)) otros.push("Lo que incluye");
+    const cA = a.condiciones || {}, cB = b.condiciones || {};
+    if (!igual(cA.forma_pago, cB.forma_pago)) otros.push("La forma de pago");
+    if (!igual(cA.tiempo_entrega, cB.tiempo_entrega)) otros.push("El tiempo de entrega");
+    if (!igual(cA.garantia, cB.garantia)) otros.push("La garantía");
+    if (!igual(a.vence, b.vence)) otros.push("La vigencia");
+    if (!igual(a.notas, b.notas)) otros.push("Las notas");
+    return { total_antes: a.tot ? Number(a.tot.total) : null, total_ahora: b.tot ? Number(b.tot.total) : null, agregados, quitados, cambiados, otros };
+  }
+
+  async function versionesDe(cotId) {
+    if (!nube) return (leer().versiones || []).filter(x => x.cotizacion_id === cotId).sort((a, b) => b.version - a.version);
+    return ok(await sb.from("cotizacion_versiones").select("*").eq("cotizacion_id", cotId).order("version", { ascending: false }), "No se pudieron leer las versiones.");
+  }
+
   async function publicar(ctx, { expediente }) {
     const { c, cli } = ctx;
     const ya = await enlaceDe(c.id);
     if (ya && ya.aprobado) throw new Error("El cliente ya la aprobó; ese enlace ya no se cambia.");
     const datos = publico(ctx);
     if (datos.vence < hoyGT()) throw new Error("Con esa fecha y vigencia la propuesta ya venció. Cambie la fecha o los días de vigencia.");
+    const h0 = huella(datos);
+    let version = Number(c.version) || 1;
+    if (ya && ya.huella && ya.huella !== h0) {
+      const vAnt = Number(ya.datos && ya.datos.version) || version;
+      const pa = (ya.archivos || []).find(a => a.cual === "propuesta");
+      let archivo = null;
+      if (pa) { const b = await D.archivo(pa.ref).catch(() => null); if (b) { archivo = `versiones/${c.id}/v${vAnt}.pdf`; await D.guardarBlob(archivo, b, "application/pdf"); } }
+      const fv = { cotizacion_id: c.id, version: vAnt, datos: ya.datos, total: ya.datos && ya.datos.tot ? Number(ya.datos.tot.total) : null, archivo };
+      if (!nube) { const d = leer(); d.versiones = d.versiones || []; d.sig.ve = d.sig.ve || 1; if (!d.versiones.some(x => x.cotizacion_id === c.id && x.version === vAnt)) d.versiones.push({ id: d.sig.ve++, ...fv, creado: new Date().toISOString() }); escribir(d); }
+      else { const r = await sb.from("cotizacion_versiones").upsert(fv, { onConflict: "cotizacion_id,version" }); if (r.error) throw new Error("No se pudo guardar la versión anterior."); }
+      version = vAnt + 1;
+      datos.cambios = { desde: vAnt, fecha: new Date().toISOString(), ...cambiosEntre(ya.datos, datos) };
+      await D.ponerVersion(c.id, version); c.version = version;
+    } else if (ya && ya.datos && ya.datos.cambios) datos.cambios = ya.datos.cambios;
+    datos.version = version;
     const token = ya ? ya.token : nuevoToken();
     const archivos = [];
     const subir = async (cual, nombre, bytes) => {
@@ -80,7 +120,7 @@
     await subir("propuesta", window.EMT_PDF.nombreArchivo(c, cli), await window.EMT_PDF.generar(ctx));
     if (expediente) await subir("expediente", window.EMT_EXPEDIENTE.nombreArchivo(c, cli), await window.EMT_EXPEDIENTE.armar(ctx));
     if (ya) for (const a of ya.archivos || []) if (!archivos.some(x => x.ref === a.ref)) await D.quitarArchivo(a.ref);
-    const fila = { datos, huella: huella(datos), archivos, vence: datos.vence, activo: true, actualizado: new Date().toISOString() };
+    const fila = { datos, huella: h0, archivos, vence: datos.vence, activo: true, actualizado: new Date().toISOString() };
     if (!nube) {
       const d = leer();
       if (ya) { const i = d.enlaces.findIndex(x => x.id === ya.id); d.enlaces[i] = { ...d.enlaces[i], ...fila }; }
@@ -133,5 +173,5 @@
     return () => oyentes.delete(fn);
   }
 
-  Object.assign(D, { CLAVES_ENLACES: [CLAVE, CLAVE_AT], enlacePublico: publico, huellaEnlace: huella, venceDe, hoyGT, urlEnlace: urlDe, enlaceDe, publicarEnlace: publicar, cambiarEnlace, pendientesEnlace, atenderEventos, resumenEnlaces, alEnlace });
+  Object.assign(D, { CLAVES_ENLACES: [CLAVE, CLAVE_AT], enlacePublico: publico, huellaEnlace: huella, venceDe, hoyGT, urlEnlace: urlDe, enlaceDe, publicarEnlace: publicar, cambiarEnlace, pendientesEnlace, atenderEventos, resumenEnlaces, versionesDe, alEnlace });
 })();

@@ -96,7 +96,6 @@
     return r.data ? r.data.id : null;
   }
 
-  function siguienteNumero(l) { const n = l.map(x => Number((String(x.numero).match(/^OB-(\d+)$/) || [])[1] || 0)).reduce((a, b) => Math.max(a, b), 0); return "OB-" + String(n + 1).padStart(3, "0"); }
 
   async function crearObra(a) {
     if (!a.cliente_id) throw new Error("Escoja el cliente.");
@@ -109,11 +108,11 @@
       const d = leer();
       if (cab.cotizacion_id && d.obras.some(x => x.cotizacion_id === cab.cotizacion_id)) throw new Error("Esa cotización ya tiene su obra.");
       const id = d.sig.o++;
-      d.obras.push({ id, numero: siguienteNumero(d.obras), ...cab, creado: new Date().toISOString(), etapas: etapas.map(e => ({ id: d.sig.x++, ...e })), bitacora: [], previstos, movimientos: [], tramites: pasos.map(p => ({ id: d.sig.x++, ...p })) });
+      d.obras.push({ id, numero: await D.numeroDe("obra", d.obras), ...cab, creado: new Date().toISOString(), etapas: etapas.map(e => ({ id: d.sig.x++, ...e })), bitacora: [], previstos, movimientos: [], tramites: pasos.map(p => ({ id: d.sig.x++, ...p })) });
       escribir(d); return id;
     }
     const nums = await ok(await sb.from("obras").select("numero"), "No se pudo crear la obra.");
-    const r = await sb.from("obras").insert({ ...cab, numero: siguienteNumero(nums) }).select("id").single();
+    const r = await sb.from("obras").insert({ ...cab, numero: await D.numeroDe("obra", nums) }).select("id").single();
     if (r.error) throw new Error(/duplicate|unique/i.test(r.error.message) ? "Esa cotización ya tiene su obra." : "No se pudo crear la obra.");
     const id = r.data.id;
     if (etapas.length) await ok(await sb.from("obra_etapas").insert(etapas.map(e => ({ ...e, obra_id: id }))), "No se pudieron crear las etapas.");

@@ -149,7 +149,6 @@
     await ok(await sb.from("estimacion_config").delete().eq("obra_id", obra.id), "No se pudo quitar.");
   }
 
-  function siguienteNumero(l) { const n = l.map(x => Number((String(x.numero).match(/^EST-(\d+)$/) || [])[1] || 0)).reduce((a, b) => Math.max(a, b), 0); return "EST-" + String(n + 1).padStart(4, "0"); }
 
   function armarDatos(obra, cli, x, e, k) {
     return {
@@ -180,12 +179,12 @@
     if (!nube) {
       const d = leer();
       if (viejo) { const y = d.est.find(z => z.id === viejo.id); Object.assign(y, fila); y.datos = armarDatos(obra, cli, x, y, k); escribir(d); return y.id; }
-      const y = { id: d.sig.x++, obra_id: obra.id, numero: siguienteNumero(d.est), correlativo, estado: "borrador", aprobado: null, parte_id: null, creado: new Date().toISOString(), ...fila };
+      const y = { id: d.sig.x++, obra_id: obra.id, numero: await D.numeroDe("est", d.est), correlativo, estado: "borrador", aprobado: null, parte_id: null, creado: new Date().toISOString(), ...fila };
       y.datos = armarDatos(obra, cli, x, y, k); d.est.push(y); escribir(d); return y.id;
     }
     if (viejo) { await ok(await sb.from("estimaciones").update({ ...fila, datos: armarDatos(obra, cli, x, { ...viejo, ...fila }, k) }).eq("id", viejo.id), "No se pudo guardar la estimación."); return viejo.id; }
     const nums = await ok(await sb.from("estimaciones").select("numero"), "No se pudo guardar la estimación.");
-    const numero = siguienteNumero(nums);
+    const numero = await D.numeroDe("est", nums);
     const r = await ok(await sb.from("estimaciones").insert({ obra_id: obra.id, numero, correlativo, estado: "borrador", ...fila, datos: armarDatos(obra, cli, x, { numero, correlativo, ...fila }, k) }).select("id").single(), "No se pudo guardar la estimación.");
     return r.id;
   }

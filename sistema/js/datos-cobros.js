@@ -88,7 +88,6 @@
     await ok(await sb.from("cobros_partes").delete().eq("id", id), "No se pudo quitar el cobro.");
   }
 
-  function siguienteNumero(l) { const n = l.map(x => Number((String(x.numero).match(/^REC-(\d+)$/) || [])[1] || 0)).reduce((a, b) => Math.max(a, b), 0); return "REC-" + String(n + 1).padStart(4, "0"); }
 
   async function registrarPago(p) {
     const datos = { cliente_id: p.cliente_id, obra_id: p.obra_id || null, parte_id: p.parte_id || null, fecha: fechaO(p.fecha) || hoy(), monto: r2(p.monto), forma: FORMAS[p.forma] ? p.forma : "transferencia", referencia: o(p.referencia), banco: o(p.banco), notas: o(p.notas), anulado: false, motivo_anulado: null };
@@ -99,9 +98,9 @@
     if (ret < 0) throw new Error("La retención no puede ser negativa.");
     if (ret && !datos.const_iva) throw new Error("Escriba el número de la constancia de retención de IVA.");
     if (p.tope != null && r2(datos.monto + ret) > r2(p.tope) + 0.001) throw new Error(`El pago${ret ? " con la retención" : ""} pasa de lo que falta cobrar (${"Q " + r2(p.tope).toLocaleString("en-US", { minimumFractionDigits: 2 })}).`);
-    if (!nube) { const d = leer(); const id = d.sig.x++; const numero = siguienteNumero(d.pagos); d.pagos.push({ id, numero, creado: new Date().toISOString(), ...datos }); escribir(d); return { id, numero }; }
+    if (!nube) { const d = leer(); const id = d.sig.x++; const numero = await D.numeroDe("rec", d.pagos); d.pagos.push({ id, numero, creado: new Date().toISOString(), ...datos }); escribir(d); return { id, numero }; }
     const nums = await ok(await sb.from("pagos").select("numero"), "No se pudo registrar el pago.");
-    const r = await sb.from("pagos").insert({ ...datos, numero: siguienteNumero(nums) }).select("id, numero").single();
+    const r = await sb.from("pagos").insert({ ...datos, numero: await D.numeroDe("rec", nums) }).select("id, numero").single();
     return ok(r, "No se pudo registrar el pago.");
   }
 

@@ -226,3 +226,5 @@ form { display: grid; gap: 14px; }
 .est-banda > span { flex: 1; min-width: 0; }
 .est-banda .e-btn { flex: none; min-height: 44px; }
 .nw { white-space: nowrap; }
+.ver-c { border-color: var(--laton-300, #C8A96A); }
+.ver-otros { margin: 12px 0 0; }

@@ -85,7 +85,7 @@ window.EMT_PDF = (() => {
     const lw = 150; p1.drawImage(logoBl, { x: M, y: H - M - lw * logoBl.height / logoBl.width, width: lw, height: lw * logoBl.height / logoBl.width });
     const lt = partir(titulo, F.x, 38, W - 2 * M).slice(0, 4);
     let y = 214 + lt.length * 42;
-    txt(p1, `PROPUESTA TÉCNICA Y ECONÓMICA · ${c.numero}`, M, y + 14, { f: F.b, s: 9, c: COL.laton });
+    txt(p1, `PROPUESTA TÉCNICA Y ECONÓMICA · ${c.numero}${Number(c.version) > 1 ? " · VERSIÓN " + c.version : ""}`, M, y + 14, { f: F.b, s: 9, c: COL.laton });
     lt.forEach((l, i) => txt(p1, l, M, y - 30 - i * 42, { f: F.x, s: 38, c: "#FFFFFF" }));
     p1.drawLine({ start: { x: M, y: 196 }, end: { x: W - M, y: 196 }, thickness: 1.2, color: hex(COL.laton) });
     txt(p1, "PARA", M, 172, { f: F.b, s: 8, c: COL.claro });
@@ -101,7 +101,7 @@ window.EMT_PDF = (() => {
       pg = doc.addPage([W, H]); paginas.push(pg);
       const lh = 110 * logoCo.height / logoCo.width;
       pg.drawImage(logoCo, { x: M, y: H - 46 - lh, width: 110, height: lh });
-      txt(pg, `PROPUESTA ${c.numero}`, W - M, H - 46 - lh + 4, { f: F.b, s: 8, c: COL.latonT, der: true });
+      txt(pg, `PROPUESTA ${c.numero}${Number(c.version) > 1 ? " · V" + c.version : ""}`, W - M, H - 46 - lh + 4, { f: F.b, s: 8, c: COL.latonT, der: true });
       pg.drawLine({ start: { x: M, y: H - 70 }, end: { x: W - M, y: H - 70 }, thickness: 1.6, color: hex(COL.laton) });
       y = H - 104;
     };
@@ -261,7 +261,7 @@ window.EMT_PDF = (() => {
     return doc.save();
   }
 
-  function nombreArchivo(c, cli) { return `Propuesta ${c.numero}${cli ? " - " + cli.nombre.replace(/[\\/:*?"<>|]/g, "") : ""}.pdf`; }
+  function nombreArchivo(c, cli) { return `Propuesta ${c.numero}${Number(c.version) > 1 ? " V" + c.version : ""}${cli ? " - " + cli.nombre.replace(/[\\/:*?"<>|]/g, "") : ""}.pdf`; }
   function descargar(b, nombre) {
     const url = URL.createObjectURL(new Blob([b], { type: "application/pdf" }));
     const a = document.createElement("a"); a.href = url; a.download = nombre; document.body.appendChild(a); a.click(); a.remove();

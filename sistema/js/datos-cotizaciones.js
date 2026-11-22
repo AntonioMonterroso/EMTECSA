@@ -101,9 +101,48 @@
   }
   const nombreGrupo = (c, g) => { if (!g) return "Va en todas"; const [t, id] = String(g).split(":"); const o = c.opciones || {}; if (t === "o") { const x = (o.lista || []).find(y => y.id === id); return x ? `Opción ${x.id}${x.nombre ? " · " + x.nombre : ""}` : "Va en todas"; } const x = (o.extras || []).find(y => y.id === id); return x ? `Extra · ${x.nombre}` : "Va en todas"; };
 
-  function siguienteNumero(lista) {
-    const n = lista.map(x => Number((String(x.numero).match(/^COT-(\d+)$/) || [])[1] || 0)).reduce((a, b) => Math.max(a, b), 0);
-    return "COT-" + String(n + 1).padStart(4, "0");
+  const TIPOS_NUM = { cot: { n: "Cotizaciones", p: "COT", dig: 4 }, obra: { n: "Obras", p: "OB", dig: 3 }, rec: { n: "Recibos de pago", p: "REC", dig: 4 }, est: { n: "Estimaciones de avance", p: "EST", dig: 4 }, oc: { n: "Órdenes de cambio", p: "OC", dig: 4 } };
+  async function numeracion() {
+    let v = {};
+    if (!nube) v = leer().ajustes.numeracion || {};
+    else { const r = await sb.from("ajustes").select("valor").eq("clave", "numeracion").maybeSingle(); v = (r.data && r.data.valor) || {}; }
+    return Object.fromEntries(Object.entries(TIPOS_NUM).map(([k, t]) => [k, { nombre: t.n, prefijo: (v[k] && v[k].prefijo) || t.p, desde: Math.max(1, Number(v[k] && v[k].desde) || 1), dig: t.dig }]));
+  }
+  const escRe = s => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const armarNumero = (c, numeros) => {
+    const re = new RegExp(`^${escRe(c.prefijo)}-(\\d+)$`);
+    const n = numeros.map(x => Number((String(x).match(re) || [])[1] || 0)).reduce((a, b) => Math.max(a, b), 0);
+    return `${c.prefijo}-${String(Math.max(n + 1, c.desde)).padStart(c.dig, "0")}`;
+  };
+  async function numeroDe(tipo, lista) { const c = (await numeracion())[tipo]; return armarNumero(c, (lista || []).map(x => x && typeof x === "object" ? x.numero : x)); }
+  async function numerosUsados(tipo) {
+    const T = { cot: ["cotizaciones", "emtecsa.sistema.cotizaciones", "cotizaciones"], obra: ["obras", "emtecsa.sistema.obras", "obras"], rec: ["pagos", "emtecsa.sistema.cobros", "pagos"], est: ["estimaciones", "emtecsa.sistema.estimaciones", "est"], oc: ["ordenes_cambio", "emtecsa.sistema.cambios", "oc"] }[tipo];
+    if (!nube) { try { return ((JSON.parse(localStorage.getItem(T[1])) || {})[T[2]] || []).map(x => x.numero); } catch (e) { return []; } }
+    const r = await sb.from(T[0]).select("numero"); return r.error ? [] : r.data.map(x => x.numero);
+  }
+  async function proximosNumeros() {
+    const c = await numeracion();
+    const out = {};
+    for (const k of Object.keys(c)) out[k] = { ...c[k], siguiente: armarNumero(c[k], await numerosUsados(k)) };
+    return out;
+  }
+  async function ponerVersion(cotId, v) {
+    if (!nube) { const d = leer(); const c = d.cotizaciones.find(x => x.id === cotId); if (c) { c.version = v; escribir(d); } return; }
+    await ok(await sb.from("cotizaciones").update({ version: v }).eq("id", cotId), "No se pudo guardar la versión.");
+  }
+  async function guardarNumeracion(tipo, x) {
+    if (!TIPOS_NUM[tipo]) throw new Error("Ese documento no existe.");
+    const prefijo = String(x.prefijo || "").trim().toUpperCase();
+    if (!/^[A-Z0-9]{1,6}$/.test(prefijo)) throw new Error("El prefijo va con letras o números, de 1 a 6, sin espacios ni guiones.");
+    const desde = String(x.desde == null ? "" : x.desde).replace(/[,\s]/g, "") === "" ? 1 : Number(String(x.desde).replace(/[,\s]/g, ""));
+    if (!Number.isInteger(desde) || desde < 1 || desde > 9999999) throw new Error("El número tiene que ser entero, de 1 en adelante.");
+    const actual = await numeracion();
+    const otro = Object.entries(actual).find(([k, c]) => k !== tipo && c.prefijo === prefijo);
+    if (otro) throw new Error(`«${prefijo}» ya lo usan las ${otro[1].nombre.toLowerCase()}.`);
+    const valor = Object.fromEntries(Object.entries(actual).map(([k, c]) => [k, { prefijo: k === tipo ? prefijo : c.prefijo, desde: k === tipo ? desde : c.desde }]));
+    if (!nube) { const d = leer(); d.ajustes.numeracion = valor; escribir(d); return; }
+    const r = await sb.from("ajustes").upsert({ clave: "numeracion", valor });
+    if (r.error) throw new Error("No se pudo guardar la numeración.");
   }
 
   async function aumentoDefecto() {
@@ -163,7 +202,7 @@
     await ok(await sb.from("cotizaciones").update({ vigencia_dias: dias }).eq("id", id), "No se pudo cambiar la vigencia.");
   }
 
-  const COLS_COT = "id, numero, cliente_id, sitio_id, contacto_id, titulo, estado, fecha, vigencia_dias, iva, imprevistos_pct, descuento_tipo, descuento, notas, total, foto, alcance_incluye, alcance_excluye, condiciones, expediente, opciones, eleccion, tramite, creado";
+  const COLS_COT = "id, numero, cliente_id, sitio_id, contacto_id, titulo, estado, fecha, vigencia_dias, iva, imprevistos_pct, descuento_tipo, descuento, notas, total, foto, alcance_incluye, alcance_excluye, condiciones, expediente, opciones, eleccion, tramite, version, creado";
   const COLS_PART = "id, cotizacion_id, estructura_id, material_id, materiales, descripcion, cantidad, mano_obra, precio_unitario, orden, del_plano, grupo";
   const permisosYo = () => { const s2 = window.EMT_APP && window.EMT_APP.sesion(); const p = s2 && s2.perfil; return { costo: D.puede(p, "verCosto"), aumento: D.puede(p, "verCosto") || D.puede(p, "verAumento") }; };
 
@@ -191,12 +230,12 @@
     const base = { foto: "torre-luna-2", alcance_incluye: emp.incluye || null, alcance_excluye: emp.excluye || null, condiciones: { forma_pago: emp.forma_pago, tiempo_entrega: emp.tiempo_entrega, garantia: emp.garantia }, cliente_id, sitio_id: sitio_id || null, contacto_id: contacto_id || null, titulo: String(titulo || "").trim(), estado: "borrador", fecha: (d => new Date(d - d.getTimezoneOffset() * 6e4).toISOString().slice(0, 10))(new Date()), vigencia_dias: 30, aumento_pct: pct, iva: true, imprevistos_pct: null, descuento_tipo: null, descuento: null, notas: null, total: 0 };
     if (!nube) {
       const d = leer();
-      const c = { id: d.sig.c++, numero: siguienteNumero(d.cotizaciones), ...base, partidas: [], cargos: [], creado: new Date().toISOString() };
+      const c = { id: d.sig.c++, numero: await numeroDe("cot", d.cotizaciones), ...base, version: 1, partidas: [], cargos: [], creado: new Date().toISOString() };
       d.cotizaciones.push(c); escribir(d); return c.id;
     }
     if (!permisosYo().aumento) delete base.aumento_pct;
     const nums = await ok(await sb.from("cotizaciones").select("numero"), "No se pudo crear la cotización.");
-    const r = await sb.from("cotizaciones").insert({ ...base, numero: siguienteNumero(nums) }).select("id").single();
+    const r = await sb.from("cotizaciones").insert({ ...base, numero: await numeroDe("cot", nums) }).select("id").single();
     return (await ok(r, "No se pudo crear la cotización.")).id;
   }
 
@@ -246,5 +285,5 @@
     return { ...cat, materiales, estructuras: cat.estructuras.map(e => ({ ...e, materiales: e.materiales.map(x => ({ ...x, material: porId[x.material.id] || x.material })) })) };
   }
 
-  Object.assign(D, { catalogoParaCotizacion, empresa, guardarEmpresa, ingenierosDe, ING_K, ESTADOS, IVA, precioPieza, precioEstructura, calcularCotizacion: calcular, aumentoDefecto, guardarAumentoDefecto, cotizaciones, cotizacion, crearCotizacion: crear, guardarCotizacion: guardar, cambiarVigencia, escenariosCotizacion: escenarios, nombreGrupo });
+  Object.assign(D, { ponerVersion, TIPOS_NUM, numeracion, numeroDe, proximosNumeros, guardarNumeracion, catalogoParaCotizacion, empresa, guardarEmpresa, ingenierosDe, ING_K, ESTADOS, IVA, precioPieza, precioEstructura, calcularCotizacion: calcular, aumentoDefecto, guardarAumentoDefecto, cotizaciones, cotizacion, crearCotizacion: crear, guardarCotizacion: guardar, cambiarVigencia, escenariosCotizacion: escenarios, nombreGrupo });
 })();

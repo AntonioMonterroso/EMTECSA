@@ -254,6 +254,21 @@
       ${l.slice().reverse().map(s => { const d = s.datos || {}; return `<div class="est-f"><span class="pr-d"><b>Estimación ${esc(d.correlativo)} · <span class="nw">${esc(s.numero)}</span></b><small>${esc(periodoT(d))} · avance ${esc(pctT(d.pct_acum))}</small>${s.estado === "aprobada" && s.aprobado ? `<small class="ok">Aprobada por ${esc(s.aprobado.nombre)} · ${esc(fechaHora(s.aprobado.fecha))}</small>` : ""}</span><span class="est-der"><b class="e-cifra">${esc(Q(d.neto))}</b>${s.estado === "enviada" ? `<button class="e-btn e-btn-p" type="button" data-est="${s.id}">${ico("firma", 17)}Revisar y aprobar</button>` : `<button class="e-btn" type="button" data-est="${s.id}">Ver</button>`}</span></div>`; }).join("")}</section>`;
   }
 
+  function versionHTML() {
+    const d = R.datos, cm = d.cambios;
+    if (!(Number(d.version) > 1) || !cm) return "";
+    const fila = (sig, x, extra) => `<div class="pr"><span class="pr-d"><b>${sig} ${esc(x.d)}</b><small>${extra}</small></span></div>`;
+    const lis = [
+      ...(cm.agregados || []).map(x => fila("+", x, `Se agregó: ${esc(cant(x.c))} × ${esc(Q(x.u))} = ${esc(Q(x.t))}`)),
+      ...(cm.quitados || []).map(x => fila("−", x, `Se quitó: era ${esc(cant(x.c))} × ${esc(Q(x.u))} = ${esc(Q(x.t))}`)),
+      ...(cm.cambiados || []).map(x => fila("•", x, `${x.antes.c !== x.ahora.c ? `Cantidad: ${esc(cant(x.antes.c))} → ${esc(cant(x.ahora.c))}. ` : ""}${x.antes.u !== x.ahora.u ? `Precio: ${esc(Q(x.antes.u))} → ${esc(Q(x.ahora.u))}. ` : ""}Total del renglón: ${esc(Q(x.antes.t))} → ${esc(Q(x.ahora.t))}`))
+    ];
+    const cambioT = cm.total_antes != null && cm.total_ahora != null && cm.total_antes !== cm.total_ahora;
+    const n = lis.length + (cm.otros || []).length;
+    return `<details class="pc-caja plg ver-c" ${R.aprobado ? "" : "open"}><summary><span><h2>Versión ${esc(d.version)} · qué cambió</h2><small>${cambioT ? `Total: ${esc(Q(cm.total_antes))} → ${esc(Q(cm.total_ahora))}` : n ? `${n} ${n === 1 ? "cambio" : "cambios"} desde la versión ${esc(cm.desde)}` : `Desde la versión ${esc(cm.desde)}`}</small></span><span class="chev">${ico("chev", 18)}</span></summary>
+      <div class="part">${lis.join("")}${(cm.otros || []).length ? `<p class="suave chico ver-otros">También cambió: ${esc(cm.otros.join(", ").toLowerCase().replace(/^./, s => s.toUpperCase()))}.</p>` : ""}${!n ? `<p class="suave chico ver-otros">Se actualizaron detalles menores.</p>` : ""}</div></details>`;
+  }
+
   function cambiosHTML() {
     const l = R.oc || []; if (!R.aprobado || !l.length) return "";
     return `<section class="pc-caja est-c" id="cambios"><h2>Órdenes de cambio</h2><p class="suave chico">Trabajos que se agregan o se quitan durante la obra. Revise cada una y apruébela con su firma.</p>
@@ -264,7 +279,7 @@
     const d = R.datos, emp = d.empresa || {}, t = d.tot || {}, ap = R.aprobado;
     const puedeAprobar = !ap && R.estado === "enviada";
     document.title = `Propuesta ${d.numero} · ${emp.nombre || "EMTECSA"}`;
-    document.querySelector("[data-num]").textContent = d.numero;
+    document.querySelector("[data-num]").textContent = d.numero + (Number(d.version) > 1 ? ` · V${d.version}` : "");
     const arch = R.archivos || [];
     const prop = arch.find(a => a.cual === "propuesta"), expd = arch.find(a => a.cual === "expediente");
     const fila = (k, v, cl = "") => `<div class="${cl}"><span>${k}</span><b>${esc(v)}</b></div>`;
@@ -300,6 +315,7 @@
           </section>
         </aside>
         <div class="princ">
+          ${versionHTML()}
           <details class="pc-caja plg" ${window.innerWidth >= 900 ? "open" : ""}><summary><span><h2>Detalle de precios</h2><small>${nPart} ${nPart === 1 ? "renglón" : "renglones"}</small></span><span class="chev">${ico("chev", 18)}</span></summary>
             <div class="part">${partidasHTML(d)}
               ${(d.cargos || []).map(g => `<div class="pr"><span class="pr-d"><b>${esc(g.d)}</b><small>Transporte y equipo</small></span><b class="e-cifra">${esc(Q(g.m))}</b></div>`).join("")}</div>

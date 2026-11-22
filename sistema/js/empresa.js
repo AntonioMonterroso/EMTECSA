@@ -2,7 +2,7 @@
 window.EMT_EMPRESA = (() => {
   const GRUPOS_E = [
     ["empresa", "La empresa", ["Datos de la empresa", "Constructora e ingeniero", "Logos de distribuidoras", "Colores del sistema"]],
-    ["firmas", "Firmas y documentos", ["Quién firma las propuestas", "Carta de presentación", "Documentos de la empresa"]],
+    ["firmas", "Firmas y documentos", ["Quién firma las propuestas", "Carta de presentación", "Documentos de la empresa", "Numeración de documentos"]],
     ["cotizar", "Cómo se cotiza", ["Textos para cada cotización nueva", "Seguimiento de cotizaciones", "Del plano a la cotización"]],
     ["obras", "Obras", ["Etapas por tipo de trabajo", "Checklists de cada obra", "Costos de obra"]]
   ];
@@ -65,6 +65,7 @@ window.EMT_EMPRESA = (() => {
           <details class="caja plegable"><summary><span class="pl-t"><h2>Carta de presentación</h2></span><span class="chev">${ico("chev", 16, 2.2)}</span></summary><div class="pl-cuerpo">
             ${area("carta", "Texto de la carta", "Se completa sola con: {cliente}, {contacto}, {trabajo}, {sitio} y {en_sitio} (que pone «, en …» solo si la cotización tiene sitio).", 7)}
           </div></details>
+          <details class="caja plegable"><summary><span class="pl-t"><h2>Numeración de documentos</h2><span class="suave">Prefijo y número · se guarda solo</span></span><span class="chev">${ico("chev", 16, 2.2)}</span></summary><div class="pl-cuerpo" data-nums></div></details>
           <details class="caja plegable"><summary><span class="pl-t"><h2>Textos para cada cotización nueva</h2></span><span class="chev">${ico("chev", 16, 2.2)}</span></summary><div class="pl-cuerpo">
             <p class="suave" style="font-size:13.5px">Se copian en cada cotización nueva y ahí se pueden cambiar.</p>
             ${area("incluye", "El trabajo incluye", "Uno por línea.", 3)}
@@ -198,6 +199,28 @@ window.EMT_EMPRESA = (() => {
         ${puede ? `<button class="s-btn suave-b chico" type="button" data-fijo-nuevo>${ico("plus", 14)}Agregar documento</button>` : ""}`;
     };
     pintarFijos();
+    const pintarNums = async () => {
+      const caja = $("[data-nums]", v); if (!caja) return;
+      const l = await D.proximosNumeros().catch(() => null); if (!l) return;
+      caja.innerHTML = `<p class="suave" style="margin:0;font-size:13.5px">Cada documento nuevo toma el número que sigue. Para seguir la numeración que ya usaban, ponga desde qué número arranca.</p>
+        <div class="lista sin-chip">${Object.entries(l).map(([k, x]) => `<div class="fila num-f" style="cursor:default"><span class="icono gris">${ico("file", 18)}</span><span><b>${esc(x.nombre)}</b><small>El siguiente sale <span class="nw">${esc(x.siguiente)}</span></small></span>${puede ? `<button class="s-ib" type="button" aria-label="Cambiar la numeración de ${esc(x.nombre.toLowerCase())}" data-num-ed="${k}">${ico("pen", 15)}</button>` : "<span></span>"}</div>`).join("")}</div>`;
+      caja.onclick = ev => {
+        const b = ev.target.closest("[data-num-ed]"); if (!b) return;
+        const k = b.dataset.numEd, x = l[k];
+        A().modal({
+          titulo: x.nombre, guardarTxt: "Guardar",
+          cuerpo: `<div class="f-fila"><label class="f-campo">Prefijo<input name="prefijo" value="${esc(x.prefijo)}" autocomplete="off" maxlength="6" style="text-transform:uppercase"><small>Letras o números, sin guion.</small></label>
+            <label class="f-campo">Arrancar desde<input name="desde" inputmode="numeric" value="${esc(x.desde > 1 ? x.desde : "")}" autocomplete="off" placeholder="1"><small>Si ya hay números más altos, sigue después del más alto.</small></label></div>
+            <p class="suave" style="margin:0;font-size:14px" data-num-ej></p>`,
+          alAbrir: f => {
+            const ej = () => { const p = f.prefijo.value.trim().toUpperCase() || x.prefijo; const n = Math.max(Number(f.desde.value.replace(/[,\s]/g, "")) || 1, p === x.prefijo ? Number(x.siguiente.split("-").pop()) : 1); f.querySelector("[data-num-ej]").textContent = `Así sale el siguiente: ${p}-${String(n).padStart(x.dig, "0")}`; };
+            f.addEventListener("input", ej); ej();
+          },
+          alGuardar: async f => { await D.guardarNumeracion(k, { prefijo: f.prefijo.value, desde: f.desde.value }); A().cerrarCapas(); A().aviso("Numeración guardada."); await pintarNums(); }
+        });
+      };
+    };
+    pintarNums();
     e.ingenieros = D.ingenierosDe(e).map(i => ({ ...i }));
     const ING_C = [["nombre", "Ingeniero electricista"], ["titulo", "Título"], ["colegiado", "No. de colegiado activo"], ["vence", "Constancia vigente hasta", "date"], ["telefono", "Teléfono", "tel"], ["id", "Identificador en Energuate"]];
     const pintarIngs = () => {

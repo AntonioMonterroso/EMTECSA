@@ -60,7 +60,6 @@
     return { renglones: l.map(r => ({ k: r.k || null, d: r.d, c: r.c, u: r.u, ref: r.ref || null })), subtotal, iva: ivaM, total, conFactor };
   }
 
-  function siguienteNumero(l) { const n = l.map(x => Number((String(x.numero).match(/^OC-(\d+)$/) || [])[1] || 0)).reduce((a, b) => Math.max(a, b), 0); return "OC-" + String(n + 1).padStart(4, "0"); }
 
   async function guardarCambio(obra, x0) {
     const x = await cambiosDe(obra);
@@ -82,12 +81,12 @@
     if (!nube) {
       const d = leer();
       if (viejo) { const y = d.oc.find(z => z.id === viejo.id); Object.assign(y, fila, { datos: datos(y.numero) }); escribir(d); return y.id; }
-      const numero = siguienteNumero(d.oc);
+      const numero = await D.numeroDe("oc", d.oc);
       const y = { id: d.sig.x++, obra_id: obra.id, numero, correlativo, estado: "borrador", aprobado: null, parte_id: null, creado: new Date().toISOString(), ...fila, datos: datos(numero) };
       d.oc.push(y); escribir(d); return y.id;
     }
     if (viejo) { await ok(await sb.from("ordenes_cambio").update({ ...fila, datos: datos(viejo.numero) }).eq("id", viejo.id), "No se pudo guardar la orden de cambio."); return viejo.id; }
-    const numero = siguienteNumero(await ok(await sb.from("ordenes_cambio").select("numero"), "No se pudo guardar la orden de cambio."));
+    const numero = await D.numeroDe("oc", await ok(await sb.from("ordenes_cambio").select("numero"), "No se pudo guardar la orden de cambio."));
     return (await ok(await sb.from("ordenes_cambio").insert({ obra_id: obra.id, numero, correlativo, estado: "borrador", ...fila, datos: datos(numero) }).select("id").single(), "No se pudo guardar la orden de cambio.")).id;
   }
 
