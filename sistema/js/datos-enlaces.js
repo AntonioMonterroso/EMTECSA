@@ -29,6 +29,7 @@
     const gruposN = es && es.hay ? Object.fromEntries([null, ...es.opciones.map(x => "o:" + x.id), ...es.extras.map(x => "x:" + x.id)].map(g => [g || "", D.nombreGrupo(c, g)])) : null;
     return {
       opciones: es && es.hay ? { lista: es.opciones.map(o => ({ id: o.id, nombre: o.nombre, tot: totDe(o.k) })), extras: es.extras.map(x => ({ id: x.id, nombre: x.nombre, monto: x.monto })), grupos: gruposN } : null,
+      moneda: c.moneda === "USD" && Number(c.tipo_cambio) > 0 ? "USD" : "GTQ", tc: c.moneda === "USD" && Number(c.tipo_cambio) > 0 ? Number(c.tipo_cambio) : null,
       numero: c.numero, titulo: String(c.titulo || "").trim(), fecha: String(c.fecha).slice(0, 10), vigencia_dias: Number(c.vigencia_dias), vence: venceDe(c), foto: c.foto || "torre-luna-2",
       cliente: cli ? { nombre: cli.nombre, razon_social: cli.razon_social || null } : null,
       contacto: contacto ? { nombre: contacto.nombre, puesto: contacto.puesto || null } : null,

@@ -6,7 +6,8 @@ window.EMT_CONSTANCIA = (() => {
   ];
   const COL = { marino: "#102440", laton: "#C8A96A", latonT: "#7A5C22", texto: "#0E1D33", gris: "#4F5B69", linea: "#D5DBE2", fondo: "#F6F7F9" };
   const W = 612, H = 792, M = 56;
-  const Q = n => (Number(n || 0) < 0 ? "-" : "") + "Q " + Math.abs(Number(n || 0)).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  let mon = "Q", tc = 1;
+  const Q = n => (Number(n || 0) < 0 ? "-" : "") + mon + " " + (Math.round(Math.abs(Number(n || 0)) / tc * 100) / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   let libs = null;
   const cargar = ([src, integrity]) => new Promise((ok, mal) => { if ([...document.scripts].some(s => s.src === src)) { const t = setInterval(() => { if (src.includes("fontkit") ? window.fontkit : window.PDFLib) { clearInterval(t); ok(); } }, 50); return; } const s = document.createElement("script"); s.src = src; s.integrity = integrity; s.crossOrigin = "anonymous"; s.onload = ok; s.onerror = () => mal(new Error("No se pudo cargar la herramienta del PDF. Revise el internet.")); document.head.appendChild(s); });
   async function preparar(base) {
@@ -26,7 +27,8 @@ window.EMT_CONSTANCIA = (() => {
     return [...new Uint8Array(b)].slice(0, 6).map(x => x.toString(16).padStart(2, "0")).join("").toUpperCase().replace(/(.{4})/g, "$1 ").trim();
   }
 
-  async function armar({ d, ap, base = "" }) {
+  async function armar(x) { if (x.d && x.d.moneda === "USD" && Number(x.d.tc) > 0) { mon = "US$"; tc = Number(x.d.tc); } try { return await armarPdf(x); } finally { mon = "Q"; tc = 1; } }
+  async function armarPdf({ d, ap, base = "" }) {
     const [fR, fS, fB, fX] = await preparar(base);
     const { PDFDocument, rgb } = window.PDFLib;
     const hex = h => rgb(parseInt(h.slice(1, 3), 16) / 255, parseInt(h.slice(3, 5), 16) / 255, parseInt(h.slice(5, 7), 16) / 255);

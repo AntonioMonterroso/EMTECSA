@@ -17,6 +17,7 @@
   const ico = (n, w = 18) => MAS[n] ? `<svg width="${w}" height="${w}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${MAS[n]}</svg>` : window.EMT.ico(n, w);
   const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
   const Q = n => "Q\u00a0" + Number(n || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const M = n => { const d = typeof R !== "undefined" && R && R.datos; const tc = d && d.moneda === "USD" ? Number(d.tc) : 0; return tc > 0 ? "US$\u00a0" + (Math.round(Number(n || 0) / tc * 100) / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : Q(n); };
   const cant = n => Number(n).toLocaleString("en-US", { maximumFractionDigits: 3 });
   const fecha = f => { const [y, m, d] = String(f).slice(0, 10).split("-").map(Number); return new Date(y, m - 1, d).toLocaleDateString("es-GT", { day: "numeric", month: "long", year: "numeric" }); };
   const fechaHora = iso => new Date(iso).toLocaleString("es-GT", { timeZone: "America/Guatemala", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" });
@@ -232,14 +233,14 @@
 
   function escogerHTML(d) {
     const o = d.opciones, el = selActual();
-    return `<div class="esc">${o.lista.length ? `<p class="esc-t">Escoja una opción</p>${o.lista.map(x => `<label class="esc-f"><input type="radio" name="op" value="${esc(x.id)}" ${el.eleccion.opcion === x.id ? "checked" : ""}><span><b>Opción ${esc(x.id)}</b><small>${esc(x.nombre)}</small></span><b class="e-cifra">${esc(Q(x.tot.total))}</b></label>`).join("")}` : ""}
-      ${o.extras.length ? `<p class="esc-t">Extras · si los quiere</p>${o.extras.map(x => `<label class="esc-f"><input type="checkbox" name="ex" value="${esc(x.id)}" ${el.eleccion.extras.includes(x.id) ? "checked" : ""}><span><b>${esc(x.nombre)}</b></span><b class="e-cifra">+ ${esc(Q(x.monto))}</b></label>`).join("")}` : ""}</div>`;
+    return `<div class="esc">${o.lista.length ? `<p class="esc-t">Escoja una opción</p>${o.lista.map(x => `<label class="esc-f"><input type="radio" name="op" value="${esc(x.id)}" ${el.eleccion.opcion === x.id ? "checked" : ""}><span><b>Opción ${esc(x.id)}</b><small>${esc(x.nombre)}</small></span><b class="e-cifra">${esc(M(x.tot.total))}</b></label>`).join("")}` : ""}
+      ${o.extras.length ? `<p class="esc-t">Extras · si los quiere</p>${o.extras.map(x => `<label class="esc-f"><input type="checkbox" name="ex" value="${esc(x.id)}" ${el.eleccion.extras.includes(x.id) ? "checked" : ""}><span><b>${esc(x.nombre)}</b></span><b class="e-cifra">+ ${esc(M(x.monto))}</b></label>`).join("")}` : ""}</div>`;
   }
   function partidasHTML(d) {
-    const fila = p => `<div class="pr"><span class="pr-d"><b>${esc(p.d)}</b><small>${esc(cant(p.c))} × ${esc(Q(p.u))}</small></span><b class="e-cifra">${esc(Q(p.t))}</b></div>`;
+    const fila = p => `<div class="pr"><span class="pr-d"><b>${esc(p.d)}</b><small>${esc(cant(p.c))} × ${esc(M(p.u))}</small></span><b class="e-cifra">${esc(M(p.t))}</b></div>`;
     if (!d.opciones) return d.partidas.map(fila).join("");
     const gs = Object.keys(d.opciones.grupos);
-    return gs.map(g => { const l = d.partidas.filter(p => (p.g || "") === g); if (!l.length) return ""; return `<p class="gr-t ${g ? (g[0] === "o" ? "op" : "ex") : ""}"><span>${esc(d.opciones.grupos[g])}</span><small>${esc(Q(l.reduce((a, p) => a + p.t, 0)))}</small></p>` + l.map(fila).join(""); }).join("");
+    return gs.map(g => { const l = d.partidas.filter(p => (p.g || "") === g); if (!l.length) return ""; return `<p class="gr-t ${g ? (g[0] === "o" ? "op" : "ex") : ""}"><span>${esc(d.opciones.grupos[g])}</span><small>${esc(M(l.reduce((a, p) => a + p.t, 0)))}</small></p>` + l.map(fila).join(""); }).join("");
   }
 
   const pctT = n => `${(Math.round((Number(n) || 0) * 100) / 100).toLocaleString("en-US", { maximumFractionDigits: 2 })}\u00a0%`;
@@ -259,13 +260,13 @@
     if (!(Number(d.version) > 1) || !cm) return "";
     const fila = (sig, x, extra) => `<div class="pr"><span class="pr-d"><b>${sig} ${esc(x.d)}</b><small>${extra}</small></span></div>`;
     const lis = [
-      ...(cm.agregados || []).map(x => fila("+", x, `Se agregó: ${esc(cant(x.c))} × ${esc(Q(x.u))} = ${esc(Q(x.t))}`)),
-      ...(cm.quitados || []).map(x => fila("−", x, `Se quitó: era ${esc(cant(x.c))} × ${esc(Q(x.u))} = ${esc(Q(x.t))}`)),
-      ...(cm.cambiados || []).map(x => fila("•", x, `${x.antes.c !== x.ahora.c ? `Cantidad: ${esc(cant(x.antes.c))} → ${esc(cant(x.ahora.c))}. ` : ""}${x.antes.u !== x.ahora.u ? `Precio: ${esc(Q(x.antes.u))} → ${esc(Q(x.ahora.u))}. ` : ""}Total del renglón: ${esc(Q(x.antes.t))} → ${esc(Q(x.ahora.t))}`))
+      ...(cm.agregados || []).map(x => fila("+", x, `Se agregó: ${esc(cant(x.c))} × ${esc(M(x.u))} = ${esc(M(x.t))}`)),
+      ...(cm.quitados || []).map(x => fila("−", x, `Se quitó: era ${esc(cant(x.c))} × ${esc(M(x.u))} = ${esc(M(x.t))}`)),
+      ...(cm.cambiados || []).map(x => fila("•", x, `${x.antes.c !== x.ahora.c ? `Cantidad: ${esc(cant(x.antes.c))} → ${esc(cant(x.ahora.c))}. ` : ""}${x.antes.u !== x.ahora.u ? `Precio: ${esc(M(x.antes.u))} → ${esc(M(x.ahora.u))}. ` : ""}Total del renglón: ${esc(M(x.antes.t))} → ${esc(M(x.ahora.t))}`))
     ];
     const cambioT = cm.total_antes != null && cm.total_ahora != null && cm.total_antes !== cm.total_ahora;
     const n = lis.length + (cm.otros || []).length;
-    return `<details class="pc-caja plg ver-c" ${R.aprobado ? "" : "open"}><summary><span><h2>Versión ${esc(d.version)} · qué cambió</h2><small>${cambioT ? `Total: ${esc(Q(cm.total_antes))} → ${esc(Q(cm.total_ahora))}` : n ? `${n} ${n === 1 ? "cambio" : "cambios"} desde la versión ${esc(cm.desde)}` : `Desde la versión ${esc(cm.desde)}`}</small></span><span class="chev">${ico("chev", 18)}</span></summary>
+    return `<details class="pc-caja plg ver-c" ${R.aprobado ? "" : "open"}><summary><span><h2>Versión ${esc(d.version)} · qué cambió</h2><small>${cambioT ? `Total: ${esc(M(cm.total_antes))} → ${esc(M(cm.total_ahora))}` : n ? `${n} ${n === 1 ? "cambio" : "cambios"} desde la versión ${esc(cm.desde)}` : `Desde la versión ${esc(cm.desde)}`}</small></span><span class="chev">${ico("chev", 18)}</span></summary>
       <div class="part">${lis.join("")}${(cm.otros || []).length ? `<p class="suave chico ver-otros">También cambió: ${esc(cm.otros.join(", ").toLowerCase().replace(/^./, s => s.toUpperCase()))}.</p>` : ""}${!n ? `<p class="suave chico ver-otros">Se actualizaron detalles menores.</p>` : ""}</div></details>`;
   }
 
@@ -303,8 +304,9 @@
             ${d.opciones && !ap ? escogerHTML(d) : ""}
             ${ap && ap.eleccion_txt ? `<p class="escogio"><span>Escogió</span><b>${esc(ap.eleccion_txt)}</b></p>` : ""}
             <span class="l">${d.opciones && !ap ? (t.con_iva ? "Total con lo escogido, con IVA" : "Total con lo escogido") : t.con_iva ? "Total con IVA" : "Total"}</span>
-            <b class="e-cifra grande" data-total-vivo>${esc(Q(ap ? ap.total : d.opciones ? selActual().total : t.total))}</b>
+            <b class="e-cifra grande" data-total-vivo>${esc(M(ap ? ap.total : d.opciones ? selActual().total : t.total))}</b>
             <small class="suave">${ap ? "Gracias por su confianza. EMTECSA ya recibió el aviso y le contactará para programar el trabajo." : R.vencido ? "" : `Válida hasta el ${esc(fecha(R.vence))}`}</small>
+            ${d.moneda === "USD" && d.tc ? `<small class="suave usd-n">En dólares (US$) · Q ${esc(Number(d.tc).toLocaleString("en-US", { maximumFractionDigits: 5 }))} por US$1</small>` : ""}
             <div class="acc">
               ${puedeAprobar ? `<button class="e-btn e-btn-p ancho" type="button" data-aprobar>${ico("firma", 18)}Aprobar con mi firma</button>` : ""}
               ${ap ? `<button class="e-btn e-btn-p ancho" type="button" data-constancia>${ico("download", 18)}Constancia de aprobación</button>` : ""}
@@ -318,8 +320,8 @@
           ${versionHTML()}
           <details class="pc-caja plg" ${window.innerWidth >= 900 ? "open" : ""}><summary><span><h2>Detalle de precios</h2><small>${nPart} ${nPart === 1 ? "renglón" : "renglones"}</small></span><span class="chev">${ico("chev", 18)}</span></summary>
             <div class="part">${partidasHTML(d)}
-              ${(d.cargos || []).map(g => `<div class="pr"><span class="pr-d"><b>${esc(g.d)}</b><small>Transporte y equipo</small></span><b class="e-cifra">${esc(Q(g.m))}</b></div>`).join("")}</div>
-            <div class="tots">${d.opciones ? `<p class="suave chico" style="margin:0 0 4px">${d.opciones.lista.length ? "Los totales de cada opción están arriba, junto al botón de aprobar." : "Los extras se suman al total si los escoge."}</p>` : ""}${d.opciones && d.opciones.lista.length ? "" : fila("Subtotal", Q(t.subtotal + (t.cargos || 0)))}${t.imp_pct != null ? fila(`Imprevistos y administración ${cant(t.imp_pct)} %`, Q(t.imprevistos)) : ""}${t.descuento ? fila(`Descuento${t.desc_pct != null ? " " + cant(t.desc_pct) + " %" : ""}`, "− " + Q(t.descuento)) : ""}${t.con_iva ? fila("Total sin IVA", Q(t.neto)) + fila("IVA 12 %", Q(t.iva)) : ""}${fila(t.con_iva ? "Total con IVA" : "Total", Q(t.total), "g")}</div>
+              ${(d.cargos || []).map(g => `<div class="pr"><span class="pr-d"><b>${esc(g.d)}</b><small>Transporte y equipo</small></span><b class="e-cifra">${esc(M(g.m))}</b></div>`).join("")}</div>
+            <div class="tots">${d.opciones ? `<p class="suave chico" style="margin:0 0 4px">${d.opciones.lista.length ? "Los totales de cada opción están arriba, junto al botón de aprobar." : "Los extras se suman al total si los escoge."}</p>` : ""}${d.opciones && d.opciones.lista.length ? "" : fila("Subtotal", M(t.subtotal + (t.cargos || 0)))}${t.imp_pct != null ? fila(`Imprevistos y administración ${cant(t.imp_pct)} %`, M(t.imprevistos)) : ""}${t.descuento ? fila(`Descuento${t.desc_pct != null ? " " + cant(t.desc_pct) + " %" : ""}`, "− " + M(t.descuento)) : ""}${t.con_iva ? fila("Total sin IVA", M(t.neto)) + fila("IVA 12 %", M(t.iva)) : ""}${fila(t.con_iva ? "Total con IVA" : "Total", M(t.total), "g")}</div>
           </details>
           ${d.incluye.length || d.excluye.length ? `<details class="pc-caja plg"><summary><span><h2>Lo que incluye</h2><small>${d.incluye.length} ${d.incluye.length === 1 ? "punto" : "puntos"}${d.excluye.length ? ` · ${d.excluye.length} no incluidos` : ""}</small></span><span class="chev">${ico("chev", 18)}</span></summary>
             ${d.incluye.length ? `<div class="alc"><h3>Incluye</h3>${lista(d.incluye)}</div>` : ""}${d.excluye.length ? `<div class="alc no"><h3>No incluye</h3>${lista(d.excluye)}</div>` : ""}</details>` : ""}
@@ -333,7 +335,7 @@
         </div>
       </div>
       ${pie(emp)}
-      ${puedeAprobar ? `<div class="barra-c"><span><small>${t.con_iva ? "Total con IVA" : "Total"}</small><b data-total-vivo>${esc(Q(d.opciones ? selActual().total : t.total))}</b></span><button class="e-btn e-btn-p" type="button" data-aprobar>${ico("firma", 18)}Aprobar</button></div>` : ""}`;
+      ${puedeAprobar ? `<div class="barra-c"><span><small>${t.con_iva ? "Total con IVA" : "Total"}</small><b data-total-vivo>${esc(M(d.opciones ? selActual().total : t.total))}</b></span><button class="e-btn e-btn-p" type="button" data-aprobar>${ico("firma", 18)}Aprobar</button></div>` : ""}`;
     document.body.classList.toggle("con-barra", puedeAprobar);
     const barra = raiz.querySelector(".barra-c"), boton = raiz.querySelector(".lado [data-aprobar]");
     if (barra && boton && "IntersectionObserver" in window) { barra.classList.add("oculta"); new IntersectionObserver(([x]) => barra.classList.toggle("oculta", x.isIntersecting || x.boundingClientRect.top > 0)).observe(boton); }
@@ -421,12 +423,12 @@
     let firma = null;
     abrirHoja(`
       <div class="hoja-cab"><h2>Aprobar la propuesta</h2><button class="x" type="button" aria-label="Cerrar" data-cerrar>${ico("x", 18)}</button></div>
-      <p class="res-ap"><span>${esc(d.numero)}${d.titulo ? " · " + esc(d.titulo) : ""}${d.opciones ? `<br><b class="res-esc">${esc(selActual().txt)}</b>` : ""}</span><b class="e-cifra">${esc(Q(d.opciones ? selActual().total : t.total))}${t.con_iva ? " <small>con IVA</small>" : ""}</b></p>
+      <p class="res-ap"><span>${esc(d.numero)}${d.titulo ? " · " + esc(d.titulo) : ""}${d.opciones ? `<br><b class="res-esc">${esc(selActual().txt)}</b>` : ""}</span><b class="e-cifra">${esc(M(d.opciones ? selActual().total : t.total))}${t.con_iva ? " <small>con IVA</small>" : ""}</b></p>
       <form data-f-ap novalidate>
         <label class="campo">Su nombre completo<input name="nombre" autocomplete="name" value="${esc(d.contacto ? d.contacto.nombre : "")}" required></label>
         <label class="campo"><span>Puesto <small>opcional</small></span><input name="puesto" autocomplete="organization-title" value="${esc(d.contacto && d.contacto.puesto || "")}"></label>
         <div class="campo"><span class="firma-t">Su firma<button class="lnk" type="button" data-borrar>Borrar</button></span><div class="firma-c"><canvas data-lienzo aria-label="Recuadro para firmar con el dedo o el mouse"></canvas><span class="firma-g" data-guia>Firme aquí con el dedo o el mouse</span></div></div>
-        <label class="chk"><input type="checkbox" name="acepto"><span>Acepto la propuesta ${esc(d.numero)}${d.opciones ? " (" + esc(selActual().txt) + ")" : ""} por ${esc(Q(d.opciones ? selActual().total : t.total))}${t.con_iva ? " con IVA" : ""} y sus condiciones.</span></label>
+        <label class="chk"><input type="checkbox" name="acepto"><span>Acepto la propuesta ${esc(d.numero)}${d.opciones ? " (" + esc(selActual().txt) + ")" : ""} por ${esc(M(d.opciones ? selActual().total : t.total))}${t.con_iva ? " con IVA" : ""} y sus condiciones.</span></label>
         <p class="err" data-err hidden></p>
         <button class="e-btn e-btn-p ancho" type="submit" data-enviar>${ico("check", 18)}Aprobar y firmar</button>
       </form>`, h => {
@@ -580,7 +582,7 @@
 
   function gracias() {
     const ap = R.aprobado;
-    abrirHoja(`<div class="hecho"><span class="ic-c verde">${ico("check", 28)}</span><h2>Propuesta aprobada</h2><p><b>Firmada por ${esc(ap.nombre)}</b><br>${esc(fechaHora(ap.fecha))}</p>${ap.eleccion_txt ? `<p class="escogio"><span>Escogió</span><b>${esc(ap.eleccion_txt)} · ${esc(Q(ap.total))}</b></p>` : ""}<p>${esc(R.datos.empresa.nombre || "EMTECSA")} ya recibió el aviso y le contactará para programar el trabajo.</p>
+    abrirHoja(`<div class="hecho"><span class="ic-c verde">${ico("check", 28)}</span><h2>Propuesta aprobada</h2><p><b>Firmada por ${esc(ap.nombre)}</b><br>${esc(fechaHora(ap.fecha))}</p>${ap.eleccion_txt ? `<p class="escogio"><span>Escogió</span><b>${esc(ap.eleccion_txt)} · ${esc(M(ap.total))}</b></p>` : ""}<p>${esc(R.datos.empresa.nombre || "EMTECSA")} ya recibió el aviso y le contactará para programar el trabajo.</p>
       <button class="e-btn e-btn-p ancho" type="button" data-tramite>${ico("pen", 18)}Llenar mis datos para Energuate</button><button class="e-btn ancho" type="button" data-constancia>${ico("download", 18)}Descargar la constancia</button><button class="e-btn ancho" type="button" data-cerrar>Después</button></div>`);
   }
 
@@ -626,7 +628,7 @@
     if (t.name === "op") SEL = { ...SEL, opcion: t.value };
     if (t.name === "ex") SEL = { ...SEL, extras: t.checked ? [...SEL.extras, t.value] : SEL.extras.filter(x => x !== t.value) };
     const tot = selActual().total;
-    document.querySelectorAll("[data-total-vivo]").forEach(b => { b.textContent = Q(tot); if (!quieto()) { b.classList.remove("late"); void b.offsetWidth; b.classList.add("late"); } });
+    document.querySelectorAll("[data-total-vivo]").forEach(b => { b.textContent = M(tot); if (!quieto()) { b.classList.remove("late"); void b.offsetWidth; b.classList.add("late"); } });
   });
   document.addEventListener("click", e => {
     if (e.target.closest("[data-aprobar]")) aprobar();

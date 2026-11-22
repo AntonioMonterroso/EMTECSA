@@ -126,6 +126,50 @@
     for (const k of Object.keys(c)) out[k] = { ...c[k], siguiente: armarNumero(c[k], await numerosUsados(k)) };
     return out;
   }
+  async function margenMinimo() {
+    if (!nube) return Number(leer().ajustes.margen_minimo) || 0;
+    const r = await sb.from("ajustes").select("valor").eq("clave", "margen_minimo").maybeSingle();
+    return Number(r.data && r.data.valor) || 0;
+  }
+  async function guardarMargenMinimo(v) {
+    const n = String(v == null ? "" : v).replace(/[%,\s]/g, "") === "" ? 0 : Number(String(v).replace(/[%,\s]/g, ""));
+    if (!(n >= 0 && n < 100)) throw new Error("El margen mínimo va de 0 a 99 %.");
+    if (!nube) { const d = leer(); d.ajustes.margen_minimo = n; escribir(d); return; }
+    const r = await sb.from("ajustes").upsert({ clave: "margen_minimo", valor: n });
+    if (r.error) throw new Error("No se pudo guardar el margen mínimo.");
+  }
+  const descuentoActual = c => c.descuento_tipo && Number(c.descuento) > 0 ? { tipo: c.descuento_tipo, valor: Number(c.descuento) } : null;
+  const descuentoAutorizado = c => { const d = descuentoActual(c), a = c.descuento_aut; return !d || !!(a && a.estado === "autorizado" && a.tipo === d.tipo && Number(a.valor) === d.valor); };
+  async function revisarDescuento(cotId, esc) {
+    const c = await cotizacion(cotId); if (!c || !descuentoActual(c)) return { bajo: false };
+    const k = calcular(c, await D.catalogo(), esc);
+    if (!nube) { const minimo = await margenMinimo(); if (!(minimo > 0) || !(k.neto > 0)) return { bajo: false, minimo }; const margen = Math.round((k.neto - k.costoMat - k.manoObra) / k.neto * 1000) / 10; return { bajo: margen < minimo, minimo, margen }; }
+    const ids = k.partidas.filter(p => p.incluida !== false && p.id != null).map(p => p.id);
+    const r = await sb.rpc("cotizacion_bajo_minimo", { p_id: cotId, p_neto: k.neto, p_ids: ids });
+    if (r.error) throw new Error("No se pudo revisar el margen de la cotización.");
+    return r.data || { bajo: false };
+  }
+  async function ponerDescuentoAut(cotId, aut) {
+    if (!nube) { const d = leer(); const c = d.cotizaciones.find(x => x.id === cotId); if (c) { c.descuento_aut = aut; escribir(d); } return; }
+    const r = await sb.from("cotizaciones").update({ descuento_aut: aut }).eq("id", cotId);
+    if (r.error) throw new Error(/gerencia/i.test(r.error.message || "") ? "Solo gerencia autoriza descuentos." : "No se pudo guardar la autorización.");
+  }
+  async function pedirAutorizacion(c, quien, r) { const d = descuentoActual(c); await ponerDescuentoAut(c.id, { estado: "pendiente", tipo: d.tipo, valor: d.valor, minimo: r && r.minimo != null ? r.minimo : null, pedido_por: quien || null, fecha: new Date().toISOString() }); }
+  async function resolverDescuento(c, si, quien, nota) {
+    const a = c.descuento_aut || {}; const d = descuentoActual(c) || { tipo: a.tipo, valor: a.valor };
+    await ponerDescuentoAut(c.id, { ...a, estado: si ? "autorizado" : "rechazado", tipo: d.tipo, valor: d.valor, por: quien || null, resuelto: new Date().toISOString(), nota: String(nota || "").trim() || null });
+  }
+  async function cambioBanguat() {
+    const hoyL = (d => new Date(d - d.getTimezoneOffset() * 6e4).toISOString().slice(0, 10))(new Date());
+    if (!nube) { let usd = 7.75; try { usd = Number((JSON.parse(localStorage.getItem("emtecsa.sistema.finanzas")) || {}).cambio) || 7.75; } catch (e) {} return { usd, fecha: null, de: "Finanzas" }; }
+    const r = await sb.from("ajustes").select("valor").eq("clave", "tipo_cambio_banguat").maybeSingle();
+    const v = r.data && r.data.valor;
+    if (v && v.usd > 0 && v.fecha === hoyL) return { ...v, de: "Banguat" };
+    try { const f = await sb.functions.invoke("cambio", { body: {} }); if (!f.error && f.data && f.data.usd > 0) return { ...f.data, de: "Banguat" }; } catch (e) {}
+    if (v && v.usd > 0) return { ...v, de: "Banguat" };
+    const t = await sb.from("ajustes").select("valor").eq("clave", "tipo_cambio").maybeSingle();
+    return { usd: Number(t.data && t.data.valor && t.data.valor.usd) || 7.75, fecha: null, de: "Finanzas" };
+  }
   async function ponerVersion(cotId, v) {
     if (!nube) { const d = leer(); const c = d.cotizaciones.find(x => x.id === cotId); if (c) { c.version = v; escribir(d); } return; }
     await ok(await sb.from("cotizaciones").update({ version: v }).eq("id", cotId), "No se pudo guardar la versión.");
@@ -191,7 +235,7 @@
       const cl = Object.fromEntries((await D.clientes()).map(c => [c.id, c]));
       return d.cotizaciones.map(c => ({ ...c, cliente: cl[c.cliente_id] || null })).sort((a, b) => b.numero.localeCompare(a.numero));
     }
-    const r = await sb.from("cotizaciones").select("id, numero, cliente_id, sitio_id, contacto_id, titulo, estado, fecha, vigencia_dias, total, clientes (id, nombre, nit, telefono)").order("numero", { ascending: false });
+    const r = await sb.from("cotizaciones").select("id, numero, cliente_id, sitio_id, contacto_id, titulo, estado, fecha, vigencia_dias, total, descuento_aut, moneda, clientes (id, nombre, nit, telefono)").order("numero", { ascending: false });
     return (await ok(r, "No se pudo leer la lista de cotizaciones.")).map(c => ({ ...c, cliente: c.clientes }));
   }
 
@@ -202,7 +246,7 @@
     await ok(await sb.from("cotizaciones").update({ vigencia_dias: dias }).eq("id", id), "No se pudo cambiar la vigencia.");
   }
 
-  const COLS_COT = "id, numero, cliente_id, sitio_id, contacto_id, titulo, estado, fecha, vigencia_dias, iva, imprevistos_pct, descuento_tipo, descuento, notas, total, foto, alcance_incluye, alcance_excluye, condiciones, expediente, opciones, eleccion, tramite, version, creado";
+  const COLS_COT = "id, numero, cliente_id, sitio_id, contacto_id, titulo, estado, fecha, vigencia_dias, iva, imprevistos_pct, descuento_tipo, descuento, notas, total, foto, alcance_incluye, alcance_excluye, condiciones, expediente, opciones, eleccion, tramite, version, descuento_aut, moneda, tipo_cambio, creado";
   const COLS_PART = "id, cotizacion_id, estructura_id, material_id, materiales, descripcion, cantidad, mano_obra, precio_unitario, orden, del_plano, grupo";
   const permisosYo = () => { const s2 = window.EMT_APP && window.EMT_APP.sesion(); const p = s2 && s2.perfil; return { costo: D.puede(p, "verCosto"), aumento: D.puede(p, "verCosto") || D.puede(p, "verAumento") }; };
 
@@ -256,7 +300,7 @@
 
   async function guardar(c, calculo) {
     revisar(c);
-    const cab = { cliente_id: c.cliente_id, sitio_id: c.sitio_id || null, contacto_id: c.contacto_id || null, titulo: String(c.titulo || "").trim(), estado: c.estado, fecha: c.fecha, vigencia_dias: Number(c.vigencia_dias), aumento_pct: Number(c.aumento_pct) || 0, iva: !!c.iva, imprevistos_pct: c.imprevistos_pct, descuento_tipo: c.descuento_tipo || null, descuento: c.descuento_tipo ? c.descuento : null, notas: c.notas ? String(c.notas).trim() : null, total: calculo.total, foto: c.foto || null, alcance_incluye: c.alcance_incluye ? String(c.alcance_incluye).trim() : null, alcance_excluye: c.alcance_excluye ? String(c.alcance_excluye).trim() : null, condiciones: c.condiciones || {}, expediente: c.expediente || null, opciones: c.opciones && ((c.opciones.lista || []).length || (c.opciones.extras || []).length) ? c.opciones : null, eleccion: c.eleccion || null, precios: c.precios && Object.keys(c.precios).length ? c.precios : {}, precios_fijos: c.estado === "borrador" ? null : (c.precios_fijos || null) };
+    const cab = { cliente_id: c.cliente_id, sitio_id: c.sitio_id || null, contacto_id: c.contacto_id || null, titulo: String(c.titulo || "").trim(), estado: c.estado, fecha: c.fecha, vigencia_dias: Number(c.vigencia_dias), aumento_pct: Number(c.aumento_pct) || 0, iva: !!c.iva, imprevistos_pct: c.imprevistos_pct, descuento_tipo: c.descuento_tipo || null, descuento: c.descuento_tipo ? c.descuento : null, moneda: c.moneda === "USD" ? "USD" : "GTQ", tipo_cambio: c.moneda === "USD" && Number(c.tipo_cambio) > 0 ? Number(c.tipo_cambio) : null, notas: c.notas ? String(c.notas).trim() : null, total: calculo.total, foto: c.foto || null, alcance_incluye: c.alcance_incluye ? String(c.alcance_incluye).trim() : null, alcance_excluye: c.alcance_excluye ? String(c.alcance_excluye).trim() : null, condiciones: c.condiciones || {}, expediente: c.expediente || null, opciones: c.opciones && ((c.opciones.lista || []).length || (c.opciones.extras || []).length) ? c.opciones : null, eleccion: c.eleccion || null, precios: c.precios && Object.keys(c.precios).length ? c.precios : {}, precios_fijos: c.estado === "borrador" ? null : (c.precios_fijos || null) };
     const partidas = calculo.partidas.map((p, i) => ({ estructura_id: p.estructura_id || null, material_id: p.material_id || null, materiales: p.materiales || null, descripcion: p.descripcion, cantidad: Number(p.cantidad), costo_materiales: r2(p.costo_materiales), mano_obra: r2(p.mano_obra), precio_unitario: r2(p.precio_unitario), del_plano: !!p.del_plano, grupo: p.grupo || null, orden: i }));
     const cargos = c.cargos.map((g, i) => ({ descripcion: String(g.descripcion).trim(), monto: r2(g.monto), orden: i }));
     if (!nube) {
@@ -285,5 +329,5 @@
     return { ...cat, materiales, estructuras: cat.estructuras.map(e => ({ ...e, materiales: e.materiales.map(x => ({ ...x, material: porId[x.material.id] || x.material })) })) };
   }
 
-  Object.assign(D, { ponerVersion, TIPOS_NUM, numeracion, numeroDe, proximosNumeros, guardarNumeracion, catalogoParaCotizacion, empresa, guardarEmpresa, ingenierosDe, ING_K, ESTADOS, IVA, precioPieza, precioEstructura, calcularCotizacion: calcular, aumentoDefecto, guardarAumentoDefecto, cotizaciones, cotizacion, crearCotizacion: crear, guardarCotizacion: guardar, cambiarVigencia, escenariosCotizacion: escenarios, nombreGrupo });
+  Object.assign(D, { margenMinimo, guardarMargenMinimo, descuentoAutorizado, revisarDescuento, pedirAutorizacion, resolverDescuento, cambioBanguat, ponerVersion, TIPOS_NUM, numeracion, numeroDe, proximosNumeros, guardarNumeracion, catalogoParaCotizacion, empresa, guardarEmpresa, ingenierosDe, ING_K, ESTADOS, IVA, precioPieza, precioEstructura, calcularCotizacion: calcular, aumentoDefecto, guardarAumentoDefecto, cotizaciones, cotizacion, crearCotizacion: crear, guardarCotizacion: guardar, cambiarVigencia, escenariosCotizacion: escenarios, nombreGrupo });
 })();

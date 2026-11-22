@@ -11,7 +11,8 @@ window.EMT_PDF = (() => {
   const W = 612, H = 792, M = 56, PIE = 46;
   const COL = { noche: "#07111F", marino: "#102440", laton: "#C8A96A", latonT: "#7A5C22", texto: "#0E1D33", gris: "#4F5B69", linea: "#D5DBE2", fondo: "#EBEEF2", claro: "#D7DFEA" };
   let libs = null, fuentes = null;
-  const Q = n => (Number(n || 0) < 0 ? "-" : "") + "Q " + Math.abs(Number(n || 0)).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  let mon = "Q", tc = 1;
+  const Q = n => (Number(n || 0) < 0 ? "-" : "") + mon + " " + (Math.round(Math.abs(Number(n || 0)) / tc * 100) / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const cant = n => Number(n).toLocaleString("en-US", { maximumFractionDigits: 3 });
 
   function cargarScript([src, integrity]) {
@@ -54,7 +55,9 @@ window.EMT_PDF = (() => {
     return lineas;
   }
 
-  async function generar({ c, k, cli, emp, contacto, sitio, cat }) {
+  async function generar(x) { try { return await generarPdf(x); } finally { mon = "Q"; tc = 1; } }
+  async function generarPdf({ c, k, cli, emp, contacto, sitio, cat }) {
+    if (c.moneda === "USD" && Number(c.tipo_cambio) > 0) { mon = "US$"; tc = Number(c.tipo_cambio); }
     const [fR, fS, fB, fX] = await preparar();
     const D = window.EMT_DATOS;
     const op = c.opciones || {};
@@ -238,12 +241,12 @@ window.EMT_PDF = (() => {
 
     const cond = c.condiciones || {};
     const vence = new Date(fecha); vence.setDate(vence.getDate() + Number(c.vigencia_dias || 0));
-    const items = [["Vigencia", `${c.vigencia_dias} días, hasta el ${vence.toLocaleDateString("es-GT", { day: "numeric", month: "long", year: "numeric" })}.`], ["Forma de pago", cond.forma_pago], ["Tiempo de entrega", cond.tiempo_entrega], ["Garantía", cond.garantia], ["Notas", c.notas]].filter(([, v]) => String(v || "").trim());
+    const items = [...(mon === "US$" ? [["Moneda", `Precios en dólares de los Estados Unidos (US$). Tipo de cambio de referencia: Q ${tc.toLocaleString("en-US", { maximumFractionDigits: 5 })} por US$1.`]] : []), ["Vigencia", `${c.vigencia_dias} días, hasta el ${vence.toLocaleDateString("es-GT", { day: "numeric", month: "long", year: "numeric" })}.`], ["Forma de pago", cond.forma_pago], ["Tiempo de entrega", cond.tiempo_entrega], ["Garantía", cond.garantia], ["Notas", c.notas]].filter(([, v]) => String(v || "").trim());
     titulo2("Condiciones");
     items.forEach(([t, v]) => { lugar(40); txt(pg, t.toUpperCase(), M, y, { f: F.b, s: 8.5, c: COL.latonT }); y -= 16; parrafo(v); y -= 10; });
 
     titulo2("Aceptación");
-    if (es) parrafo(`Aceptamos la propuesta ${c.numero}${es.opciones.length ? ", opción ______" : ""}${es.extras.length ? ", con los extras ______________________" : ""}, por un total de Q ______________${c.iva ? ", IVA incluido" : ""}, con el alcance y las condiciones descritas.`);
+    if (es) parrafo(`Aceptamos la propuesta ${c.numero}${es.opciones.length ? ", opción ______" : ""}${es.extras.length ? ", con los extras ______________________" : ""}, por un total de ${mon} ______________${c.iva ? ", IVA incluido" : ""}, con el alcance y las condiciones descritas.`);
     else parrafo(`Aceptamos la propuesta ${c.numero} por un total de ${Q(k.total)}${c.iva ? ", IVA incluido" : ""}, con el alcance y las condiciones descritas.`);
     y -= 16; lugar(122);
     const caja = (x, yy, w, t) => { pg.drawRectangle({ x, y: yy - 52, width: w, height: 52, borderColor: hex(COL.linea), borderWidth: 0.8 }); txt(pg, t.toUpperCase(), x + 10, yy - 14, { f: F.b, s: 7.5, c: COL.gris }); };

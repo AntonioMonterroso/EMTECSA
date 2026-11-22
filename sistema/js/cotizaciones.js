@@ -132,6 +132,7 @@ window.EMT_COTIZACIONES = (() => {
         </div>
         <nav class="pasos4" data-pasos4 aria-label="Pasos de la cotización"></nav>
         <div class="pasos-cot" data-pasos data-en-paso="4"></div>
+        <div class="desc-aut-caja" data-desc-aut></div>
         <div class="nota-fija" data-nota-fija data-en-paso="4" hidden>${ico("shield", 18)}<span></span></div>
         <section class="caja prev-cot" data-en-paso="4">
           <div class="prev-mini"><img src="../img/${esc(c.foto || "torre-luna-2")}.jpg" alt="" data-prev-foto><span>${esc(c.numero)}</span></div>
@@ -195,6 +196,8 @@ window.EMT_COTIZACIONES = (() => {
                 <div class="sub-opc" data-sub-imp ${c.imprevistos_pct != null ? "" : "hidden"}><span class="f-pct"><input data-c="imprevistos_pct" inputmode="decimal" value="${esc(c.imprevistos_pct ?? "")}" placeholder="5" aria-label="Porcentaje de imprevistos" autocomplete="off"><span>%</span></span></div>
                 <label class="sw-fila"><span>Descuento</span><input type="checkbox" class="sw" data-opc="desc" ${c.descuento_tipo ? "checked" : ""}></label>
                 <div class="sub-opc" data-sub-desc ${c.descuento_tipo ? "" : "hidden"}><div class="seg chico" role="group" aria-label="Tipo de descuento"><button type="button" data-dtipo="monto" aria-pressed="${c.descuento_tipo !== "pct"}">Q</button><button type="button" data-dtipo="pct" aria-pressed="${c.descuento_tipo === "pct"}">%</button></div><input class="f-desc" data-c="descuento" inputmode="decimal" value="${esc(c.descuento ?? "")}" placeholder="0" aria-label="Descuento" autocomplete="off"></div>
+                <label class="sw-fila"><span>Propuesta en dólares</span><input type="checkbox" class="sw" data-opc="usd" ${c.moneda === "USD" ? "checked" : ""}></label>
+                <div class="sub-opc usd-opc" data-sub-usd ${c.moneda === "USD" ? "" : "hidden"}><span class="f-monto"><span>Q</span><input data-c="tipo_cambio" inputmode="decimal" value="${esc(c.tipo_cambio || "")}" aria-label="Quetzales por un dólar" autocomplete="off"></span><span class="suave" data-usd-de>por US$1</span><button class="s-btn suave-b chico" type="button" data-usd-hoy>Banguat de hoy</button></div>
               </div>
               </fieldset>
               <div data-opc-res></div>
@@ -221,6 +224,36 @@ window.EMT_COTIZACIONES = (() => {
       $("[data-pasos]", v).innerHTML = `<div class="estado-cot"><span class="estado-t">Estado</span><div class="seg chico estado-seg" role="group" aria-label="Estado de la cotización">${["borrador", "enviada", "aprobada", "rechazada"].map(k2 => `<button type="button" data-estado="${k2}" ${dis} aria-pressed="${k2 === est}">${D.ESTADOS[k2]}</button>`).join("")}</div></div>
         <p class="paso-ayuda">${esc(est === "enviada" && enlO.hayEnlace ? "Si la aprueba desde su enlace, pasa sola a «Aprobada»." : AYUDA[est][1])}</p>`;
       if ($("[data-pasos4]", v)) pintarPasos4();
+    };
+    const usarCambioHoy = async () => {
+      const x = await D.cambioBanguat().catch(() => null); if (!x) { aviso("No se pudo leer el tipo de cambio. Escríbalo.", "mal"); return; }
+      c.tipo_cambio = Number(x.usd); const inp = $('[data-c="tipo_cambio"]', v); if (inp) inp.value = c.tipo_cambio;
+      const de = $("[data-usd-de]", v); if (de) de.textContent = x.de === "Banguat" && x.fecha ? `por US$1 · Banguat del ${new Date(x.fecha + "T12:00").toLocaleDateString("es-GT", { day: "numeric", month: "short" })}` : "por US$1 · de Finanzas";
+    };
+    const pintarDescAut = () => {
+      const box = $("[data-desc-aut]", v); if (!box) return;
+      const a = c.descuento_aut, conDesc = c.descuento_tipo && Number(c.descuento) > 0, ok = D.descuentoAutorizado(c);
+      const descTxt = x => x.tipo === "pct" ? `${cant(x.valor)} %` : Q(x.valor);
+      const puedeAut = D.puede(p, "autorizarDescuento");
+      if (!conDesc || !a || (a.estado === "autorizado" && !ok && c.estado !== "borrador")) { box.innerHTML = ""; return; }
+      if (a.estado === "autorizado" && ok) { box.innerHTML = `<p class="desc-aut verde">${ico("check", 15)}<span>Descuento autorizado por ${esc(a.por || "gerencia")}.</span></p>`; return; }
+      if (a.estado === "autorizado" || (a.estado === "pendiente" && (a.tipo !== c.descuento_tipo || Number(a.valor) !== Number(c.descuento)))) { box.innerHTML = `<p class="desc-aut">${ico("alerta", 15)}<span>El descuento cambió desde que se pidió la autorización. Hay que pedirla otra vez al mandar.</span></p>`; return; }
+      if (a.estado === "pendiente") {
+        box.innerHTML = `<div class="desc-aut azul">${ico("clock", 15)}<span>${puedeAut ? `${esc(a.pedido_por || "Ventas")} pide autorizar ${esc(descTxt(a))} de descuento. Baja del margen mínimo${a.minimo != null ? ` de ${esc(cant(a.minimo))} %` : ""}.` : `Esperando que gerencia autorice ${esc(descTxt(a))} de descuento.`}</span>${puedeAut ? `<span class="fila-b"><button class="s-btn suave-b chico" type="button" data-desc-no>No autorizar</button><button class="s-btn lleno chico" type="button" data-desc-si>Autorizar</button></span>` : ""}</div>`;
+        return;
+      }
+      if (a.estado === "rechazado") box.innerHTML = `<p class="desc-aut">${ico("alerta", 15)}<span>Gerencia no autorizó ${esc(descTxt(a))} de descuento${a.nota ? `: «${esc(a.nota)}»` : ""}. Cambie el descuento o pida otra vez.</span></p>`;
+    };
+    const revisarAntesDeMandar = async () => {
+      if (D.puede(p, "autorizarDescuento") || D.descuentoAutorizado(c)) return true;
+      const r = await D.revisarDescuento(c.id);
+      if (!r || !r.bajo) return true;
+      const a = c.descuento_aut;
+      if (a && a.estado === "pendiente" && a.tipo === c.descuento_tipo && Number(a.valor) === Number(c.descuento)) { aviso("El descuento está esperando la autorización de gerencia.", "mal"); return false; }
+      A().modal({ titulo: "Este descuento necesita autorización", guardarTxt: "Pedir autorización",
+        cuerpo: `<p class="suave" style="font-size:15px">Con este descuento la cotización queda por debajo del margen mínimo${r.minimo != null ? ` de ${esc(cant(r.minimo))} %` : ""}. Gerencia tiene que autorizarlo antes de mandarla. Le llega el aviso en Hoy y en el teléfono.</p>`,
+        alGuardar: async () => { await D.pedirAutorizacion(c, A().sesion().perfil.nombre, r); c.descuento_aut = { estado: "pendiente", tipo: c.descuento_tipo, valor: Number(c.descuento), minimo: r.minimo, pedido_por: A().sesion().perfil.nombre }; A().cerrarCapas(); aviso("Listo: se le pidió a gerencia."); pintarDescAut(); } });
+      return false;
     };
     const congelar = () => {
       const kb = D.calcularCotizacion({ ...c, estado: "borrador" }, cat, { todo: true });
@@ -272,7 +305,9 @@ window.EMT_COTIZACIONES = (() => {
         + (c.imprevistos_pct != null ? fila(`Imprevistos y administración ${cant(c.imprevistos_pct)} %`, Q(k.imprevistos)) : "")
         + (c.descuento_tipo ? fila(`Descuento${c.descuento_tipo === "pct" ? " " + cant(c.descuento || 0) + " %" : ""}`, "− " + Q(k.descuento)) : "")
         + (c.iva ? fila("Total sin IVA", Q(k.neto)) + fila("IVA 12 %", Q(k.iva)) : "")
-        + fila(c.iva ? "Total con IVA" : "Total", Q(k.total), "g");
+        + fila(c.iva ? "Total con IVA" : "Total", Q(k.total), "g")
+        + (c.moneda === "USD" && Number(c.tipo_cambio) > 0 ? fila(`En dólares · Q ${Number(c.tipo_cambio).toLocaleString("en-US", { maximumFractionDigits: 5 })} por US$1`, "US$ " + (Math.round(k.total / Number(c.tipo_cambio) * 100) / 100).toLocaleString("en-US", { minimumFractionDigits: 2 }), "usd") : "");
+      pintarDescAut();
       const ib = $("[data-interno]", v);
       if (ib) ib.innerHTML = `<small>${ico("ojoNo", 13)}Solo para gerencia</small>` + fila("Costo de materiales", Q(k.costoMat)) + fila("Mano de obra", Q(k.manoObra)) + fila("Ganancia estimada", Q(k.ganancia), k.ganancia < 0 ? "mal" : "");
       const avisos = [];
@@ -419,7 +454,7 @@ window.EMT_COTIZACIONES = (() => {
     };
 
     const enlO = { box: $("[data-enlace]", v), c, cli, cat, emp: await D.empresa(), puede, hayEnlace: false, sucio: () => sucio,
-      prepararEnvio: async () => { if (c.estado === "borrador") { congelar(); c.estado = "enviada"; } const kk = D.calcularCotizacion(c, cat); await D.guardarCotizacion(c, kk); sucio = false; return { c, k: kk }; },
+      prepararEnvio: async () => { if (sucio) { await D.guardarCotizacion(c, D.calcularCotizacion(c, cat)); sucio = false; } if (!(await revisarAntesDeMandar())) throw new Error("El descuento necesita la autorización de gerencia."); if (c.estado === "borrador") { congelar(); c.estado = "enviada"; } const kk = D.calcularCotizacion(c, cat); await D.guardarCotizacion(c, kk); sucio = false; return { c, k: kk }; },
       recargar: () => A().quieto(() => editor(v, id)),
       alAprobar: async () => { if (!sucio) await A().quieto(() => editor(v, id)); else { c.estado = "aprobada"; pintarPasos(); aplicarFijo(); await window.EMT_ENLACES.panel(enlO); } } };
     pintarPasos(); pintarPartidas(); pintarCargos(); pintarTotales(); aplicarFijo(); irPaso(paso);
@@ -546,6 +581,7 @@ window.EMT_COTIZACIONES = (() => {
         else if (k2 === "aumento_pct") c.aumento_pct = leerNum(t.value, 0);
         else if (k2 === "imprevistos_pct") c.imprevistos_pct = leerNum(t.value, 0);
         else if (k2 === "descuento") c.descuento = leerNum(t.value, 0);
+        else if (k2 === "tipo_cambio") c.tipo_cambio = leerNum(t.value, 0);
         marcar(); pintarTotales();
       }
       if (t.dataset.cond) { c.condiciones = { ...(c.condiciones || {}), [t.dataset.cond]: t.value }; marcar(); }
@@ -588,6 +624,7 @@ window.EMT_COTIZACIONES = (() => {
       if (t.dataset.c === "sitio_id" || t.dataset.c === "contacto_id") { c[t.dataset.c] = t.value ? Number(t.value) : null; marcar(); }
       if (t.matches("[data-foto]")) { c.foto = t.value; marcar(); }
       if (t.dataset.opc === "iva") { c.iva = t.checked; marcar(); pintarTotales(); }
+      if (t.dataset.opc === "usd") { c.moneda = t.checked ? "USD" : "GTQ"; $("[data-sub-usd]", v).hidden = !t.checked; if (t.checked && !(Number(c.tipo_cambio) > 0)) await usarCambioHoy(); marcar(); pintarTotales(); }
       if (t.dataset.opc === "imp") { c.imprevistos_pct = t.checked ? (leerNum($('[data-c="imprevistos_pct"]', v).value, 0)) : null; $("[data-sub-imp]", v).hidden = !t.checked; marcar(); pintarTotales(); if (t.checked) $('[data-c="imprevistos_pct"]', v).focus(); }
       if (t.dataset.opc === "desc") { c.descuento_tipo = t.checked ? ($('[data-dtipo="pct"]', v).getAttribute("aria-pressed") === "true" ? "pct" : "monto") : null; c.descuento = t.checked ? leerNum($('[data-c="descuento"]', v).value, 0) : null; $("[data-sub-desc]", v).hidden = !t.checked; marcar(); pintarTotales(); if (t.checked) $('[data-c="descuento"]', v).focus(); }
       if (t.dataset.gmonto != null) t.value = montoTxt(leerNum(t.value, 0));
@@ -691,6 +728,7 @@ window.EMT_COTIZACIONES = (() => {
       const es = e.target.closest("[data-estado]");
       if (es && es.dataset.estado !== c.estado && es.dataset.estado === "aprobada" && hayOp() && !es.dataset.elegido) { elegir(es); return; }
       if (es && es.dataset.estado === "rechazada" && c.estado !== "rechazada" && !es.dataset.motivo && window.EMT_SEGUIMIENTO) { window.EMT_SEGUIMIENTO.motivo(c, null, async () => { es.dataset.motivo = "1"; es.click(); }); return; }
+      if (es && es.dataset.estado === "enviada" && c.estado === "borrador") { if (sucio && !(await guardarCot())) return; if (!(await revisarAntesDeMandar())) return; }
       if (es && es.dataset.estado !== c.estado) {
         delete es.dataset.elegido;
         const conMotivo = !!es.dataset.motivo; delete es.dataset.motivo;
@@ -704,11 +742,20 @@ window.EMT_COTIZACIONES = (() => {
         if (conMotivo) { const g = $("[data-guardar-cot]", v); if (g) g.click(); }
       }
       if (e.target.closest("[data-guardar-cot]")) { if (await guardarCot()) aviso("Cotización guardada."); return; }
+      if (e.target.closest("[data-usd-hoy]") && !e.target.closest("fieldset:disabled")) { await usarCambioHoy(); marcar(); pintarTotales(); return; }
+      const dz = e.target.closest("[data-desc-si], [data-desc-no]");
+      if (dz) {
+        const si = dz.matches("[data-desc-si]");
+        const hecho = async nota => { await D.resolverDescuento(c, si, A().sesion().perfil.nombre, nota); c.descuento_aut = { ...c.descuento_aut, estado: si ? "autorizado" : "rechazado", tipo: c.descuento_tipo, valor: Number(c.descuento), por: A().sesion().perfil.nombre, nota: nota || null }; pintarDescAut(); aviso(si ? "Descuento autorizado." : "Descuento no autorizado."); };
+        if (si) { const ib = k.neto > 0 && D.puede(p, "verCosto") ? Math.round((k.neto - k.costoMat - k.manoObra) / k.neto * 1000) / 10 : null; A().modal({ titulo: "¿Autorizar el descuento?", guardarTxt: "Autorizar", cuerpo: `<p class="suave" style="font-size:15px">${ib != null ? `Con el descuento la ganancia queda en ${esc(cant(ib))} % del total sin IVA (${esc(Q(k.ganancia))}).` : "La cotización queda por debajo del margen mínimo."} Al autorizarlo ya se puede mandar al cliente.</p>`, alGuardar: async () => { A().cerrarCapas(); await hecho(null); } }); }
+        else A().modal({ titulo: "No autorizar el descuento", guardarTxt: "No autorizar", cuerpo: `<label class="f-campo">Por qué <small>opcional</small><input name="nota" autocomplete="off" placeholder="Por ejemplo: máximo 5 %"></label>`, alGuardar: async f => { A().cerrarCapas(); await hecho(f.nota.value); } });
+        return;
+      }
       const ip = e.target.closest("[data-ir-paso]"); if (ip) { irPaso(Number(ip.dataset.irPaso)); return; }
       const sg = e.target.closest("[data-sig]");
       if (sg) {
         if (sg.dataset.accion === "siguiente") { if (paso === 2 && !c.partidas.length) { aviso("Agregue al menos una estructura o material.", "mal"); $("[data-busca-est]", v)?.focus(); return; } if (sucio && puede && !fijo()) { if (!(await guardarCot())) return; } irPaso(paso + 1); return; }
-        if (sg.dataset.accion === "mandar") { if (sucio && !(await guardarCot())) return; window.EMT_ENLACES.mandar(enlO).catch(err => aviso(err.message, "mal")); return; }
+        if (sg.dataset.accion === "mandar") { if (sucio && !(await guardarCot())) return; if (!(await revisarAntesDeMandar())) return; window.EMT_ENLACES.mandar(enlO).catch(err => aviso(err.message, "mal")); return; }
         const vb = $('[data-pdf="ver"]', v); if (vb) vb.click(); return;
       }
       if (e.target.closest("[data-bajar-mats]")) bajarLista(c, k, cli);

@@ -356,6 +356,7 @@
     if (!nClientes) pend.push({ c: "azul", i: "building", t: "Agregar sus clientes principales", d: "Con su NIT, sus plantas, contactos y equipos.", h: "#/clientes" });
     const espera = [];
     if (!D.nube) espera.push({ i: "shield", t: "Conectar la base de EMTECSA", d: "Cuando EMTECSA cree su cuenta de Supabase." });
+    if (D.puede(sesion.perfil, "autorizarDescuento")) avisosC.unshift(...(await D.cotizaciones().catch(() => [])).filter(x => x.descuento_aut && x.descuento_aut.estado === "pendiente").map(x => ({ c: "laton", i: "alerta", t: `Autorizar descuento: ${x.cliente ? x.cliente.nombre : ""}`, d: `${x.numero} · lo pide ${x.descuento_aut.pedido_por || "ventas"} · ${x.descuento_aut.tipo === "pct" ? x.descuento_aut.valor + " %" : Q(x.descuento_aut.valor)}`, chip: "Esperando", accion: "Revisar", h: `#/cotizaciones/${x.id}` })));
     const porAprobar = window.EMT_EQUIPO ? await window.EMT_EQUIPO.pendientes() : [];
     avisosC.unshift(...porAprobar.map(u => ({ c: "laton", i: "users", t: `Aprobar a ${u.nombre}`, d: `${u.correo || ""} · pidió entrar al sistema`, chip: "Esperando", h: "#/equipo" })));
     if (sesion.perfil.rol === "gerencia" && !D.nube) espera.push({ i: "users", t: "Que su equipo cree sus cuentas", d: "Se hace después de conectar la base; usted las aprueba en Equipo." });

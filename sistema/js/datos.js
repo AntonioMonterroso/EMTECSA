@@ -35,7 +35,8 @@ window.EMT_DATOS = (() => {
     editarTienda: ["gerencia", "administracion"],
     verEnlaces: ["gerencia", "ventas", "administracion"],
     verFinanzas: ["gerencia", "administracion"],
-    finanzasPersonales: []
+    finanzasPersonales: [],
+    autorizarDescuento: []
   };
   const CLAVE_EQUIPO = "emtecsa.sistema.equipo";
   let EF = null;

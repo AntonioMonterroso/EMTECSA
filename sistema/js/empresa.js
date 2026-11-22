@@ -3,7 +3,7 @@ window.EMT_EMPRESA = (() => {
   const GRUPOS_E = [
     ["empresa", "La empresa", ["Datos de la empresa", "Constructora e ingeniero", "Logos de distribuidoras", "Colores del sistema"]],
     ["firmas", "Firmas y documentos", ["Quién firma las propuestas", "Carta de presentación", "Documentos de la empresa", "Numeración de documentos"]],
-    ["cotizar", "Cómo se cotiza", ["Textos para cada cotización nueva", "Seguimiento de cotizaciones", "Del plano a la cotización"]],
+    ["cotizar", "Cómo se cotiza", ["Textos para cada cotización nueva", "Margen mínimo y descuentos", "Seguimiento de cotizaciones", "Del plano a la cotización"]],
     ["obras", "Obras", ["Etapas por tipo de trabajo", "Checklists de cada obra", "Costos de obra"]]
   ];
   let grupoE = "empresa";
@@ -65,6 +65,7 @@ window.EMT_EMPRESA = (() => {
           <details class="caja plegable"><summary><span class="pl-t"><h2>Carta de presentación</h2></span><span class="chev">${ico("chev", 16, 2.2)}</span></summary><div class="pl-cuerpo">
             ${area("carta", "Texto de la carta", "Se completa sola con: {cliente}, {contacto}, {trabajo}, {sitio} y {en_sitio} (que pone «, en …» solo si la cotización tiene sitio).", 7)}
           </div></details>
+          <details class="caja plegable"><summary><span class="pl-t"><h2>Margen mínimo y descuentos</h2><span class="suave">Se guarda solo</span></span><span class="chev">${ico("chev", 16, 2.2)}</span></summary><div class="pl-cuerpo" data-margen></div></details>
           <details class="caja plegable"><summary><span class="pl-t"><h2>Numeración de documentos</h2><span class="suave">Prefijo y número · se guarda solo</span></span><span class="chev">${ico("chev", 16, 2.2)}</span></summary><div class="pl-cuerpo" data-nums></div></details>
           <details class="caja plegable"><summary><span class="pl-t"><h2>Textos para cada cotización nueva</h2></span><span class="chev">${ico("chev", 16, 2.2)}</span></summary><div class="pl-cuerpo">
             <p class="suave" style="font-size:13.5px">Se copian en cada cotización nueva y ahí se pueden cambiar.</p>
@@ -221,6 +222,19 @@ window.EMT_EMPRESA = (() => {
       };
     };
     pintarNums();
+    const pintarMargen = async () => {
+      const caja = $("[data-margen]", v); if (!caja) return;
+      const m = await D.margenMinimo().catch(() => 0);
+      caja.innerHTML = `<p class="suave" style="margin:0;font-size:13.5px">Si un descuento deja la ganancia de una cotización por debajo de este porcentaje (sobre el total sin IVA), hay que pedirle autorización a gerencia antes de mandarla.</p>
+        <div class="lista sin-chip"><div class="fila num-f" style="cursor:default"><span class="icono gris">${ico("chart", 18)}</span><span><b>Margen mínimo</b><small>${m > 0 ? `${esc(A().cant(m))} %` : "Sin mínimo: ningún descuento pide autorización"}</small></span>${puede ? `<button class="s-ib" type="button" aria-label="Cambiar el margen mínimo" data-margen-ed>${ico("pen", 15)}</button>` : "<span></span>"}</div></div>`;
+      caja.onclick = ev => {
+        if (!ev.target.closest("[data-margen-ed]")) return;
+        A().modal({ titulo: "Margen mínimo", guardarTxt: "Guardar",
+          cuerpo: `<label class="f-campo">Margen mínimo (%)<input name="m" inputmode="decimal" value="${esc(m || "")}" autocomplete="off" placeholder="15"><small>Ponga 0 para que ningún descuento pida autorización.</small></label>`,
+          alGuardar: async f => { await D.guardarMargenMinimo(f.m.value); A().cerrarCapas(); A().aviso("Margen mínimo guardado."); await pintarMargen(); } });
+      };
+    };
+    pintarMargen();
     e.ingenieros = D.ingenierosDe(e).map(i => ({ ...i }));
     const ING_C = [["nombre", "Ingeniero electricista"], ["titulo", "Título"], ["colegiado", "No. de colegiado activo"], ["vence", "Constancia vigente hasta", "date"], ["telefono", "Teléfono", "tel"], ["id", "Identificador en Energuate"]];
     const pintarIngs = () => {
