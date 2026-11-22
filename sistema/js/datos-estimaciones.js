@@ -26,20 +26,46 @@
     return { cfg: numCfg(c.data), lista: e.data.map(numEst) };
   }
 
-  async function renglonesDe(obra) {
-    if (!obra.cotizacion_id) return { renglones: null, baseV: 0, contratoCot: null, conIva: false };
-    const cot = await D.cotizacion(obra.cotizacion_id); if (!cot) return { renglones: null, baseV: 0, contratoCot: null, conIva: false };
-    const k = D.calcularCotizacion(cot, await D.catalogo());
-    const l = [
-      ...k.partidas.filter(p => p.incluida !== false).map((p, i) => ({ k: "p" + (p.id != null ? p.id : i), d: t(p.descripcion) || "Partida", c: Number(p.cantidad), u: r2(p.precio_unitario) })),
-      ...(cot.cargos || []).map((g, i) => ({ k: "g" + (g.id != null ? g.id : i), d: t(g.descripcion) || "Transporte y equipo", c: 1, u: r2(g.monto) }))
-    ].filter(x => x.c > 0 && x.u > 0);
-    const baseV = r2(l.reduce((a, x) => a + x.c * x.u, 0));
-    return { renglones: baseV > 0 ? l : null, baseV, contratoCot: k.total, conIva: !!cot.iva };
+  async function renglonesObra(obra, excluir) {
+    let l = null, grupos = {}, contratoCot = null, conIva = true, cot = null;
+    if (obra.cotizacion_id) {
+      cot = await D.cotizacion(obra.cotizacion_id);
+      if (cot) {
+        const k = D.calcularCotizacion(cot, await D.catalogo());
+        l = [
+          ...k.partidas.filter(p => p.incluida !== false).map((p, i) => ({ k: "p" + (p.id != null ? p.id : i), d: t(p.descripcion) || "Partida", c: Number(p.cantidad), u: r2(p.precio_unitario), g: "cot", estructura_id: p.estructura_id || null, material_id: p.material_id || null })),
+          ...(cot.cargos || []).map((g, i) => ({ k: "g" + (g.id != null ? g.id : i), d: t(g.descripcion) || "Transporte y equipo", c: 1, u: r2(g.monto), g: "cot" }))
+        ].filter(x => x.c > 0 && x.u > 0);
+        const b = r2(l.reduce((a, x) => a + x.c * x.u, 0));
+        if (b > 0) grupos.cot = { base: b, total: k.total }; else l = null;
+        contratoCot = k.total; conIva = !!cot.iva;
+      }
+    }
+    let extra = 0;
+    const ocs = D.ordenesCambio ? (await D.ordenesCambio(obra.id)).filter(x => x.estado === "aprobada" && x.id !== excluir) : [];
+    for (const oc of ocs) {
+      if (oc.tipo === "adicional") {
+        extra = r2(extra + oc.total);
+        if (l) {
+          const g = "oc" + oc.id, rs = oc.renglones.map((r, i) => ({ k: `oc${oc.id}:${i}`, d: `${r.d} · ${oc.numero}`, c: r.c, u: r.u, g })).filter(r => r.c > 0 && r.u > 0);
+          const b = r2(rs.reduce((a, x) => a + x.c * x.u, 0));
+          if (b > 0) { l.push(...rs); grupos[g] = { base: b, total: oc.total }; }
+        }
+      } else {
+        extra = r2(extra - oc.total);
+        if (l) oc.renglones.forEach(r => {
+          const z = r.k ? l.find(y => y.k === r.k) : null; if (!z) return;
+          const g = grupos[z.g], f = g.base > 0 ? g.total / g.base : 1;
+          z.c = r3(z.c - r.c); g.total = r2(g.total - r2(r.c * z.u * f)); g.base = r2(g.base - r.c * z.u);
+        });
+      }
+    }
+    const renglones = l ? l.filter(x => x.c > 0) : null;
+    return { renglones: renglones && renglones.length ? renglones : null, grupos, contratoCot, conIva, extra, aumento: cot ? Number(cot.aumento_pct) || 0 : null, precios: cot ? cot.precios || null : null };
   }
 
   function calcular(avance, ctx, prevs) {
-    const { cfg, renglones, baseV } = ctx;
+    const { cfg, renglones } = ctx;
     const ult = prevs[prevs.length - 1] || null;
     const antes = (ult && ult.avance) || {};
     const pctAnt = ult ? Number(ult.pct_acum) : 0;
@@ -49,14 +75,16 @@
         const ant = Number(antes[r.k]) || 0;
         const v = avance[r.k];
         const acum = v == null || v === "" ? ant : Number(String(v).replace(/,/g, ""));
-        return { k: r.k, d: r.d, c: r.c, u: r.u, ant: r3(ant), acum: r3(acum), per: r3(acum - ant) };
+        return { k: r.k, d: r.d, c: r.c, u: r.u, g: r.g, ant: r3(ant), acum: r3(acum), per: r3(acum - ant) };
       });
       for (const f of filas) {
         if (!isFinite(f.acum) || f.acum < 0) throw new Error(`Revise la cantidad de «${f.d}».`);
         if (f.acum > f.c + 1e-9) throw new Error(`«${f.d}» pasa de lo contratado (${cantTxt(f.c)}). Lo que sea adicional va en una orden de cambio.`);
         if (f.acum < f.ant - 1e-9) throw new Error(`«${f.d}» no puede bajar de lo que ya se estimó antes (${cantTxt(f.ant)}).`);
       }
-      pct = filas.reduce((a, f) => a + f.acum * f.u, 0) / baseV * 100;
+      const val = {}; filas.forEach(f => { val[f.g] = (val[f.g] || 0) + f.acum * f.u; });
+      const acumExacto = Object.entries(ctx.grupos).reduce((a, [g, x]) => a + (x.base > 0 ? x.total * (val[g] || 0) / x.base : 0), 0);
+      pct = filas.every(f => f.acum >= f.c - 1e-9) ? 100 : acumExacto / cfg.contrato * 100;
     } else {
       pct = Number(String(avance.general == null ? "" : avance.general).replace(/,/g, ""));
       if (!isFinite(pct) || pct < 0 || pct > 100) throw new Error("Escriba el avance de la obra entre 0 y 100 %.");
@@ -76,7 +104,8 @@
   }
 
   async function estimacionesDe(obra) {
-    const [{ cfg, lista }, rg] = await Promise.all([leerObra(obra.id), renglonesDe(obra)]);
+    const [{ cfg: cfg0, lista }, rg] = await Promise.all([leerObra(obra.id), renglonesObra(obra)]);
+    const cfg = cfg0 ? { ...cfg0, contrato_base: cfg0.contrato, contrato: r2(cfg0.contrato + rg.extra) } : null;
     lista.sort((a, b) => a.correlativo - b.correlativo);
     const vigentes = lista.filter(e => e.estado !== "anulada");
     const aprobadas = vigentes.filter(e => e.estado === "aprobada");
@@ -214,5 +243,5 @@
     await ok(await sb.from("estimacion_config").update({ garantia_parte_id: pid, actualizado: new Date().toISOString() }).eq("obra_id", obra.id), "No se pudo guardar.");
   }
 
-  Object.assign(D, { ESTADOS_EST: ESTADOS, CLAVE_EST: CLAVE, estimacionesDe, calcularEstimacion: calcular, guardarConfigEst, quitarConfigEst, guardarEstimacion, quitarEstimacion, mandarEstimacion, regresarBorrador, aprobarEstimacion, anularEstimacion, cobrarGarantia, estimacion: una });
+  Object.assign(D, { ESTADOS_EST: ESTADOS, CLAVE_EST: CLAVE, renglonesObra, estimacionesDe, calcularEstimacion: calcular, guardarConfigEst, quitarConfigEst, guardarEstimacion, quitarEstimacion, mandarEstimacion, regresarBorrador, aprobarEstimacion, anularEstimacion, cobrarGarantia, estimacion: una });
 })();

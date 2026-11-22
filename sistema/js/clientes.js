@@ -82,7 +82,7 @@ window.EMT_CLIENTES = (() => {
           <div><small>Dirección fiscal</small><span>${esc([c.direccion, c.municipio, c.departamento].filter(Boolean).join(", ") || "—")}</span></div>
           <div><small>Teléfono</small><span>${c.telefono ? `<a href="tel:${esc(telLimpio(c.telefono))}">${esc(c.telefono)}</a>` : "—"}</span></div>
           <div><small>Correo</small><span>${c.correo ? `<a href="mailto:${esc(c.correo)}">${esc(c.correo)}</a>` : "—"}</span></div>
-          <div><small>Crédito</small><span>${c.dias_credito ? `${c.dias_credito} días` : "Contado"}${c.limite_credito != null ? ` · límite <span class="e-cifra">${esc(Q(c.limite_credito))}</span>` : ""}</span></div>
+          <div><small>Crédito</small><span>${c.dias_credito ? `${c.dias_credito} días` : "Contado"}${c.limite_credito != null ? ` · límite <span class="e-cifra">${esc(Q(c.limite_credito))}</span>` : ""}${c.agente_iva ? `<br>Agente de retención de IVA · ${esc(A().cant(c.ret_iva_pct))} %` : ""}</span></div>
           ${ec && (ec.cargos || ec.abonos) ? `<div><small>${ec.saldo < 0 ? "A favor" : "Saldo"}</small><span class="e-cifra"><b>${esc(Q(Math.abs(ec.saldo)))}</b></span></div><div><small>Vencido</small><span class="e-cifra ${ec.vencido ? "falta" : ""}">${esc(Q(ec.vencido))}</span></div><div class="ancho2"><small>Dinero</small><span><a href="#/cobros/clientes/${c.id}">Ver su estado de cuenta</a></span></div>` : ""}
           ${c.notas ? `<div class="ancho2"><small>Notas</small><span>${esc(c.notas)}</span></div>` : ""}
         </div>
@@ -161,9 +161,12 @@ window.EMT_CLIENTES = (() => {
         <label class="f-campo">Municipio<input name="municipio" data-geo-muni="fiscal" value="${esc(c0.municipio || "")}" autocomplete="off"></label></div>
         <div class="f-fila"><label class="f-campo">Días de crédito<input name="dias" inputmode="numeric" value="${esc(c0.dias_credito || 0)}" autocomplete="off"><small>0 es al contado.</small></label>
         ${campoMonto("limite", "Límite de crédito", c0.limite_credito, "Opcional.")}</div>
+        <div class="f-fila ret-cli"><label class="chk-f"><input type="checkbox" name="agente_iva" ${c0.agente_iva ? "checked" : ""}><span>Es agente de retención de IVA<small>Al pagar retiene parte del IVA y entrega una constancia.</small></span></label>
+        <label class="f-campo" data-ret-pct ${c0.agente_iva ? "" : "hidden"}>Retiene del IVA (%)<input name="ret_pct" inputmode="decimal" value="${esc(c0.ret_iva_pct || 15)}" autocomplete="off"><small>Lo más común es 15 %.</small></label></div>
         <label class="f-campo">Notas<textarea name="notas" rows="3">${esc(c0.notas || "")}</textarea></label>`,
       alAbrir: (f, m) => {
         formatoAlSalir(f);
+        f.agente_iva.addEventListener("change", () => { f.querySelector("[data-ret-pct]").hidden = !f.agente_iva.checked; });
         const ar = m.querySelector("[data-archivar]");
         if (ar) ar.addEventListener("click", async () => { ar.disabled = true; try { await D.archivarCliente(c.id, !archivado); cerrarCapas(); aviso(archivado ? "El cliente volvió a la lista." : "Cliente archivado. Lo encuentra en «Archivados»."); await recargar(); } catch (err) { ar.disabled = false; aviso(err.message, "mal"); } });
         const hint = () => { const el = f.querySelector("[data-nit-ok]"); const t = f.nit.value.trim(); if (!t) { el.textContent = ""; return; } const ok = D.nitValido(t); el.textContent = ok ? "NIT con dígito verificador correcto." : "El dígito verificador no coincide; revíselo."; el.className = ok ? "ok" : "mal"; };
@@ -174,7 +177,7 @@ window.EMT_CLIENTES = (() => {
         if (nom && okNombre !== nom) { const otro = (await D.clientes()).find(x => (!c || x.id !== c.id) && A().normal(x.nombre) === nom); if (otro) { okNombre = nom; throw new Error(`Ya hay un cliente llamado «${otro.nombre}» (NIT ${D.nitBonito(otro.nit)}). Si de verdad es otro cliente, toque «Guardar» otra vez.`); } }
         const nitN = D.normalNit(f.nit.value.trim());
         if (nitN && !D.nitValido(nitN) && okNit !== nitN) { okNit = nitN; throw new Error("El dígito verificador del NIT no coincide. Revíselo; si está seguro, toque «Guardar» otra vez."); }
-        const datos = { id: c ? c.id : null, codigo: f.codigo.value, tipo: f.tipo.value, nombre: f.nombre.value, razon_social: f.razon_social.value, nit: f.nit.value, telefono: f.telefono.value, correo: f.correo.value, direccion: f.direccion.value, departamento: f.departamento.value, municipio: f.municipio.value, dias_credito: f.dias.value.trim() === "" ? 0 : Number(f.dias.value), limite_credito: numero(f.limite.value), notas: f.notas.value };
+        const datos = { id: c ? c.id : null, codigo: f.codigo.value, tipo: f.tipo.value, nombre: f.nombre.value, razon_social: f.razon_social.value, nit: f.nit.value, telefono: f.telefono.value, correo: f.correo.value, direccion: f.direccion.value, departamento: f.departamento.value, municipio: f.municipio.value, dias_credito: f.dias.value.trim() === "" ? 0 : Number(f.dias.value), limite_credito: numero(f.limite.value), notas: f.notas.value, agente_iva: f.agente_iva.checked, ret_iva_pct: f.ret_pct.value };
         const id = await D.guardarCliente(datos);
         cerrarCapas(); aviso(nuevo ? "Cliente agregado." : "Cliente guardado.");
         if (nuevo) ir("clientes", id); else await recargar();

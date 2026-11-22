@@ -225,3 +225,4 @@ form { display: grid; gap: 14px; }
 .est-banda { align-items: center; }
 .est-banda > span { flex: 1; min-width: 0; }
 .est-banda .e-btn { flex: none; min-height: 44px; }
+.nw { white-space: nowrap; }

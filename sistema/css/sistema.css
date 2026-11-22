@@ -1610,3 +1610,24 @@ fieldset.empresa[data-grupo-act="obras"] > details[data-grupo-e="obras"] { displ
   .est-d { grid-column: 1 / -1; }
 }
 .nw { white-space: nowrap; }
+.chk-f { display: flex; gap: 10px; align-items: flex-start; font-size: 14px; cursor: pointer; min-height: 44px; }
+.chk-f input { width: 20px; height: 20px; margin: 2px 0 0; flex: none; accent-color: var(--accent, #102440); }
+.chk-f small { display: block; font-size: 12.5px; color: var(--text-muted); font-weight: 500; }
+.ret-cli { align-items: start; }
+.ret-iva { display: grid; gap: 10px; border: 1px solid var(--capa-borde); border-radius: 16px; padding: 12px 14px; margin: 0; min-width: 0; }
+.ret-iva legend { font-size: 13.5px; font-weight: 650; padding: 0 4px; }
+.ret-iva input[type="file"] { width: 100%; min-width: 0; font-size: 13px; }
+.oc-res { margin: 0 4px; font-size: 13.5px; }
+.oc-tipo { align-self: start; }
+.oc-busca { position: relative; margin: 0; }
+.oc-busca .f-res { max-height: 260px; overflow: auto; }
+.oc-rs { display: grid; gap: 8px; }
+.oc-r { display: grid; grid-template-columns: minmax(0, 1fr) 110px 150px 38px; gap: 10px; align-items: end; padding: 12px 14px; border-radius: 16px; background: var(--capa); border: 1px solid var(--capa-borde); }
+.oc-r .f-campo { margin: 0; min-width: 0; }
+.oc-r input { width: 100%; min-width: 0; }
+.oc-r .f-campo > span:first-child { font-size: 12px; }
+@media (max-width: 640px) {
+  .oc-r { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 38px; }
+  .oc-r .oc-d { grid-column: 1 / -1; }
+}
+[data-oc-cuerpo] { display: grid; gap: 12px; }

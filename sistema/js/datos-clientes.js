@@ -64,7 +64,9 @@
     const dias = c.dias_credito == null || c.dias_credito === "" ? 0 : Number(c.dias_credito);
     if (!Number.isInteger(dias) || dias < 0) throw new Error("Los días de crédito van en números enteros.");
     if (c.limite_credito != null && !(c.limite_credito >= 0)) throw new Error("El límite de crédito no puede ser negativo.");
-    return { codigo, nombre, razon_social: o(c.razon_social), nit, tipo: TIPOS[c.tipo] ? c.tipo : "industria", direccion: o(c.direccion), telefono: o(c.telefono), correo: o(c.correo), dias_credito: dias, limite_credito: c.limite_credito == null ? null : Number(c.limite_credito), notas: o(c.notas), departamento: o(c.departamento), municipio: o(c.municipio) };
+    const retPct = c.ret_iva_pct == null || c.ret_iva_pct === "" ? 15 : Number(String(c.ret_iva_pct).replace(/[%,\s]/g, ""));
+    if (c.agente_iva && !(retPct > 0 && retPct <= 100)) throw new Error("El porcentaje de retención de IVA va de 1 a 100.");
+    return { codigo, nombre, razon_social: o(c.razon_social), nit, tipo: TIPOS[c.tipo] ? c.tipo : "industria", direccion: o(c.direccion), telefono: o(c.telefono), correo: o(c.correo), dias_credito: dias, limite_credito: c.limite_credito == null ? null : Number(c.limite_credito), notas: o(c.notas), departamento: o(c.departamento), municipio: o(c.municipio), agente_iva: !!c.agente_iva, ret_iva_pct: c.agente_iva ? retPct : 15 };
   }
   function revisarSitio(s) {
     const nombre = limpio(s.nombre);

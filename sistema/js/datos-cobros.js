@@ -16,7 +16,8 @@
   function leer() { try { const d = JSON.parse(localStorage.getItem(CLAVE)); if (d && d.v === 1) return d; } catch (e) {} return vacio(); }
   function escribir(d) { d.cambios = true; try { localStorage.setItem(CLAVE, JSON.stringify(d)); } catch (e) { throw new Error("No se pudo guardar en esta computadora. Revise el espacio del navegador."); } }
   async function ok(r, msg) { if (r.error) throw new Error(msg); return r.data; }
-  const num = x => ({ ...x, monto: Number(x.monto), porcentaje: x.porcentaje == null ? null : Number(x.porcentaje) });
+  const num = x => ({ ...x, monto: Number(x.monto), ret_iva: Number(x.ret_iva) || 0, porcentaje: x.porcentaje == null ? null : Number(x.porcentaje) });
+  const aplicado = p => r2(p.monto + (Number(p.ret_iva) || 0));
 
   async function todo() {
     if (!nube) { const d = leer(); return { partes: d.partes, pagos: d.pagos, fianzas: d.fianzas, gastos: d.gastos }; }
@@ -30,8 +31,8 @@
     const porObra = Object.fromEntries(obras.map(x => [x.id, x]));
     const pagado = {}, libre = {};
     b.pagos.filter(p => !p.anulado).forEach(p => {
-      if (p.parte_id) pagado[p.parte_id] = r2((pagado[p.parte_id] || 0) + p.monto);
-      else if (p.obra_id) libre[p.obra_id] = r2((libre[p.obra_id] || 0) + p.monto);
+      if (p.parte_id) pagado[p.parte_id] = r2((pagado[p.parte_id] || 0) + aplicado(p));
+      else if (p.obra_id) libre[p.obra_id] = r2((libre[p.obra_id] || 0) + aplicado(p));
     });
     b.partes.forEach(p => { const x = pagado[p.id] || 0; if (x > p.monto) { libre[p.obra_id] = r2((libre[p.obra_id] || 0) + x - p.monto); pagado[p.id] = r2(p.monto); } });
     b.partes.slice().sort((x, y) => String(x.vence || "9999").localeCompare(String(y.vence || "9999")) || (x.orden || 0) - (y.orden || 0)).forEach(p => {
@@ -91,9 +92,13 @@
 
   async function registrarPago(p) {
     const datos = { cliente_id: p.cliente_id, obra_id: p.obra_id || null, parte_id: p.parte_id || null, fecha: fechaO(p.fecha) || hoy(), monto: r2(p.monto), forma: FORMAS[p.forma] ? p.forma : "transferencia", referencia: o(p.referencia), banco: o(p.banco), notas: o(p.notas), anulado: false, motivo_anulado: null };
+    const ret = r2(p.ret_iva);
+    if (ret) Object.assign(datos, { ret_iva: ret, const_iva: o(p.const_iva), const_ref: o(p.const_ref) });
     if (!datos.cliente_id) throw new Error("Falta el cliente del pago.");
     if (!(datos.monto > 0)) throw new Error("Escriba el monto que pagó el cliente.");
-    if (p.tope != null && datos.monto > r2(p.tope) + 0.001) throw new Error(`El pago pasa de lo que falta cobrar (${"Q " + r2(p.tope).toLocaleString("en-US", { minimumFractionDigits: 2 })}).`);
+    if (ret < 0) throw new Error("La retención no puede ser negativa.");
+    if (ret && !datos.const_iva) throw new Error("Escriba el número de la constancia de retención de IVA.");
+    if (p.tope != null && r2(datos.monto + ret) > r2(p.tope) + 0.001) throw new Error(`El pago${ret ? " con la retención" : ""} pasa de lo que falta cobrar (${"Q " + r2(p.tope).toLocaleString("en-US", { minimumFractionDigits: 2 })}).`);
     if (!nube) { const d = leer(); const id = d.sig.x++; const numero = siguienteNumero(d.pagos); d.pagos.push({ id, numero, creado: new Date().toISOString(), ...datos }); escribir(d); return { id, numero }; }
     const nums = await ok(await sb.from("pagos").select("numero"), "No se pudo registrar el pago.");
     const r = await sb.from("pagos").insert({ ...datos, numero: siguienteNumero(nums) }).select("id, numero").single();
@@ -136,11 +141,35 @@
     r.partes.filter(p => p.cliente_id === clienteId).forEach(p => mov.push({ fecha: p.vence || (p.obra && p.obra.fecha_inicio) || "", tipo: "cargo", texto: `${p.descripcion}${p.obra ? " · " + p.obra.numero : ""}`, cargo: p.monto, abono: 0, vence: p.vence, venc: p.venc }));
     const ped = D.pedidosTienda ? await D.pedidosTienda().catch(() => []) : [];
     ped.filter(p => p.clienteId === clienteId && p.pagoId && Number(p.total) > 0).forEach(p => { const h = (p.historia || []).find(x => x.estado === "en-marcha"); mov.push({ fecha: String((h && h.fecha) || p.actualizado || "").slice(0, 10), tipo: "cargo", texto: `Pedido ${p.id} de la tienda`, cargo: r2(p.total), abono: 0 }); });
-    r.pagos.filter(p => p.cliente_id === clienteId && !p.anulado).forEach(p => mov.push({ fecha: p.fecha, tipo: "abono", texto: `Pago ${p.numero} · ${FORMAS[p.forma]}${p.referencia ? " " + p.referencia : ""}`, cargo: 0, abono: p.monto }));
+    r.pagos.filter(p => p.cliente_id === clienteId && !p.anulado).forEach(p => mov.push({ fecha: p.fecha, tipo: "abono", texto: `Pago ${p.numero} · ${FORMAS[p.forma]}${p.referencia ? " " + p.referencia : ""}${p.ret_iva ? ` · retención de IVA ${"Q " + r2(p.ret_iva).toLocaleString("en-US", { minimumFractionDigits: 2 })}${p.const_iva ? ", constancia " + p.const_iva : ""}` : ""}`, cargo: 0, abono: aplicado(p) }));
     mov.sort((a, b) => String(a.fecha || "9999").localeCompare(String(b.fecha || "9999")) || (a.tipo === "cargo" ? -1 : 1));
     let s = 0; mov.forEach(m => { s = r2(s + m.cargo - m.abono); m.saldo = s; });
     const cargos = r2(mov.reduce((a, m) => a + m.cargo, 0)), abonos = r2(mov.reduce((a, m) => a + m.abono, 0));
     return { mov, cargos, abonos, saldo: r2(cargos - abonos), vencido: r2(r.pendientes.filter(p => p.cliente_id === clienteId && p.venc === "vencido").reduce((a, p) => a + p.saldo, 0)) };
+  }
+
+  const idbC = (() => {
+    let a;
+    const abrir = () => a || (a = new Promise((bien, mal) => { const r = indexedDB.open("emtecsa-cobros", 1); r.onupgradeneeded = () => r.result.createObjectStore("archivos"); r.onsuccess = () => bien(r.result); r.onerror = () => mal(r.error); }));
+    const tx = (modo, fn) => abrir().then(db => new Promise((bien, mal) => { const x = db.transaction("archivos", modo); const q = fn(x.objectStore("archivos")); x.oncomplete = () => bien(q && q.result); x.onerror = () => mal(x.error); }));
+    return { poner: (k, v) => tx("readwrite", s => s.put(v, k)), leer: k => tx("readonly", s => s.get(k)) };
+  })();
+  async function subirConstancia(file) {
+    if (!file) return null;
+    if (!/^image\/|^application\/pdf$/.test(file.type)) throw new Error("La constancia va en foto o PDF.");
+    if (file.size > 8 * 1048576) throw new Error("La constancia pesa más de 8 MB.");
+    const ext = file.type === "application/pdf" ? "pdf" : (file.name.split(".").pop() || "jpg").toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 5) || "jpg";
+    const ref = `constancias/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+    if (!nube) { await idbC.poner(ref, file); return ref; }
+    const r = await sb.storage.from("cobros").upload(ref, file, { contentType: file.type, upsert: false });
+    if (r.error) throw new Error("No se pudo subir la constancia. Intente otra vez.");
+    return ref;
+  }
+  async function constanciaUrl(ref) {
+    if (!ref) return null;
+    if (!nube) { const b = await idbC.leer(ref); return b ? URL.createObjectURL(b) : null; }
+    const r = await sb.storage.from("cobros").createSignedUrl(ref, 600);
+    return r.error ? null : r.data.signedUrl;
   }
 
   function enLetras(n) {
@@ -159,5 +188,5 @@
     return txt.charAt(0).toUpperCase() + txt.slice(1);
   }
 
-  Object.assign(D, { FORMAS, TIPOS_FIANZA, TIPOS_GASTO, resumenCobros: resumen, guardarPlan, agregarParte, quitarParte, registrarPago, anularPago, guardarFianza, guardarGasto, quitarGasto, estadoCuenta, enLetras });
+  Object.assign(D, { FORMAS, TIPOS_FIANZA, TIPOS_GASTO, resumenCobros: resumen, guardarPlan, agregarParte, quitarParte, subirConstancia, constanciaUrl, aplicadoPago: aplicado, registrarPago, anularPago, guardarFianza, guardarGasto, quitarGasto, estadoCuenta, enLetras });
 })();

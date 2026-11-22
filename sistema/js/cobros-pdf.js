@@ -55,6 +55,11 @@
     campo("Forma de pago", D.FORMAS[pago.forma] + (pago.banco ? " · " + pago.banco : ""), M, y, 230);
     campo("Número de boleta, transferencia o cheque", pago.referencia || "", 310, y, W - M - 310);
     y -= 52;
+    if (Number(pago.ret_iva) > 0) {
+      campo("Retención de IVA", `${Q(pago.ret_iva)}${pago.const_iva ? " · constancia " + pago.const_iva : ""}`, M, y, 250);
+      campo("Total abonado a la cuenta", Q(Number(pago.monto) + Number(pago.ret_iva)), 310, y, W - M - 310);
+      y -= 52;
+    }
     if (saldoObra != null) { campo("Saldo pendiente de la obra", Q(saldoObra), M, y, 230); }
     if (pago.notas) campo("Notas", pago.notas, 310, y, W - M - 310);
     y -= 70;
@@ -266,5 +271,66 @@
     return doc.save();
   }
 
-  Object.assign(P, { recibo, estadoCuenta, pedido, reporteFinanzas, estimacion });
+  async function ordenCambio({ oc, emp }) {
+    const d = oc.datos || {};
+    const ded = oc.tipo === "deductivo";
+    const { doc, F, hex, txt, cabeza, pie } = await nuevo(`${oc.numero} · Orden de cambio ${oc.correlativo}`, emp);
+    const cant = n => Number(n || 0).toLocaleString("en-US", { maximumFractionDigits: 3 });
+    const paginas = [];
+    let pg = doc.addPage([W, H]); paginas.push(pg);
+    cabeza(pg, ded ? "ORDEN DE CAMBIO · DEDUCTIVO" : "ORDEN DE CAMBIO", oc.numero, (emp.ciudad ? emp.ciudad + ", " : "") + fLarga(oc.fecha));
+    if (oc.estado === "borrador") txt(pg, "BORRADOR", W / 2, H / 2 - 40, { f: F.x, s: 80, c: "#EEF1F4", centro: true });
+    let y = H - 162;
+    const dato = (eti, val, x, yy, w, lin = 2) => { txt(pg, eti.toUpperCase(), x, yy, { f: F.b, s: 7.5, c: COL.gris }); const l = partir(val || "—", F.s, 11, w).slice(0, lin); l.forEach((t, i) => txt(pg, t, x, yy - 15 - i * 14, { f: F.s, s: 11 })); return l.length; };
+    dato("Cliente", d.cliente || "", M, y, 300);
+    dato("Orden de cambio", `No. ${oc.correlativo} · ${ded ? "quita trabajo" : "agrega trabajo"}`, 400, y, W - M - 400);
+    y -= 52;
+    dato("Obra", [d.obra && d.obra.numero, d.obra && d.obra.titulo].filter(Boolean).join(" · "), M, y, W - 2 * M);
+    y -= 52;
+    const nl = dato("Qué pidió el cliente", oc.motivo, M, y, W - 2 * M, 4);
+    y -= 30 + nl * 14;
+    const COLS = [[M, "DESCRIPCIÓN"], [W - M - 190, "CANTIDAD"], [W - M - 95, "PRECIO C/U"], [W - M, "TOTAL"]];
+    const cabTabla = (p2, yy) => { p2.drawRectangle({ x: M, y: yy - 8, width: W - 2 * M, height: 24, color: hex(COL.marino) }); COLS.forEach(([x, t], i) => txt(p2, t, x + (i < 1 ? 8 : -8), yy, { f: F.b, s: 7.5, c: "#FFFFFF", der: i >= 1 })); return yy - 26; };
+    y = cabTabla(pg, y);
+    (d.renglones || []).forEach((r, i) => {
+      const l = partir(r.d, F.r, 9, W - M - 190 - M - 70).slice(0, 3);
+      const alto = 10 + l.length * 12;
+      if (y - alto < PIE + 40) { pg = doc.addPage([W, H]); paginas.push(pg); y = cabTabla(pg, H - M - 10); }
+      if (i % 2 === 1) pg.drawRectangle({ x: M, y: y - alto + 12, width: W - 2 * M, height: alto, color: hex("#F5F7F9") });
+      l.forEach((t, j) => txt(pg, t, M + 8, y - j * 12, { s: 9, f: F.s }));
+      txt(pg, cant(r.c), W - M - 198, y, { s: 9, der: true });
+      txt(pg, Q(r.u), W - M - 103, y, { s: 9, der: true, c: COL.gris });
+      txt(pg, Q(Math.round(r.c * r.u * 100) / 100), W - M - 8, y, { s: 9, der: true, f: F.s });
+      y -= alto;
+    });
+    y -= 14;
+    const s = ded ? "− " : "+ ";
+    const lineas = d.proporcional ? [["A precio de la cotización", Q(oc.subtotal)]] : [["Subtotal", Q(oc.subtotal)], ...(d.iva ? [["IVA 12 %", Q(d.iva)]] : [])];
+    if (d.contrato_antes != null) lineas.push(["Contrato antes de este cambio", Q(d.contrato_antes)]);
+    if (oc.dias_plazo) lineas.push(["Plazo adicional", `${oc.dias_plazo} ${oc.dias_plazo === 1 ? "día" : "días"}`]);
+    if (y - (lineas.length * 18 + 110) < PIE + 150) { pg = doc.addPage([W, H]); paginas.push(pg); y = H - M - 10; }
+    const rx = W - M - 300;
+    lineas.forEach(([t, v]) => { txt(pg, t, rx, y, { s: 9.5, c: COL.gris }); txt(pg, v, W - M, y, { s: 9.5, f: F.s, der: true }); y -= 18; });
+    pg.drawRectangle({ x: rx - 12, y: y - 34, width: W - M - rx + 12, height: 44, color: hex(COL.noche) });
+    txt(pg, ded ? "SE QUITA DEL CONTRATO" : "SE AGREGA AL CONTRATO", rx, y - 12, { f: F.b, s: 8, c: COL.laton });
+    txt(pg, s + Q(oc.total), W - M - 10, y - 18, { f: F.x, s: 16, c: "#FFFFFF", der: true });
+    y -= 50;
+    if (d.contrato_despues != null) { txt(pg, `El contrato queda en ${Q(d.contrato_despues)}.`, rx, y, { s: 9, f: F.b }); y -= 14; }
+    if (d.proporcional) { txt(pg, "Incluye IVA y lo demás de la cotización, en la misma proporción.", rx, y, { s: 8, c: COL.gris }); y -= 14; }
+    if (oc.notas) { y -= 10; partir("Notas: " + oc.notas, F.r, 9, W - 2 * M).slice(0, 4).forEach((l, i) => txt(pg, l, M, y - i * 12, { s: 9, c: COL.gris })); y -= 48; }
+    y -= 60;
+    if (y < PIE + 70) { pg = doc.addPage([W, H]); paginas.push(pg); y = H - M - 90; }
+    const ap = oc.aprobado;
+    const firmaX = (x, nombre, rol) => { pg.drawLine({ start: { x, y }, end: { x: x + 210, y }, thickness: 0.8, color: hex(COL.texto) }); txt(pg, nombre || "", x + 105, y - 16, { f: F.b, s: 10, centro: true }); txt(pg, rol, x + 105, y - 30, { s: 8.5, c: COL.gris, centro: true }); };
+    firmaX(M, emp.firma_nombre || emp.nombre || "EMTECSA", ["Elaboró", emp.firma_puesto].filter(Boolean).join(" · "));
+    if (ap && ap.firma && /^data:image\/png;base64,/.test(ap.firma)) {
+      try { const img = await doc.embedPng(Uint8Array.from(atob(ap.firma.split(",")[1]), c => c.charCodeAt(0))); const hF = 46, wF = Math.min(200, hF * img.width / img.height); pg.drawImage(img, { x: W - M - 105 - wF / 2, y: y + 4, width: wF, height: hF }); } catch (e) {}
+    }
+    firmaX(W - M - 210, ap ? ap.nombre : "", ap ? [ap.puesto, "Aprobó · " + new Date(ap.fecha).toLocaleString("es-GT", { timeZone: "America/Guatemala", day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })].filter(Boolean).join(" · ") : "Aprobó por el cliente");
+    if (oc.estado === "anulada") { txt(pg, "ANULADA", W / 2, H / 2 - 40, { f: F.x, s: 80, c: "#B3261E", centro: true }); txt(pg, oc.motivo_anulado || "", W / 2, H / 2 - 66, { f: F.s, s: 11, c: "#B3261E", centro: true }); }
+    paginas.forEach((p, i) => { pie(p); txt(p, `Página ${i + 1} de ${paginas.length}`, W - M, PIE - 4, { s: 7.5, c: COL.gris, der: true }); });
+    return doc.save();
+  }
+
+  Object.assign(P, { recibo, estadoCuenta, pedido, reporteFinanzas, estimacion, ordenCambio });
 })();

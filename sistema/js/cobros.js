@@ -104,6 +104,35 @@ window.EMT_COBROS = (() => {
   const ligarCobro = (f, res, nombre) => window.EMT_FINANZAS ? window.EMT_FINANZAS.ligar(f, "cobro", { tipo: "ingreso", monto: A().numero(f.monto.value), fecha: f.fecha.value, categoria: "Cobros de obras", descripcion: `Recibo ${res.numero}${nombre ? " · " + nombre : ""}`, referencia: f.ref.value, origen: "pago", origen_id: res.id }) : null;
   const CAT_GASTO = { viaticos: "Viáticos", combustible: "Combustible", equipo: "Herramienta y equipo", subcontrato: "Otros gastos", materiales: "Materiales y compras", otro: "Otros gastos" };
 
+  const kRet = cli => cli && cli.agente_iva ? 12 / 112 * (Number(cli.ret_iva_pct) || 15) / 100 : 0;
+  const r2 = n => Math.round((Number(n) || 0) * 100) / 100;
+  const campoRet = (cli, saldo) => {
+    const { esc, campoMonto } = A();
+    const k = kRet(cli), ret = saldo != null && k ? r2(saldo * k) : null;
+    return `<fieldset class="ret-iva" data-ret ${k ? "" : "hidden"}><legend>Retención de IVA${cli && cli.agente_iva ? ` · ${esc(A().cant(cli.ret_iva_pct))} % del IVA` : ""}</legend>
+      <div class="f-fila">${campoMonto("ret", "IVA que retuvo", ret)}<label class="f-campo">Número de constancia<input name="const_iva" autocomplete="off"></label></div>
+      <label class="f-campo">Constancia en foto o PDF <small>opcional</small><input type="file" name="const_f" accept="image/*,application/pdf"></label>
+      <p class="suave" data-ret-res style="font-size:13px;margin:0"></p></fieldset>`;
+  };
+  function activarRet(f, getCli) {
+    const { Q, numero } = A();
+    let aMano = false;
+    const res = () => { const b = f.querySelector("[data-ret-res]"); if (!b) return; let m = 0, rt = 0; try { m = numero(f.monto.value) || 0; rt = numero(f.ret.value) || 0; } catch (e) {} b.textContent = rt ? `Pagó ${Q(m)} y retuvo ${Q(rt)}: se abonan ${Q(m + rt)} a su cuenta.` : "Si no le retuvo, deje la retención en 0.00."; };
+    f.addEventListener("input", e => {
+      if (e.target.name === "ret") aMano = true;
+      if (e.target.name === "monto" && !aMano) { const k = kRet(getCli()); if (k) { let m = 0; try { m = numero(f.monto.value) || 0; } catch (er) {} f.ret.value = A().montoTxt(r2(m * k / (1 - k))); } }
+      res();
+    });
+    res();
+    return { reset: () => { aMano = false; res(); } };
+  }
+  async function datosRet(f) {
+    const box = f.querySelector("[data-ret]"); if (!box || box.hidden) return {};
+    const ret = A().numero(f.ret.value) || 0; if (!ret) return {};
+    const file = f.const_f && f.const_f.files[0];
+    return { ret_iva: ret, const_iva: f.const_iva.value, const_ref: file ? await D.subirConstancia(file) : null };
+  }
+
   async function pagoSuelto(r, recargar, clientesL) {
     const { modal, esc, campoMonto, formatoAlSalir, numero, cerrarCapas, aviso } = A();
     const clientes = clientesL || await D.clientes();
@@ -119,11 +148,14 @@ window.EMT_COBROS = (() => {
         <label class="f-campo">Banco<input name="banco" autocomplete="off"></label></div>
         <label class="f-campo">Número de boleta, transferencia o cheque<input name="ref" autocomplete="off"></label>
         <label class="f-campo">Notas<input name="notas" autocomplete="off" placeholder="Anticipo, venta de material…"></label>
+        ${campoRet(null, null)}
         ${campoCobro(cuF)}`,
       alAbrir: f => {
         formatoAlSalir(f);
+        const rt = activarRet(f, () => cli);
         buscadorCliente(f.querySelector("[data-pick-cli]"), clientes, c => {
           cli = c;
+          const box = f.querySelector("[data-ret]"); box.hidden = !kRet(c); box.querySelector("legend").textContent = `Retención de IVA${c && c.agente_iva ? ` · ${A().cant(c.ret_iva_pct)} % del IVA` : ""}`; f.ret.value = ""; rt.reset();
           const mias = c ? obras.filter(o => o.cliente_id === c.id) : [];
           f.obra.disabled = !c;
           f.obra.innerHTML = c ? `<option value="">Sin obra</option>${mias.map(o => `<option value="${o.id}">${esc(o.numero)} · ${esc(o.titulo || "")}</option>`).join("")}` : `<option value="">Escoja primero el cliente</option>`;
@@ -131,7 +163,7 @@ window.EMT_COBROS = (() => {
       },
       alGuardar: async f => {
         if (!cli) throw new Error("Escoja el cliente.");
-        const res = await D.registrarPago({ cliente_id: cli.id, obra_id: f.obra.value ? Number(f.obra.value) : null, parte_id: null, monto: numero(f.monto.value), fecha: f.fecha.value, forma: f.forma.value, banco: f.banco.value, referencia: f.ref.value, notas: f.notas.value });
+        const res = await D.registrarPago({ cliente_id: cli.id, obra_id: f.obra.value ? Number(f.obra.value) : null, parte_id: null, monto: numero(f.monto.value), fecha: f.fecha.value, forma: f.forma.value, banco: f.banco.value, referencia: f.ref.value, notas: f.notas.value, ...await datosRet(f) });
         await ligarCobro(f, res, cli.nombre);
         cerrarCapas(); aviso(`Pago registrado: recibo ${res.numero}.`);
         await recargar();
@@ -146,19 +178,22 @@ window.EMT_COBROS = (() => {
     const otros = parte.obra_id ? r.pendientes.filter(x => x.obra_id === parte.obra_id && x.id !== parte.id) : [];
     const tope = Math.round((parte.saldo + otros.reduce((a, x) => a + x.saldo, 0)) * 100) / 100;
     const cuF = await cuentasCobro();
+    const cliP = parte.cliente && "agente_iva" in parte.cliente ? parte.cliente : await D.cliente(parte.cliente_id).catch(() => parte.cliente);
+    const kP = kRet(cliP);
     modal({
       titulo: "Registrar pago", guardarTxt: "Registrar pago",
       cuerpo: `<div class="cli-elegido"><span><b>${esc(parte.cliente ? parte.cliente.nombre : "")}</b><small>${parte.obra ? esc(parte.obra.numero) + " · " : ""}${esc(parte.descripcion)} · saldo ${esc(Q(parte.saldo))}</small></span></div>
         ${otros.length ? `<p class="suave" style="font-size:13px;margin:0">Si paga más de ${esc(Q(parte.saldo))}, el resto se abona a los otros cobros de la obra (hasta ${esc(Q(tope))}).</p>` : ""}
-        <div class="f-fila">${campoMonto("monto", "Monto que pagó", parte.saldo)}<label class="f-campo">Fecha<input type="date" name="fecha" value="${hoyISO()}"></label></div>
+        <div class="f-fila">${campoMonto("monto", "Monto que pagó", kP ? r2(parte.saldo - r2(parte.saldo * kP)) : parte.saldo)}<label class="f-campo">Fecha<input type="date" name="fecha" value="${hoyISO()}"></label></div>
         <div class="f-fila"><label class="f-campo">Forma de pago<select name="forma">${Object.entries(D.FORMAS).map(([k, n]) => `<option value="${k}">${n}</option>`).join("")}</select></label>
         <label class="f-campo">Banco<input name="banco" autocomplete="off"></label></div>
         <label class="f-campo">Número de boleta, transferencia o cheque<input name="ref" autocomplete="off"></label>
         <label class="f-campo">Notas<input name="notas" autocomplete="off"></label>
+        ${campoRet(cliP, parte.saldo)}
         ${campoCobro(cuF)}`,
-      alAbrir: f => formatoAlSalir(f),
+      alAbrir: f => { formatoAlSalir(f); activarRet(f, () => cliP); },
       alGuardar: async f => {
-        const res = await D.registrarPago({ cliente_id: parte.cliente_id, obra_id: parte.obra_id, parte_id: parte.id, monto: numero(f.monto.value), fecha: f.fecha.value, forma: f.forma.value, banco: f.banco.value, referencia: f.ref.value, notas: f.notas.value, tope });
+        const res = await D.registrarPago({ cliente_id: parte.cliente_id, obra_id: parte.obra_id, parte_id: parte.id, monto: numero(f.monto.value), fecha: f.fecha.value, forma: f.forma.value, banco: f.banco.value, referencia: f.ref.value, notas: f.notas.value, tope, ...await datosRet(f) });
         await ligarCobro(f, res, parte.cliente ? parte.cliente.nombre : "");
         cerrarCapas(); aviso(`Pago registrado: recibo ${res.numero}.`);
         await recargar();
@@ -200,7 +235,7 @@ window.EMT_COBROS = (() => {
     box.innerHTML = l.length ? `<div class="lista">${l.map(p => `
       <div class="fila cobro ${p.anulado ? "anulado" : ""}" style="cursor:default"><span class="icono ${p.anulado ? "gris" : "verde"}">${ico("file", 18)}</span>
         <span><b>${esc(p.numero)} · ${esc(cl[p.cliente_id] ? cl[p.cliente_id].nombre : "Cliente")}</b><small>${esc(fCorta(p.fecha))} · ${esc(D.FORMAS[p.forma])}${p.referencia ? " " + esc(p.referencia) : ""}${p.anulado ? " · anulado: " + esc(p.motivo_anulado || "") : ""}</small></span>
-        <span class="der"><b class="e-cifra">${esc(Q(p.monto))}</b>${p.anulado ? '<small><span class="chip gris">Anulado</span></small>' : ""}</span>
+        <span class="der"><b class="e-cifra">${esc(Q(p.monto))}</b>${p.ret_iva && !p.anulado ? `<small>+ ${esc(Q(p.ret_iva))} retenido</small>` : ""}${p.anulado ? '<small><span class="chip gris">Anulado</span></small>' : ""}</span>
         <span class="acc">${!p.anulado ? `<button class="s-ib" type="button" aria-label="Ver recibo ${esc(p.numero)}" data-rec="${p.id}">${ico("eye", 15)}</button>${puede ? `<button class="s-ib" type="button" aria-label="Abrir el recibo ${esc(p.numero)}" data-anular="${p.id}">${ico("pen", 15)}</button>` : ""}` : ""}</span></div>`).join("")}</div>`
       : `<div class="vacio chico"><p>Todavía no hay pagos registrados.</p></div>`;
     box.onclic = e => {
@@ -210,8 +245,10 @@ window.EMT_COBROS = (() => {
         const p = l.find(x => x.id === Number(an.dataset.anular));
         const anular = () => { const m = modal({ titulo: `¿Anular el recibo ${p.numero}?`, guardarTxt: "Anular", cuerpo: `<p class="suave" style="font-size:14.5px">El recibo no se borra: queda anulado y el monto vuelve a quedar pendiente de cobro.</p><label class="f-campo">Motivo<input name="motivo" autocomplete="off"></label>`, alGuardar: async f => { await D.anularPago(p.id, f.motivo.value); if (D.anularPorOrigen) await D.anularPorOrigen("pago", p.id, "Recibo anulado: " + f.motivo.value).catch(() => {}); cerrarCapas(); aviso("Recibo anulado."); await recargar(); } }); m.querySelector("[data-guardar]").classList.add("peligro-b"); };
         modal({ titulo: `Recibo ${p.numero}`, guardarTxt: "Ver recibo", quitar: anular, quitarTxt: "Anular",
-          cuerpo: `<div class="vm-prev"><div><span>Cliente</span><b>${esc(cl[p.cliente_id] ? cl[p.cliente_id].nombre : "")}</b></div><div><span>Fecha</span><b>${esc(fCorta(p.fecha))}</b></div><div class="g"><span>Monto</span><b>${esc(Q(p.monto))}</b></div><div><span>Forma de pago</span><b>${esc(D.FORMAS[p.forma])}${p.banco ? " · " + esc(p.banco) : ""}</b></div>${p.referencia ? `<div><span>Boleta o referencia</span><b>${esc(p.referencia)}</b></div>` : ""}${p.notas ? `<div><span>Notas</span><b>${esc(p.notas)}</b></div>` : ""}</div>
+          cuerpo: `<div class="vm-prev"><div><span>Cliente</span><b>${esc(cl[p.cliente_id] ? cl[p.cliente_id].nombre : "")}</b></div><div><span>Fecha</span><b>${esc(fCorta(p.fecha))}</b></div><div class="g"><span>Monto</span><b>${esc(Q(p.monto))}</b></div><div><span>Forma de pago</span><b>${esc(D.FORMAS[p.forma])}${p.banco ? " · " + esc(p.banco) : ""}</b></div>${p.referencia ? `<div><span>Boleta o referencia</span><b>${esc(p.referencia)}</b></div>` : ""}${p.ret_iva ? `<div><span>Retención de IVA</span><b>${esc(Q(p.ret_iva))}${p.const_iva ? " · constancia " + esc(p.const_iva) : ""}</b></div><div><span>Total abonado</span><b>${esc(Q(p.monto + p.ret_iva))}</b></div>` : ""}${p.notas ? `<div><span>Notas</span><b>${esc(p.notas)}</b></div>` : ""}</div>
+            ${p.const_ref ? `<div class="fila-b"><button class="s-btn suave-b" type="button" data-ver-const>${ico("eye", 15)}Ver la constancia</button></div>` : ""}
             <p class="suave" style="font-size:13px;margin:0">Un recibo no se cambia ni se borra. Si tiene un error, se anula y se registra el pago otra vez.</p>`,
+          alAbrir: (f, mm) => mm.addEventListener("click", async ev => { if (!ev.target.closest("[data-ver-const]")) return; const u = await D.constanciaUrl(p.const_ref); if (u) window.open(u, "_blank", "noopener"); else aviso("No se encontró la constancia.", "mal"); }),
           alGuardar: async () => { cerrarCapas(); await abrirRecibo(p.id, "ver"); } });
       }
     };
@@ -301,7 +338,8 @@ window.EMT_COBROS = (() => {
     const cat = await D.catalogo();
     const kc = cot ? D.calcularCotizacion(cot, cat) : null;
     const total = kc ? kc.total : partes.reduce((a, x) => a + x.monto, 0);
-    const cobrado = pagos.reduce((a, x) => a + x.monto, 0), gastado = gastos.reduce((a, x) => a + x.monto, 0);
+    const cobrado = pagos.reduce((a, x) => a + D.aplicadoPago(x), 0), gastado = gastos.reduce((a, x) => a + x.monto, 0);
+    const ocNeto = interno && D.cambiosDe ? ((await D.cambiosDe(o).catch(() => null)) || { neto: 0 }).neto : 0;
     let costoMat = null, sinIva = null;
     if (interno && kc) { costoMat = kc.costoMat; sinIva = kc.neto; }
     box.innerHTML = `
@@ -309,12 +347,16 @@ window.EMT_COBROS = (() => {
       ${partes.length ? `<div class="lista">${partes.map(x => `<div class="fila cobro" style="cursor:default"><span class="icono ${x.saldo <= 0 ? "verde" : x.venc === "vencido" ? "ambar" : "laton"}">${ico(x.saldo <= 0 ? "check" : "wallet", 18)}</span><span><b>${esc(x.descripcion)}${x.porcentaje != null ? ` · ${A().cant(x.porcentaje)} %` : ""}</b><small>${x.vence ? "vence " + esc(fCorta(x.vence)) : "sin fecha"}${x.pagado ? ` · pagado ${esc(Q(x.pagado))}` : ""}${x.pagado && x.saldo > 0 ? ` · falta ${esc(Q(x.saldo))}` : ""}</small></span><span class="der"><b class="e-cifra">${esc(Q(x.monto))}</b><small>${x.saldo <= 0 ? '<span class="chip verde">Pagado</span>' : chipVenc(x)}</small></span>${edC && x.saldo > 0 ? `<button class="s-btn suave-b chico" type="button" data-cobrar-o="${x.id}">Cobrar</button>` : "<span></span>"}</div>`).join("")}</div>`
         : `<div class="vacio chico"><p>Todavía no hay plan de pagos. ${cot ? `El total de la cotización es ${esc(Q(total))}.` : ""}</p></div>`}` : ""}
       ${verC && window.EMT_ESTIMACIONES ? `<div class="est-caja" data-est></div>` : ""}
+      ${verC && window.EMT_CAMBIOS ? `<div class="est-caja" data-oc></div>` : ""}
       ${verG ? `<div class="sub"><h2>Gastos de la obra · ${esc(Q(gastado))}</h2><button class="s-btn suave-b" type="button" data-gasto>${ico("plus", 15)}Agregar gasto</button></div>
       ${gastos.length ? `<div class="lista">${gastos.map(g => `<div class="fila cobro" style="cursor:default"><span class="icono gris">${ico("cart", 18)}</span><span><b>${esc(g.descripcion)}</b><small>${esc(D.TIPOS_GASTO[g.tipo])} · ${esc(fCorta(g.fecha))}</small></span><span class="der"><b class="e-cifra">${esc(Q(g.monto))}</b></span><span class="acc"><button class="s-ib" type="button" aria-label="Editar gasto" data-ed-gasto="${g.id}">${ico("pen", 15)}</button></span></div>`).join("")}</div>` : `<div class="vacio chico"><p>Sin gastos anotados: viáticos, combustible, grúa, subcontratos…</p></div>`}` : ""}
-      ${interno ? `<div class="sub"><h2>Cómo va la obra</h2></div><div class="datos-cli"><div><small>${kc ? "Total con IVA" : "Total del plan"}</small><span class="e-cifra">${esc(Q(total))}</span></div><div><small>Cobrado</small><span class="e-cifra">${esc(Q(cobrado))}</span></div><div><small>Gastos</small><span class="e-cifra">${esc(Q(gastado))}</span></div><div><small>${sinIva != null ? "Queda (sin IVA)" : "Queda"}</small><span class="e-cifra"><b>${esc(Q(sinIva != null ? sinIva - costoMat - gastado : total - gastado))}</b></span></div>
-        <div class="ancho2"><small>Cómo se calcula</small><span class="suave" style="font-size:13px">${sinIva != null ? `Total sin IVA ${esc(Q(sinIva))} menos costo de materiales ${esc(Q(costoMat))} menos gastos ${esc(Q(gastado))}. Solo lo ve gerencia.` : `Total del plan de pagos ${esc(Q(total))} menos gastos ${esc(Q(gastado))}. Sin cotización no se descuentan el IVA ni el costo de materiales. Solo lo ve gerencia.`}</span></div></div>` : ""}`;
+      ${interno ? `<div class="sub"><h2>Cómo va la obra</h2></div><div class="datos-cli"><div><small>${kc ? "Total con IVA" : "Total del plan"}${ocNeto ? " y cambios" : ""}</small><span class="e-cifra">${esc(Q(total + ocNeto))}</span></div><div><small>Cobrado</small><span class="e-cifra">${esc(Q(cobrado))}</span></div><div><small>Gastos</small><span class="e-cifra">${esc(Q(gastado))}</span></div><div><small>${sinIva != null ? "Queda (sin IVA)" : "Queda"}</small><span class="e-cifra"><b>${esc(Q(sinIva != null ? sinIva + (ocNeto / (kc && kc.iva ? 1.12 : 1)) - costoMat - gastado : total + ocNeto - gastado))}</b></span></div>
+        <div class="ancho2"><small>Cómo se calcula</small><span class="suave" style="font-size:13px">${sinIva != null ? `Total sin IVA ${esc(Q(sinIva))}${ocNeto ? ` ${ocNeto > 0 ? "más" : "menos"} órdenes de cambio sin IVA ${esc(Q(Math.abs(ocNeto) / (kc && kc.iva ? 1.12 : 1)))}` : ""} menos costo de materiales ${esc(Q(costoMat))} menos gastos ${esc(Q(gastado))}. Solo lo ve gerencia.` : `Total del plan de pagos ${esc(Q(total))} menos gastos ${esc(Q(gastado))}. Sin cotización no se descuentan el IVA ni el costo de materiales. Solo lo ve gerencia.`}</span></div></div>` : ""}`;
     const cajaEst = box.querySelector("[data-est]");
-    if (cajaEst) await window.EMT_ESTIMACIONES.seccion(cajaEst, o, { partes: todas, total, recargar, cobrar: async x => cobrar({ ...x, cliente: o.cliente || await D.cliente(o.cliente_id), cliente_id: o.cliente_id, obra: o }, recargar) });
+    const ctxD = { partes: todas, total, recargar, cobrar: async x => cobrar({ ...x, cliente: o.cliente || await D.cliente(o.cliente_id), cliente_id: o.cliente_id, obra: o }, recargar) };
+    if (cajaEst) await window.EMT_ESTIMACIONES.seccion(cajaEst, o, ctxD);
+    const cajaOC = box.querySelector("[data-oc]");
+    if (cajaOC) await window.EMT_CAMBIOS.seccion(cajaOC, o, ctxD);
     const editarGasto = g0 => modal({
       titulo: g0 ? "Editar gasto" : "Gasto de la obra",
       quitar: g0 ? () => { const m = modal({ titulo: "¿Quitar el gasto?", guardarTxt: "Quitar", cuerpo: `<p class="suave" style="font-size:15px">Se quita «${esc(g0.descripcion)}» por ${esc(Q(g0.monto))}.</p>`, alGuardar: async () => { await D.quitarGasto(g0.id); if (D.anularPorOrigen) await D.anularPorOrigen("gasto_obra", g0.id, "Se quitó el gasto de la obra").catch(() => {}); cerrarCapas(); aviso("Gasto quitado."); await recargar(); } }); m.querySelector("[data-guardar]").classList.add("peligro-b"); } : null,

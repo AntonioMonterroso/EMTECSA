@@ -38,7 +38,7 @@ window.EMT_ESTIMACIONES = (() => {
     box.innerHTML = `
       <div class="sub"><h2>Estimaciones de avance</h2><span class="fila-b est-acc">${principal}${edC && !x.vigentes.length ? `<button class="s-ib" type="button" aria-label="Cambiar cómo se cobra por estimaciones" data-est-cfg>${ico("pen", 15)}</button>` : ""}</span></div>
       <div class="datos-cli est-res-o">
-        <div><small>Contrato</small><span class="e-cifra">${esc(Q(x.cfg.contrato))}</span></div>
+        <div><small>${x.extra ? "Contrato con cambios" : "Contrato"}</small><span class="e-cifra">${esc(Q(x.cfg.contrato))}</span></div>
         <div><small>Avance estimado</small><span class="e-cifra"><b>${esc(pctTxt(x.pctAcum))}</b></span></div>
         <div><small>Estimado</small><span class="e-cifra">${esc(Q(x.estimado))}</span></div>
         <div><small>Falta estimar</small><span class="e-cifra">${esc(Q(falta))}</span></div>
@@ -59,7 +59,7 @@ window.EMT_ESTIMACIONES = (() => {
     const plan = ctx.partes.filter(p => (p.orden || 0) < 100);
     const ant = plan.find(p => /anticipo/i.test(p.descripcion));
     const quitables = plan.filter(p => p !== ant && !(p.pagado > 0));
-    const contrato = x.cfg ? x.cfg.contrato : x.contratoCot != null ? x.contratoCot : ctx.total;
+    const contrato = x.cfg ? x.cfg.contrato_base : x.contratoCot != null ? x.contratoCot : ctx.total;
     const m = modal({
       titulo: "Cobrar por estimaciones", guardarTxt: "Guardar",
       quitar: x.cfg ? async () => { try { await D.quitarConfigEst(o); cerrarCapas(); aviso("La obra ya no se cobra por estimaciones."); await ctx.recargar(); } catch (er) { aviso(er.message, "mal"); } } : null, quitarTxt: "Ya no cobrar así",

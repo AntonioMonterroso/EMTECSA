@@ -16,7 +16,7 @@
   };
   const ico = (n, w = 18) => MAS[n] ? `<svg width="${w}" height="${w}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${MAS[n]}</svg>` : window.EMT.ico(n, w);
   const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
-  const Q = n => "Q " + Number(n || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const Q = n => "Q\u00a0" + Number(n || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const cant = n => Number(n).toLocaleString("en-US", { maximumFractionDigits: 3 });
   const fecha = f => { const [y, m, d] = String(f).slice(0, 10).split("-").map(Number); return new Date(y, m - 1, d).toLocaleDateString("es-GT", { day: "numeric", month: "long", year: "numeric" }); };
   const fechaHora = iso => new Date(iso).toLocaleString("es-GT", { timeZone: "America/Guatemala", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" });
@@ -124,6 +124,35 @@
         poner("emtecsa.sistema.estimaciones", de);
         const ev = evento(d, e, "estimacion", `${s.numero} · ${n}${pu ? " · " + pu : ""}`); poner(CE, d); avisar(ev);
         return { ...s.aprobado, firma: undefined };
+      },
+      async cambios(t) {
+        const { e } = buscar(t); if (!e || !e.aprobado) return [];
+        const ob = (leer("emtecsa.sistema.obras") || { obras: [] }).obras.find(o => o.cotizacion_id === e.cotizacion_id); if (!ob) return [];
+        return ((leer("emtecsa.sistema.cambios") || { oc: [] }).oc).filter(s => s.obra_id === ob.id && (s.estado === "enviada" || s.estado === "aprobada")).sort((a, b) => a.correlativo - b.correlativo)
+          .map(s => ({ id: s.id, numero: s.numero, estado: s.estado, datos: s.datos, aprobado: s.aprobado ? { ...s.aprobado, firma: undefined } : null }));
+      },
+      async aprobarOC(t, id, nombre, puesto, firma) {
+        const { d, e } = buscar(t); if (!e) throw new Error("no_existe"); if (!e.aprobado) throw new Error("no_aprobada");
+        const ob = (leer("emtecsa.sistema.obras") || { obras: [] }).obras.find(o => o.cotizacion_id === e.cotizacion_id);
+        const dc0 = leer("emtecsa.sistema.cambios"); const s = ob && dc0 && dc0.oc.find(x => x.id === id && x.obra_id === ob.id); if (!s) throw new Error("no_existe");
+        if (s.estado === "aprobada") return { ...s.aprobado, firma: undefined };
+        if (s.estado !== "enviada") throw new Error("no_disponible");
+        const n = nombre.replace(/\s+/g, " ").trim(), pu = puesto.replace(/\s+/g, " ").trim() || null;
+        if (n.length < 3 || n.length > 120) throw new Error("nombre");
+        if (!/^data:image\/png;base64,/.test(firma) || firma.length < 200 || firma.length > 400000) throw new Error("firma");
+        const porEst = ((leer("emtecsa.sistema.estimaciones") || { config: [] }).config || []).some(c => c.obra_id === ob.id);
+        let pid = null;
+        if (!porEst && Number(s.total) > 0) {
+          const ded = s.tipo === "deductivo";
+          const cl = ((leer("emtecsa.sistema.clientes") || { clientes: [] }).clientes).find(c => c.id === ob.cliente_id);
+          const [y, m, dd] = hoyGT().split("-").map(Number); const v = new Date(y, m - 1, dd + (ded ? 0 : Number(cl && cl.dias_credito) || 0));
+          const dc = leer("emtecsa.sistema.cobros") || { v: 1, cambios: false, sig: { x: 1 }, partes: [], pagos: [], fianzas: [], gastos: [] }; pid = dc.sig.x++;
+          dc.partes.push({ id: pid, obra_id: ob.id, descripcion: `${ded ? "Deductivo" : "Orden de cambio"} · ${s.numero}`, porcentaje: null, monto: ded ? -Number(s.total) : Number(s.total), vence: `${v.getFullYear()}-${String(v.getMonth() + 1).padStart(2, "0")}-${String(v.getDate()).padStart(2, "0")}`, orden: 300 + s.correlativo }); dc.cambios = true; poner("emtecsa.sistema.cobros", dc);
+        }
+        s.estado = "aprobada"; s.parte_id = pid; s.aprobado = { nombre: n, puesto: pu, firma, fecha: ahora(), en: "enlace" }; s.actualizado = ahora();
+        poner("emtecsa.sistema.cambios", dc0);
+        const ev = evento(d, e, "cambio", `${s.numero} · ${n}${pu ? " · " + pu : ""}`); poner(CE, d); avisar(ev);
+        return { ...s.aprobado, firma: undefined };
       }
     };
   })();
@@ -137,6 +166,8 @@
     async descarga(t, cual) { try { await sb.rpc("enlace_descarga", { p_token: t, p_cual: cual }); } catch (e) {} },
     async archivo(a) { try { const r = await fetch(a.url); return r.ok ? await r.blob() : null; } catch (e) { return null; } },
     async estimaciones(t) { const r = await sb.rpc("enlace_estimaciones", { p_token: t }); return r.error ? [] : r.data || []; },
+    async cambios(t) { const r = await sb.rpc("enlace_ordenes_cambio", { p_token: t }); return r.error ? [] : r.data || []; },
+    async aprobarOC(t, id, nombre, puesto, firma) { const r = await sb.rpc("enlace_aprobar_cambio", { p_token: t, p_id: id, p_nombre: nombre, p_puesto: puesto, p_firma: firma }); if (r.error) throw new Error((r.error.message || "").match(/no_existe|no_aprobada|no_disponible|nombre|puesto|firma/)?.[0] || "red"); return r.data; },
     async aprobarEst(t, id, nombre, puesto, firma) { const r = await sb.rpc("enlace_aprobar_estimacion", { p_token: t, p_id: id, p_nombre: nombre, p_puesto: puesto, p_firma: firma }); if (r.error) throw new Error((r.error.message || "").match(/no_existe|no_aprobada|no_disponible|nombre|puesto|firma/)?.[0] || "red"); return r.data; }
   };
   const API = nube ? N : L;
@@ -189,8 +220,10 @@
   function estadoHTML() {
     const ap = R.aprobado;
     if (R.equipo) return `<div class="banda azul">${ico("eye", 17)}<span><b>Así la ve su cliente.</b> Esta visita no se cuenta.</span></div>`;
-    if (ap && !(R.est || []).some(s => s.estado === "enviada")) return "";
+    if (ap && !(R.est || []).some(s => s.estado === "enviada") && !(R.oc || []).some(s => s.estado === "enviada")) return "";
     if (R.estado === "borrador") return `<div class="banda ambar">${ico("alerta", 17)}<span><b>EMTECSA está ajustando esta propuesta.</b> Por ahora no se puede aprobar; le avisarán cuando esté lista.</span></div>`;
+    const po = ap && (R.oc || []).find(s => s.estado === "enviada");
+    if (po) return `<div class="banda azul est-banda">${ico("firma", 17)}<span><b>Tiene una orden de cambio por aprobar.</b> ${esc(po.datos.tipo === "deductivo" ? "Se quitan" : "Se agregan")} ${esc(Q(po.datos.total))}.</span><button class="e-btn e-btn-p" type="button" data-oc="${po.id}">Revisar</button></div>`;
     const pe = ap && (R.est || []).find(s => s.estado === "enviada");
     if (pe) return `<div class="banda azul est-banda">${ico("firma", 17)}<span><b>Tiene una estimación de avance por aprobar.</b> Estimación ${esc(pe.datos.correlativo)} por ${esc(Q(pe.datos.neto))}.</span><button class="e-btn e-btn-p" type="button" data-est="${pe.id}">Revisar</button></div>`;
     if (R.estado === "rechazada") return `<div class="banda gris">${ico("alerta", 17)}<span><b>Esta propuesta quedó cerrada.</b> Escríbanos si quiere retomarla.</span></div>`;
@@ -218,7 +251,13 @@
   function estimacionesHTML() {
     const l = R.est || []; if (!R.aprobado || !l.length) return "";
     return `<section class="pc-caja est-c" id="estimaciones"><h2>Estimaciones de avance</h2><p class="suave chico">Cobro según lo avanzado de la obra. Revise cada una y apruébela con su firma.</p>
-      ${l.slice().reverse().map(s => { const d = s.datos || {}; return `<div class="est-f"><span class="pr-d"><b>Estimación ${esc(d.correlativo)} · ${esc(s.numero)}</b><small>${esc(periodoT(d))} · avance ${esc(pctT(d.pct_acum))}</small>${s.estado === "aprobada" && s.aprobado ? `<small class="ok">Aprobada por ${esc(s.aprobado.nombre)} · ${esc(fechaHora(s.aprobado.fecha))}</small>` : ""}</span><span class="est-der"><b class="e-cifra">${esc(Q(d.neto))}</b>${s.estado === "enviada" ? `<button class="e-btn e-btn-p" type="button" data-est="${s.id}">${ico("firma", 17)}Revisar y aprobar</button>` : `<button class="e-btn" type="button" data-est="${s.id}">Ver</button>`}</span></div>`; }).join("")}</section>`;
+      ${l.slice().reverse().map(s => { const d = s.datos || {}; return `<div class="est-f"><span class="pr-d"><b>Estimación ${esc(d.correlativo)} · <span class="nw">${esc(s.numero)}</span></b><small>${esc(periodoT(d))} · avance ${esc(pctT(d.pct_acum))}</small>${s.estado === "aprobada" && s.aprobado ? `<small class="ok">Aprobada por ${esc(s.aprobado.nombre)} · ${esc(fechaHora(s.aprobado.fecha))}</small>` : ""}</span><span class="est-der"><b class="e-cifra">${esc(Q(d.neto))}</b>${s.estado === "enviada" ? `<button class="e-btn e-btn-p" type="button" data-est="${s.id}">${ico("firma", 17)}Revisar y aprobar</button>` : `<button class="e-btn" type="button" data-est="${s.id}">Ver</button>`}</span></div>`; }).join("")}</section>`;
+  }
+
+  function cambiosHTML() {
+    const l = R.oc || []; if (!R.aprobado || !l.length) return "";
+    return `<section class="pc-caja est-c" id="cambios"><h2>Órdenes de cambio</h2><p class="suave chico">Trabajos que se agregan o se quitan durante la obra. Revise cada una y apruébela con su firma.</p>
+      ${l.slice().reverse().map(s => { const d = s.datos || {}; return `<div class="est-f"><span class="pr-d"><b>Orden de cambio ${esc(d.correlativo)} · <span class="nw">${esc(s.numero)}</span></b><small>${esc(d.motivo || "")}</small>${s.estado === "aprobada" && s.aprobado ? `<small class="ok">Aprobada por ${esc(s.aprobado.nombre)} · ${esc(fechaHora(s.aprobado.fecha))}</small>` : ""}</span><span class="est-der"><b class="e-cifra">${d.tipo === "deductivo" ? "− " : "+ "}${esc(Q(d.total))}</b>${s.estado === "enviada" ? `<button class="e-btn e-btn-p" type="button" data-oc="${s.id}">${ico("firma", 17)}Revisar y aprobar</button>` : `<button class="e-btn" type="button" data-oc="${s.id}">Ver</button>`}</span></div>`; }).join("")}</section>`;
   }
 
   function pintar() {
@@ -270,6 +309,7 @@
             ${d.incluye.length ? `<div class="alc"><h3>Incluye</h3>${lista(d.incluye)}</div>` : ""}${d.excluye.length ? `<div class="alc no"><h3>No incluye</h3>${lista(d.excluye)}</div>` : ""}</details>` : ""}
           ${cond.length || d.notas ? `<details class="pc-caja plg"><summary><span><h2>Condiciones</h2><small>${cond.map(x => x[0]).join(" · ") || "Notas"}</small></span><span class="chev">${ico("chev", 18)}</span></summary>
             <dl class="cond">${cond.map(([k, v]) => `<div><dt>${k}</dt><dd>${esc(v)}</dd></div>`).join("")}${d.notas ? `<div><dt>Notas</dt><dd>${esc(d.notas)}</dd></div>` : ""}</dl></details>` : ""}
+          ${cambiosHTML()}
           ${estimacionesHTML()}
           ${ap ? `<section class="pc-caja tramite-c"><h2>Para los trámites con Energuate</h2><p class="suave chico">${R.tramite && R.tramite.fecha ? "Ya mandó sus datos. Puede corregirlos si hace falta." : "Para pedir la licencia de construcción hacen falta sus datos y los de cada terreno por donde pasará la línea."}</p><button class="e-btn ${R.tramite && R.tramite.fecha ? "" : "e-btn-p"} ancho" type="button" data-tramite>${ico("pen", 17)}${R.tramite && R.tramite.fecha ? "Corregir mis datos" : "Llenar mis datos"}</button></section>` : ""}
           ${mensajesHTML()}
@@ -440,7 +480,7 @@
     const puede = s.estado === "enviada" && !R.equipo;
     let firma = null;
     abrirHoja(`
-      <div class="hoja-cab"><h2>Estimación ${esc(d.correlativo)} · ${esc(s.numero)}</h2><button class="x" type="button" aria-label="Cerrar" data-cerrar>${ico("x", 18)}</button></div>
+      <div class="hoja-cab"><h2>Estimación ${esc(d.correlativo)} · <span class="nw">${esc(s.numero)}</span></h2><button class="x" type="button" aria-label="Cerrar" data-cerrar>${ico("x", 18)}</button></div>
       <p class="suave chico">${esc(d.obra ? [d.obra.numero, d.obra.titulo].filter(Boolean).join(" · ") : "")}<br>Período: ${esc(periodoT(d))}</p>
       ${cuentaEst(d)}
       ${filas.length ? `<details class="pc-caja plg est-det"><summary><span><h2>Lo hecho en este período</h2><small>${filas.length} ${filas.length === 1 ? "renglón" : "renglones"}</small></span><span class="chev">${ico("chev", 18)}</span></summary><div class="part">${filas.map(f => `<div class="pr"><span class="pr-d"><b>${esc(f.d)}</b><small>${esc(cant(f.per))} en este período · ${esc(cant(f.acum))} de ${esc(cant(f.c))} a la fecha</small></span></div>`).join("")}</div></details>` : ""}
@@ -473,6 +513,51 @@
           R.est = await API.estimaciones(token).catch(() => R.est);
           pintar(); aviso(`Estimación ${d.correlativo} aprobada. Gracias.`);
         } catch (e) { mal(ERR[e.message] || ERR.red); b.disabled = false; b.lastChild.textContent = "Aprobar y firmar"; if (e.message === "no_disponible") { R.est = await API.estimaciones(token).catch(() => R.est); } }
+      });
+    });
+  }
+
+  function verOC(id) {
+    const s = (R.oc || []).find(x => x.id === id); if (!s) return;
+    const d = s.datos || {}, ded = d.tipo === "deductivo";
+    const puede = s.estado === "enviada" && !R.equipo;
+    const l = (k, v, cl = "") => `<div class="${cl}"><span>${k}</span><b>${v}</b></div>`;
+    let firma = null;
+    abrirHoja(`
+      <div class="hoja-cab"><h2>Orden de cambio ${esc(d.correlativo)} · <span class="nw">${esc(s.numero)}</span></h2><button class="x" type="button" aria-label="Cerrar" data-cerrar>${ico("x", 18)}</button></div>
+      <p class="suave chico">${esc(d.obra ? [d.obra.numero, d.obra.titulo].filter(Boolean).join(" · ") : "")}</p>
+      <p class="escogio"><span>${ded ? "Se quita" : "Se agrega"}</span><b>${esc(d.motivo || "")}</b></p>
+      <div class="part">${(d.renglones || []).map(r => `<div class="pr"><span class="pr-d"><b>${esc(r.d)}</b><small>${esc(cant(r.c))} × ${esc(Q(r.u))}</small></span><b class="e-cifra">${esc(Q(Math.round(r.c * r.u * 100) / 100))}</b></div>`).join("")}</div>
+      <div class="tots est-cu">${d.proporcional ? l("A precio de la propuesta", esc(Q(d.subtotal))) : l("Subtotal", esc(Q(d.subtotal))) + (d.iva ? l("IVA 12 %", esc(Q(d.iva))) : "")}${l(ded ? "Se quita del total" : "Se agrega al total", (ded ? "− " : "+ ") + esc(Q(d.total)), "g")}${d.contrato_despues != null ? l("El total de la obra queda en", esc(Q(d.contrato_despues))) : ""}${d.dias_plazo ? l("Plazo", `+ ${esc(d.dias_plazo)} ${d.dias_plazo === 1 ? "día" : "días"}`) : ""}</div>
+      ${s.estado === "aprobada" && s.aprobado ? `<p class="escogio"><span>Aprobada</span><b>${esc(s.aprobado.nombre)}${s.aprobado.puesto ? ", " + esc(s.aprobado.puesto) : ""} · ${esc(fechaHora(s.aprobado.fecha))}</b></p>` : ""}
+      ${puede ? `<form data-f-oc novalidate>
+        <label class="campo">Su nombre completo<input name="nombre" autocomplete="name" value="${esc(R.datos.contacto ? R.datos.contacto.nombre : "")}" required></label>
+        <label class="campo"><span>Puesto <small>opcional</small></span><input name="puesto" autocomplete="organization-title" value="${esc(R.datos.contacto && R.datos.contacto.puesto || "")}"></label>
+        <div class="campo"><span class="firma-t">Su firma<button class="lnk" type="button" data-borrar>Borrar</button></span><div class="firma-c"><canvas data-lienzo aria-label="Recuadro para firmar con el dedo o el mouse"></canvas><span class="firma-g" data-guia>Firme aquí con el dedo o el mouse</span></div></div>
+        <label class="chk"><input type="checkbox" name="acepto"><span>Apruebo la orden de cambio ${esc(d.correlativo)} (${esc(s.numero)}): ${ded ? "se quitan" : "se agregan"} ${esc(Q(d.total))}.</span></label>
+        <p class="err" data-err hidden></p>
+        <button class="e-btn e-btn-p ancho" type="submit" data-enviar>${ico("check", 18)}Aprobar y firmar</button>
+      </form>` : ""}`, h => {
+      const f = h.querySelector("[data-f-oc]"); if (!f) return;
+      firma = lienzo(h.querySelector("[data-lienzo]"));
+      const guia = h.querySelector("[data-guia]");
+      h.querySelector("[data-lienzo]").addEventListener("firma", () => { guia.hidden = firma.tinta(); });
+      h.querySelector("[data-borrar]").addEventListener("click", () => firma.borrar());
+      const err = h.querySelector("[data-err]");
+      const mal = m => { err.textContent = m; err.hidden = false; };
+      f.addEventListener("submit", async ev => {
+        ev.preventDefault(); err.hidden = true;
+        if (f.nombre.value.trim().length < 3) { mal(ERR.nombre); f.nombre.focus(); return; }
+        if (firma.vacia()) { mal(ERR.firma); return; }
+        if (!f.acepto.checked) { mal("Marque la casilla de aprobación."); return; }
+        const b = h.querySelector("[data-enviar]"); b.disabled = true; b.lastChild.textContent = "Aprobando…";
+        try {
+          await API.aprobarOC(token, s.id, f.nombre.value, f.puesto.value, firma.png());
+          firma.soltar(); cerrarHoja(true);
+          R.oc = await API.cambios(token).catch(() => R.oc);
+          R.est = await API.estimaciones(token).catch(() => R.est);
+          pintar(); aviso(`Orden de cambio ${d.correlativo} aprobada. Gracias.`);
+        } catch (e) { mal(ERR[e.message] || ERR.red); b.disabled = false; b.lastChild.textContent = "Aprobar y firmar"; if (e.message === "no_disponible") { R.oc = await API.cambios(token).catch(() => R.oc); } }
       });
     });
   }
@@ -534,6 +619,7 @@
     const bj = e.target.closest("[data-bajar]"); if (bj) descargar(bj.dataset.bajar, bj);
     const cs = e.target.closest("[data-constancia]"); if (cs) constancia(cs);
     const es = e.target.closest("[data-est]"); if (es) verEst(Number(es.dataset.est));
+    const oc = e.target.closest("[data-oc]"); if (oc) verOC(Number(oc.dataset.oc));
   });
 
   async function cargar() {
@@ -541,7 +627,7 @@
     try { R = await API.ver(token); }
     catch (e) { raiz.innerHTML = `<section class="vacio-c"><span class="ic-c ambar">${ico("alerta", 26)}</span><h1>No se pudo abrir la propuesta</h1><p>${esc(ERR.red)}</p><div class="btns"><button class="e-btn e-btn-p" type="button" onclick="location.reload()">Intentar otra vez</button></div></section>`; return; }
     if (!R) { pintarNoHay(); return; }
-    if (R.aprobado) { R.tramite = await API.verTramite(token).catch(() => null); R.est = await API.estimaciones(token).catch(() => []); }
+    if (R.aprobado) { R.tramite = await API.verTramite(token).catch(() => null); R.est = await API.estimaciones(token).catch(() => []); R.oc = await API.cambios(token).catch(() => []); }
     if (R.vencido) pintarVencido(); else pintar();
   }
   window.addEventListener("hashchange", () => location.reload());
