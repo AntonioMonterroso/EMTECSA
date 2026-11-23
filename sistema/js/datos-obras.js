@@ -50,17 +50,17 @@
   }
 
   async function plantillas() {
-    if (!nube) return leer().plantillas.slice().sort((a, b) => a.orden - b.orden);
-    return (await ok(await sb.from("plantillas_etapas").select("*").order("orden"), "No se pudieron leer las plantillas.")).map(p => ({ ...p, etapas: p.etapas || [] }));
+    if (!nube) return leer().plantillas.slice().sort((a, b) => a.orden - b.orden).map(p => ({ ...p, dias: p.dias || {} }));
+    return (await ok(await sb.from("plantillas_etapas").select("*").order("orden"), "No se pudieron leer las plantillas.")).map(p => ({ ...p, etapas: p.etapas || [], dias: p.dias || {} }));
   }
   async function guardarPlantillas(lista) {
-    const limpia = lista.map((p, i) => ({ id: p.id || null, nombre: t(p.nombre), orden: i + 1, etapas: (p.etapas || []).map(t).filter(Boolean) })).filter(p => p.nombre);
+    const limpia = lista.map((p, i) => { const etapas = (p.etapas || []).map(t).filter(Boolean); return { id: p.id || null, nombre: t(p.nombre), orden: i + 1, etapas, dias: Object.fromEntries(etapas.map(e => [e, Math.max(1, Math.min(365, Math.round(Number((p.dias || {})[e]) || 1)))])) }; }).filter(p => p.nombre);
     if (new Set(limpia.map(p => p.nombre.toLowerCase())).size !== limpia.length) throw new Error("Hay dos tipos de trabajo con el mismo nombre.");
     if (limpia.some(p => !p.etapas.length)) throw new Error("Cada tipo de trabajo necesita al menos una etapa.");
     if (!nube) { const d = leer(); limpia.forEach(p => { if (!p.id) p.id = d.sig.p++; }); d.plantillas = limpia; escribir(d); return; }
     const actuales = await plantillas();
     for (const p of limpia) {
-      const r = p.id ? await sb.from("plantillas_etapas").update({ nombre: p.nombre, orden: p.orden, etapas: p.etapas }).eq("id", p.id) : await sb.from("plantillas_etapas").insert({ nombre: p.nombre, orden: p.orden, etapas: p.etapas });
+      const r = p.id ? await sb.from("plantillas_etapas").update({ nombre: p.nombre, orden: p.orden, etapas: p.etapas, dias: p.dias }).eq("id", p.id) : await sb.from("plantillas_etapas").insert({ nombre: p.nombre, orden: p.orden, etapas: p.etapas, dias: p.dias });
       await ok(r, "No se pudieron guardar las plantillas.");
     }
     const quedan = new Set(limpia.filter(p => p.id).map(p => p.id));
@@ -76,8 +76,8 @@
       const cl = Object.fromEntries((await D.clientes()).map(c => [c.id, c]));
       return d.obras.map(x => ({ ...x, cliente: cl[x.cliente_id] || null, avance: avance(x.etapas), etapa_actual: siguiente(x.etapas) })).sort((a, b) => b.numero.localeCompare(a.numero));
     }
-    const l = await ok(await sb.from("obras").select("*, clientes (id, nombre, nit, razon_social, codigo, telefono), obra_etapas (nombre, orden, hecha)").order("numero", { ascending: false }), "No se pudo leer la lista de obras.");
-    return l.map(x => ({ ...x, cliente: x.clientes, avance: avance(x.obra_etapas), etapa_actual: siguiente(x.obra_etapas) }));
+    const l = await ok(await sb.from("obras").select("*, clientes (id, nombre, nit, razon_social, codigo, telefono), obra_etapas (id, nombre, orden, hecha, inicio, fin, responsable)").order("numero", { ascending: false }), "No se pudo leer la lista de obras.");
+    return l.map(x => ({ ...x, cliente: x.clientes, etapas: x.obra_etapas || [], avance: avance(x.obra_etapas), etapa_actual: siguiente(x.obra_etapas) }));
   }
 
   async function obra(id) {
@@ -97,10 +97,20 @@
   }
 
 
+  const iso = x => `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, "0")}-${String(x.getDate()).padStart(2, "0")}`;
+  const deIso = f => { const [y, m, d] = f.split("-").map(Number); return new Date(y, m - 1, d); };
+  const habil = f => { const x = deIso(f); while (x.getDay() === 0) x.setDate(x.getDate() + 1); return iso(x); };
+  const sumarHabiles = (f, n) => { const x = deIso(f); let k = 0; while (k < n) { x.setDate(x.getDate() + (n > 0 ? 1 : -1)); if (x.getDay() !== 0) k++; } return iso(x); };
+  const habilesEntre = (a, b) => { if (a === b) return 0; const s = a < b ? 1 : -1; const x = deIso(a); let k = 0; while (iso(x) !== b) { x.setDate(x.getDate() + s); if (x.getDay() !== 0) k += s; } return k; };
+  function armarFechas(lista, inicio) {
+    let f = habil(inicio);
+    return lista.map(e => { const d = Math.max(1, Number(e.dias) || 1); const ini = f, fin = sumarHabiles(ini, d - 1); f = sumarHabiles(fin, 1); return { ...e, dias: d, inicio: ini, fin }; });
+  }
   async function crearObra(a) {
     if (!a.cliente_id) throw new Error("Escoja el cliente.");
     const pl = (await plantillas()).find(p => p.id === Number(a.plantilla_id));
-    const etapas = (pl ? pl.etapas : []).map((nombre, i) => ({ nombre, orden: i, inicio: null, fin: null, responsable: null, hecha: false, fecha_hecha: null }));
+    let etapas = (pl ? pl.etapas : []).map((nombre, i) => ({ nombre, orden: i, dias: Number((pl.dias || {})[nombre]) || 1, inicio: null, fin: null, responsable: null, hecha: false, fecha_hecha: null }));
+    if (fechaO(a.fecha_inicio) && pl && Object.keys(pl.dias || {}).length) etapas = armarFechas(etapas, fechaO(a.fecha_inicio));
     const cab = { cotizacion_id: a.cotizacion_id || null, cliente_id: a.cliente_id, sitio_id: a.sitio_id || null, titulo: t(a.titulo), estado: "programada", responsable: o(a.responsable), fecha_inicio: fechaO(a.fecha_inicio), notas: null };
     const pasos = Object.keys(PASOS).map(paso => ({ paso, estado: "pendiente", distribuidora: null, expediente: null, fecha_solicitud: null, fecha_resuelto: null, notas: null }));
     const previstos = (a.previstos || []).filter(p => p.cantidad > 0);
@@ -129,6 +139,7 @@
 
   async function guardarEtapa(obraId, e) {
     const datos = { nombre: t(e.nombre), inicio: fechaO(e.inicio), fin: fechaO(e.fin), responsable: o(e.responsable), hecha: !!e.hecha, fecha_hecha: e.hecha ? (fechaO(e.fecha_hecha) || hoy()) : null };
+    if (e.dias != null && e.dias !== "") datos.dias = Math.max(1, Math.min(365, Math.round(Number(e.dias)) || 1));
     if (!datos.nombre) throw new Error("Escriba el nombre de la etapa.");
     if (datos.inicio && datos.fin && datos.fin < datos.inicio) throw new Error("La fecha de fin no puede ser antes del inicio.");
     if (!nube) {
@@ -139,6 +150,31 @@
     }
     if (e.id) await ok(await sb.from("obra_etapas").update(datos).eq("id", e.id), "No se pudo guardar la etapa.");
     else { const n = await ok(await sb.from("obra_etapas").select("orden").eq("obra_id", obraId), ""); await ok(await sb.from("obra_etapas").insert({ ...datos, obra_id: obraId, orden: n.length ? Math.max(...n.map(z => z.orden)) + 1 : 0 }), "No se pudo agregar la etapa."); }
+  }
+
+  async function armarCronograma(obra, inicio, diasPorId) {
+    const ini = fechaO(inicio); if (!ini) throw new Error("Escoja la fecha de inicio.");
+    const et = obra.etapas.slice().sort((a, b) => a.orden - b.orden);
+    const fijas = et.filter(e => e.hecha), resto = et.filter(e => !e.hecha);
+    const nuevas = armarFechas(resto.map(e => ({ ...e, dias: diasPorId[e.id] != null ? diasPorId[e.id] : e.dias })), ini);
+    for (const e of nuevas) await guardarEtapa(obra.id, e);
+    if (!obra.fecha_inicio || !fijas.length) await guardarObra({ ...obra, fecha_inicio: obra.fecha_inicio && fijas.length ? obra.fecha_inicio : ini }).catch(() => {});
+    return nuevas;
+  }
+  async function moverSiguientes(obra, etapaId, finNuevo) {
+    const et = obra.etapas.slice().sort((a, b) => a.orden - b.orden);
+    const i = et.findIndex(e => e.id === etapaId); const e0 = et[i]; if (!e0 || !e0.fin || !fechaO(finNuevo)) return 0;
+    const delta = habilesEntre(e0.fin, finNuevo); if (!delta) return 0;
+    let n = 0;
+    for (const e of et.slice(i + 1)) { if (e.hecha || !e.inicio || !e.fin) continue; await guardarEtapa(obra.id, { ...e, inicio: sumarHabiles(e.inicio, delta), fin: sumarHabiles(e.fin, delta) }); n++; }
+    return n;
+  }
+  function estadoEtapa(e) {
+    const h = hoy(); if (e.hecha) return "hecha";
+    if (e.fin && e.fin < h) return "atrasada";
+    if (e.fin && e.fin <= sumarHabiles(h, 2)) return "pronto";
+    if (e.inicio && e.inicio <= h) return "curso";
+    return e.inicio ? "futura" : "sin";
   }
 
   async function guardarBitacora(obraId, b, archivos) {
@@ -207,5 +243,5 @@
     await ok(await sb.from(T[tabla]).delete().eq("id", id), "No se pudo quitar.");
   }
 
-  Object.assign(D, { ESTADOS_OBRA, PASOS, ESTADOS_TRAMITE, plantillas, guardarPlantillas, obras, obra, obraDeCotizacion, crearObra, guardarObra, guardarEtapa, guardarBitacora, quitarFoto, fotoUrl, registrarMovimientos, guardarMovimiento, guardarTramite, quitarObraItem });
+  Object.assign(D, { habilesEntre, armarFechas, armarCronograma, moverSiguientes, estadoEtapa, sumarHabiles, ESTADOS_OBRA, PASOS, ESTADOS_TRAMITE, plantillas, guardarPlantillas, obras, obra, obraDeCotizacion, crearObra, guardarObra, guardarEtapa, guardarBitacora, quitarFoto, fotoUrl, registrarMovimientos, guardarMovimiento, guardarTramite, quitarObraItem });
 })();

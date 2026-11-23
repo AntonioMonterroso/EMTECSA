@@ -15,7 +15,7 @@ window.EMT_EMPRESA = (() => {
     const p = A().sesion().perfil;
     const puede = D.puede(p, "editarEmpresa");
     const e = await D.empresa();
-    let pls = (await D.plantillas()).map(x => ({ ...x, etapas: x.etapas.slice() }));
+    let pls = (await D.plantillas()).map(x => ({ ...x, etapas: x.etapas.slice(), dias: { ...(x.dias || {}) } }));
     let plSel = 0;
     const ckl = await D.plantillasCheck();
     let logosD = await D.logosDistribuidoras();
@@ -97,7 +97,7 @@ window.EMT_EMPRESA = (() => {
       $("[data-pls]", v).innerHTML = `
         <div class="pl-tipos">${`<label class="chips-sel pl-sel-m"><span class="sr">Tipo de trabajo</span><select data-pl-sel>${pls.map((y, k) => `<option value="${k}" ${k === plSel ? "selected" : ""}>${esc(y.nombre || "Sin nombre")} · ${y.etapas.length} etapas</option>`).join("")}</select></label>`}${pls.length <= 3 ? `<div class="seg ancho" role="tablist" aria-label="Tipo de trabajo">${pls.map((y, k) => `<button type="button" role="tab" data-pl-tab="${k}" aria-selected="${k === plSel}" aria-pressed="${k === plSel}">${esc(y.nombre || "Sin nombre")}</button>`).join("")}</div>` : `<label class="chips-sel" style="display:block"><span class="sr">Tipo de trabajo</span><select data-pl-sel>${pls.map((y, k) => `<option value="${k}" ${k === plSel ? "selected" : ""}>${esc(y.nombre || "Sin nombre")} · ${y.etapas.length} etapas</option>`).join("")}</select></label>`}</div>
         ${x ? `<div class="pl-cab-t"><span><b>${esc(x.nombre || "Sin nombre")}</b><small class="suave">${x.etapas.length} ${x.etapas.length === 1 ? "etapa" : "etapas"}</small></span>${puede ? `<span class="acc"><button class="s-btn suave-b chico" type="button" data-pl-ren>${ico("pen", 14)}Nombre</button><button class="s-btn suave-b chico" type="button" data-nueva-pl>${ico("plus", 14)}Nuevo tipo</button></span>` : ""}</div>
-        <div class="lista ck-pl">${x.etapas.length ? x.etapas.map((t, k) => filaNum(t, k, x.etapas.length, "et")).join("") : `<p class="suave" style="padding:14px 16px;margin:0">Todavía no tiene etapas.</p>`}</div>
+        <div class="lista ck-pl">${x.etapas.length ? x.etapas.map((t, k) => filaNum(`${t} · ${Number((x.dias || {})[t]) || 1} ${(Number((x.dias || {})[t]) || 1) === 1 ? "día" : "días"}`, k, x.etapas.length, "et")).join("") : `<p class="suave" style="padding:14px 16px;margin:0">Todavía no tiene etapas.</p>`}</div>
         ${puede ? `<button class="s-btn suave-b chico" type="button" data-et-nuevo>${ico("plus", 14)}Agregar etapa</button>` : ""}` : `${puede ? `<button class="s-btn suave-b chico" type="button" data-nueva-pl>${ico("plus", 14)}Nuevo tipo de trabajo</button>` : ""}`}`;
     };
     const arrastrar = e => {
@@ -131,12 +131,16 @@ window.EMT_EMPRESA = (() => {
       A().modal({
         titulo: nuevo ? `Etapa nueva · ${x.nombre}` : `Editar etapa ${i + 1}`,
         guardarTxt: nuevo ? "Agregar" : "Listo",
-        quitar: nuevo ? null : () => { x.etapas.splice(i, 1); A().cerrarCapas(); pintarPls(); sinGuardar(); aviso("Etapa quitada. Recuerde guardar."); },
-        cuerpo: `<label class="f-campo">Etapa<input name="texto" value="${esc(t0)}" autocomplete="off" placeholder="Por ejemplo: Tendido de conductor"></label>`,
+        quitar: nuevo ? null : () => { x.etapas.splice(i, 1); if (x.dias) delete x.dias[t0]; A().cerrarCapas(); pintarPls(); sinGuardar(); aviso("Etapa quitada. Recuerde guardar."); },
+        cuerpo: `<div class="f-fila"><label class="f-campo">Etapa<input name="texto" value="${esc(t0)}" autocomplete="off" placeholder="Por ejemplo: Tendido de conductor"></label>
+          <label class="f-campo">Días que dura<input name="dias" inputmode="numeric" value="${esc(nuevo ? 1 : Number((x.dias || {})[t0]) || 1)}" autocomplete="off"><small>Días hábiles, sin domingos.</small></label></div>`,
         alGuardar: async f => {
           const t = f.texto.value.trim().replace(/\s+/g, " ");
           if (!t) throw new Error("Escriba el nombre de la etapa.");
           if (x.etapas.some((y, j) => j !== i && y.toLowerCase() === t.toLowerCase())) throw new Error("Esa etapa ya está en la lista.");
+          const dd = Number(String(f.dias.value).replace(/\D/g, ""));
+          if (!(dd >= 1 && dd <= 365)) throw new Error("Los días van de 1 a 365.");
+          x.dias = x.dias || {}; if (!nuevo && t0 !== t) delete x.dias[t0]; x.dias[t] = dd;
           if (nuevo) x.etapas.push(t); else x.etapas[i] = t;
           A().cerrarCapas(); pintarPls(); sinGuardar();
         }
@@ -343,7 +347,7 @@ window.EMT_EMPRESA = (() => {
       if (es && !es.disabled) { const i = Number(es.dataset.etSube ?? es.dataset.etBaja), j = es.dataset.etSube != null ? i - 1 : i + 1; const l = pls[plSel].etapas; [l[i], l[j]] = [l[j], l[i]]; pintarPls(); sinGuardar(); const b = $(`[data-et-${es.dataset.etSube != null ? "sube" : "baja"}="${j}"]`, v); if (b && !b.disabled) b.focus(); return; }
       if (!ev.target.closest("[data-guardar-emp]")) return;
       const b = ev.target.closest("[data-guardar-emp]"); b.disabled = true;
-      try { await D.guardarEmpresa(e); await D.guardarPlantillas(pls.map(x => ({ id: x.id, nombre: x.nombre, etapas: x.etapas }))); await D.guardarPlantillasCheck(ck); pls = (await D.plantillas()).map(x => ({ ...x, etapas: x.etapas.slice() })); pintarPls(); sucio = false; const s = $("[data-est-emp]", v); s.textContent = "Todo guardado"; s.className = "guardado"; aviso("Datos de la empresa guardados."); }
+      try { await D.guardarEmpresa(e); await D.guardarPlantillas(pls.map(x => ({ id: x.id, nombre: x.nombre, etapas: x.etapas, dias: x.dias }))); await D.guardarPlantillasCheck(ck); pls = (await D.plantillas()).map(x => ({ ...x, etapas: x.etapas.slice(), dias: { ...(x.dias || {}) } })); pintarPls(); sucio = false; const s = $("[data-est-emp]", v); s.textContent = "Todo guardado"; s.className = "guardado"; aviso("Datos de la empresa guardados."); }
       catch (err) { aviso(err.message, "mal"); }
       finally { b.disabled = false; }
     };

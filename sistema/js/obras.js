@@ -197,25 +197,70 @@ window.EMT_OBRAS = (() => {
     });
   }
 
+  const EST_ET = { hecha: ["verde", "Hecha"], atrasada: ["ambar", "Atrasada"], pronto: ["ambar", "Vence pronto"], curso: ["azul", "En curso"], futura: ["gris", "Por empezar"], sin: ["gris", "Sin fechas"] };
+  function cronogramaHTML(et) {
+    const { esc } = A();
+    const conF = et.filter(e => e.inicio && e.fin);
+    if (!conF.length) return "";
+    const dia = f => { const [y, m, d] = f.split("-").map(Number); return Date.UTC(y, m - 1, d) / 864e5; };
+    const h = dia(hoyISO());
+    let a = Math.min(...conF.map(e => dia(e.inicio))), b = Math.max(...conF.map(e => dia(e.fin))) + 1;
+    if (b - a < 7) b = a + 7;
+    const pc = x => Math.max(0, Math.min(100, (x - a) / (b - a) * 100));
+    const fC = f => fCorta(f);
+    const hoyEn = h >= a && h <= b;
+    return `<div class="crono" role="img" aria-label="Cronograma de la obra del ${esc(fC(conF.reduce((x, e) => e.inicio < x ? e.inicio : x, conF[0].inicio)))}">
+      <div class="crono-cab"><span>${esc(fC(new Date(a * 864e5).toISOString().slice(0, 10)))}</span><span>${esc(fC(new Date((b - 1) * 864e5).toISOString().slice(0, 10)))}</span></div>
+      ${et.map(e => { const s = D.estadoEtapa(e); return `<div class="crono-f"><span class="crono-n"><b>${esc(e.nombre)}</b><small>${e.inicio && e.fin ? `${esc(fC(e.inicio))} → ${esc(fC(e.fin))}` : "Sin fechas"} · <span class="crono-e ${s}">${esc(EST_ET[s][1])}</span></small></span><span class="crono-p">${e.inicio && e.fin ? `<i class="crono-b ${s}" style="left:${pc(dia(e.inicio))}%;width:${Math.max(1.5, pc(dia(e.fin) + 1) - pc(dia(e.inicio)))}%"></i>` : ""}${hoyEn ? `<i class="crono-hoy" style="left:${pc(h)}%"></i>` : ""}</span></div>`; }).join("")}
+      ${hoyEn ? `<p class="crono-ley"><i class="crono-hoy-l"></i>Hoy</p>` : ""}
+    </div>`;
+  }
   function pEtapas(box, o, ed, recargar) {
     const { esc, ico, modal, cerrarCapas, aviso } = A();
     const et = o.etapas.slice().sort((a, b) => a.orden - b.orden);
+    const pend = et.filter(e => !e.hecha);
     box.innerHTML = `
+      <div class="sub"><h2>Cronograma</h2>${ed && pend.length ? `<button class="s-btn suave-b" type="button" data-armar-crono>${ico("clock", 15)}${et.some(e => e.inicio) ? "Volver a armar" : "Armar el cronograma"}</button>` : ""}</div>
+      ${cronogramaHTML(et) || `<div class="vacio chico"><p>${et.length ? "Las etapas todavía no tienen fechas. Con «Armar el cronograma» se ponen solas desde la fecha de inicio." : "Agregue etapas para armar el cronograma."}</p></div>`}
+      <div data-prog-obra></div>
       <div class="sub"><h2>Etapas · ${et.length}</h2>${ed ? `<button class="s-btn suave-b" type="button" data-nueva-etapa>${ico("plus", 15)}Agregar etapa</button>` : ""}</div>
       ${et.length ? `<div class="lista">${et.map(e => `
         <div class="fila etapa ${e.hecha ? "hecha" : ""}" style="cursor:default"><button class="chk" type="button" ${ed ? "" : "disabled"} aria-pressed="${e.hecha}" aria-label="${e.hecha ? "Marcar como pendiente" : "Marcar como hecha"}: ${esc(e.nombre)}" data-hecha="${e.id}">${e.hecha ? ico("check", 16) : ""}</button>
-          <span><b>${esc(e.nombre)}</b><small>${e.hecha ? `Hecha el ${esc(fCorta(e.fecha_hecha))}` : [e.inicio || e.fin ? `${esc(fCorta(e.inicio) || "…")} → ${esc(fCorta(e.fin) || "…")}` : "Sin fechas", e.responsable ? esc(e.responsable) : ""].filter(Boolean).join(" · ")}${!e.hecha && e.fin && e.fin < hoyISO() ? ' · <span class="falta">atrasada</span>' : ""}</small></span>
+          <span><b>${esc(e.nombre)}</b><small>${e.hecha ? `Hecha el ${esc(fCorta(e.fecha_hecha))}` : [e.inicio || e.fin ? `${esc(fCorta(e.inicio) || "…")} → ${esc(fCorta(e.fin) || "…")}` : "Sin fechas", e.responsable ? esc(e.responsable) : ""].filter(Boolean).join(" · ")}${!e.hecha && ["atrasada", "pronto"].includes(D.estadoEtapa(e)) ? ` · <span class="falta">${D.estadoEtapa(e) === "atrasada" ? "atrasada" : "vence pronto"}</span>` : ""}</small></span>
           ${ed ? `<button class="s-ib" type="button" aria-label="Editar ${esc(e.nombre)}" data-ed-etapa="${e.id}">${ico("pen", 15)}</button>` : "<span></span>"}</div>`).join("")}</div>` : `<div class="vacio chico"><p>Esta obra no tiene etapas. Agréguelas con el botón.</p></div>`}`;
     const editar = e0 => modal({
       titulo: e0 ? "Editar etapa" : "Etapa nueva",
       quitar: e0 ? () => { const m = modal({ titulo: "¿Quitar la etapa?", guardarTxt: "Quitar", cuerpo: `<p class="suave" style="font-size:15px">Se quita la etapa «${esc(e0.nombre)}» de esta obra.</p>`, alGuardar: async () => { await D.quitarObraItem(o.id, "etapas", e0.id); cerrarCapas(); aviso("Etapa quitada."); await recargar(); } }); m.querySelector("[data-guardar]").classList.add("peligro-b"); } : null,
       cuerpo: `<label class="f-campo">Etapa<input name="nombre" value="${esc(e0 ? e0.nombre : "")}" autocomplete="off"></label>
         <div class="f-fila"><label class="f-campo">Inicio<input type="date" name="inicio" value="${esc(e0 && e0.inicio || "")}"></label><label class="f-campo">Fin<input type="date" name="fin" value="${esc(e0 && e0.fin || "")}"></label></div>
-        <label class="f-campo">Responsable<input name="responsable" value="${esc(e0 && e0.responsable || o.responsable || "")}" autocomplete="off"></label>`,
-      alGuardar: async f => { await D.guardarEtapa(o.id, { ...(e0 || {}), nombre: f.nombre.value, inicio: f.inicio.value, fin: f.fin.value, responsable: f.responsable.value }); cerrarCapas(); aviso(e0 ? "Etapa guardada." : "Etapa agregada."); await recargar(); }
+        <label class="f-campo">Responsable<input name="responsable" value="${esc(e0 && e0.responsable || o.responsable || "")}" autocomplete="off"></label>
+        ${e0 && e0.fin && et.some(x => x.orden > e0.orden && !x.hecha && x.inicio) ? `<label class="chk-f"><input type="checkbox" name="mover" checked><span>Si cambia el fin, mover también las etapas que siguen<small>Se corren los mismos días hábiles.</small></span></label>` : ""}`,
+      alGuardar: async f => {
+        await D.guardarEtapa(o.id, { ...(e0 || {}), nombre: f.nombre.value, inicio: f.inicio.value, fin: f.fin.value, responsable: f.responsable.value });
+        let n = 0; if (e0 && f.mover && f.mover.checked && f.fin.value && f.fin.value !== e0.fin) n = await D.moverSiguientes(o, e0.id, f.fin.value);
+        cerrarCapas(); aviso(e0 ? (n ? `Etapa guardada y ${n} ${n === 1 ? "etapa movida" : "etapas movidas"}.` : "Etapa guardada.") : "Etapa agregada."); await recargar();
+      }
     });
+    const armar = () => {
+      const ini0 = o.fecha_inicio && o.fecha_inicio >= hoyISO() ? o.fecha_inicio : (pend.find(e => e.inicio) || {}).inicio || o.fecha_inicio || hoyISO();
+      modal({
+        titulo: "Armar el cronograma", guardarTxt: "Armar",
+        cuerpo: `<label class="f-campo">Empieza el<input type="date" name="ini" value="${esc(ini0)}"></label>
+          <p class="suave" style="margin:0;font-size:13.5px">Las etapas van una después de otra, en días hábiles (sin domingos). ${et.some(e => e.hecha) ? "Las que ya están hechas no se mueven." : ""}</p>
+          <div class="est-rs">${pend.map(e => `<div class="est-r crono-arm"><span class="est-d"><b>${esc(e.nombre)}</b></span><label class="f-campo est-in"><span>Días</span><input data-dias="${e.id}" inputmode="numeric" value="${esc(e.dias || (e.inicio && e.fin ? Math.max(1, D.habilesEntre(e.inicio, e.fin) + 1) : 1))}" autocomplete="off"></label><span></span></div>`).join("")}</div>
+          <p class="suave" data-crono-fin style="margin:0;font-size:14px"></p>`,
+        alAbrir: f => {
+          const leerD = () => Object.fromEntries([...f.querySelectorAll("[data-dias]")].map(i => [i.dataset.dias, Math.max(1, Number(i.value.replace(/\D/g, "")) || 1)]));
+          const fin = () => { const ini = f.ini.value; const el = f.querySelector("[data-crono-fin]"); if (!ini) { el.textContent = ""; return; } const l = D.armarFechas(pend.map(e => ({ ...e, dias: leerD()[e.id] })), ini); el.textContent = l.length ? `La última etapa termina el ${fCorta(l[l.length - 1].fin)}.` : ""; };
+          f.addEventListener("input", fin); fin();
+        },
+        alGuardar: async f => { const dd = Object.fromEntries([...f.querySelectorAll("[data-dias]")].map(i => [Number(i.dataset.dias), Math.max(1, Number(i.value.replace(/\D/g, "")) || 1)])); await D.armarCronograma(o, f.ini.value, dd); cerrarCapas(); aviso("Cronograma armado."); await recargar(); }
+      });
+    };
+    if (window.EMT_PROGRAMACION) window.EMT_PROGRAMACION.deObra(box.querySelector("[data-prog-obra]"), o).catch(() => {});
     box.onclick = async e => {
       if (e.target.closest("[data-nueva-etapa]")) editar(null);
+      if (e.target.closest("[data-armar-crono]")) armar();
       const ee = e.target.closest("[data-ed-etapa]"); if (ee) editar(et.find(x => x.id === Number(ee.dataset.edEtapa)));
       const h = e.target.closest("[data-hecha]");
       if (h && !h.disabled) { const x = et.find(z => z.id === Number(h.dataset.hecha)); try { await D.guardarEtapa(o.id, { ...x, hecha: !x.hecha, fecha_hecha: null }); await recargar(); } catch (err) { aviso(err.message, "mal"); } }
