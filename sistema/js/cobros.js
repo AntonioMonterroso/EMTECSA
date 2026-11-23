@@ -418,5 +418,5 @@ window.EMT_COBROS = (() => {
     });
   }
 
-  return { vista, tabObra, estadoFianza, chipVenc, abrirRecibo };
+  return { vista, tabObra, estadoFianza, chipVenc, abrirRecibo, buscadorCliente };
 })();

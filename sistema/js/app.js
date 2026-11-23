@@ -36,12 +36,12 @@
   ];
   const MENU = [
     { id: "hoy", n: "Hoy", i: "home", c: "marino" },
-    { id: "ventas", n: "Ventas", i: "file", c: "laton", ir: "cotizaciones", grupo: ["cotizaciones", "clientes", "tienda"] },
+    { id: "ventas", n: "Ventas", i: "file", c: "laton", ir: "cotizaciones", grupo: ["cotizaciones", "oportunidades", "clientes", "tienda"] },
     { id: "obras", n: "Obras", i: "hammer", c: "mezcla", ir: "obras", grupo: ["obras", "programacion"] },
     { id: "dinero", n: "Finanzas", i: "wallet", c: "claro", ir: "cobros", grupo: ["cobros", "finanzas", "personal"] },
     { id: "catalogo", n: "Catálogo", i: "box", c: "gris" }
   ];
-  const PESTANAS_GRUPO = { obras: [["obras", "Obras"], ["programacion", "Programación"]], ventas: [["cotizaciones", "Cotizaciones"], ["clientes", "Clientes"], ["tienda", "Tienda", "verTienda"]], dinero: [["cobros", "Cobros", "verCobros"], ["finanzas", "Empresa", "verFinanzas"], ["personal", "Personal", "finanzasPersonales"]] };
+  const PESTANAS_GRUPO = { obras: [["obras", "Obras"], ["programacion", "Programación"]], ventas: [["cotizaciones", "Cotizaciones"], ["oportunidades", "Oportunidades", "editarCotizacion"], ["clientes", "Clientes"], ["tienda", "Tienda", "verTienda"]], dinero: [["cobros", "Cobros", "verCobros"], ["finanzas", "Empresa", "verFinanzas"], ["personal", "Personal", "finanzasPersonales"]] };
   const menuDe = s => MENU.find(m => m.id === s || (m.grupo || []).includes(s));
   const menuVisible = () => MENU.filter(m => m.id !== "dinero" || !sesion || D.puede(sesion.perfil, "verCobros") || D.puede(sesion.perfil, "verCosto") || D.puede(sesion.perfil, "verFinanzas"));
   const conteos = {};
@@ -280,7 +280,7 @@
     if (guardiaAct && location.hash !== rutaActual && !guardiaAct.limpio()) { const destino = location.hash; ignorarHash = true; location.hash = rutaActual; preguntarSalida(destino); return; }
     guardiaAct = null;
     const [sec = "hoy", sub = "", sub2 = ""] = location.hash.replace(/^#\/?/, "").split("/");
-    const s = SECCIONES.find(x => x.id === sec) || sec === "empresa" || sec === "plano" || sec === "equipo" || sec === "perfil" || sec === "errores" || sec === "finanzas" || sec === "personal" || sec === "programacion" ? sec : "hoy";
+    const s = SECCIONES.find(x => x.id === sec) || sec === "empresa" || sec === "plano" || sec === "equipo" || sec === "perfil" || sec === "errores" || sec === "finanzas" || sec === "personal" || sec === "programacion" || sec === "oportunidades" ? sec : "hoy";
     const mActual = menuDe(s);
     $$("[data-sec]").forEach(a => { if (mActual && a.dataset.sec === mActual.id) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current"); });
     const v = $("#vista");
@@ -303,6 +303,7 @@
       else if (s === "finanzas" || s === "personal") await window.EMT_FINANZAS.vista(v, s === "personal" ? "personal" : "empresa");
       else if (s === "plano") await window.EMT_PLANOS.vista(v, sub, sub2);
       else if (s === "programacion") await window.EMT_PROGRAMACION.vista(v);
+      else if (s === "oportunidades") await window.EMT_OPORTUNIDADES.vista(v);
       else if (s === "tienda") await window.EMT_TIENDA.vista(v, sub);
       else if (s === "equipo") await window.EMT_EQUIPO.vista(v, sub);
       else if (s === "perfil") await window.EMT_PERFIL.vista(v);
@@ -358,6 +359,7 @@
     const espera = [];
     if (!D.nube) espera.push({ i: "shield", t: "Conectar la base de EMTECSA", d: "Cuando EMTECSA cree su cuenta de Supabase." });
     if (D.puede(sesion.perfil, "autorizarDescuento")) avisosC.unshift(...(await D.cotizaciones().catch(() => [])).filter(x => x.descuento_aut && x.descuento_aut.estado === "pendiente").map(x => ({ c: "laton", i: "alerta", t: `Autorizar descuento: ${x.cliente ? x.cliente.nombre : ""}`, d: `${x.numero} · lo pide ${x.descuento_aut.pedido_por || "ventas"} · ${x.descuento_aut.tipo === "pct" ? x.descuento_aut.valor + " %" : Q(x.descuento_aut.valor)}`, chip: "Esperando", accion: "Revisar", h: `#/cotizaciones/${x.id}` })));
+    if (window.EMT_OPORTUNIDADES) avisosC.push(...await window.EMT_OPORTUNIDADES.avisosHoy(sesion.perfil));
     const etAv = [];
     obrasL.filter(o => o.estado === "en_curso" || o.estado === "programada").forEach(o => (o.etapas || []).forEach(e => { const st = D.estadoEtapa(e); if (st === "atrasada" || st === "pronto") etAv.push({ o, e, st }); }));
     etAv.sort((a, b) => (a.st === "atrasada" ? 0 : 1) - (b.st === "atrasada" ? 0 : 1) || String(a.e.fin).localeCompare(String(b.e.fin)));
