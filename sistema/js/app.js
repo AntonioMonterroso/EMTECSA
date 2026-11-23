@@ -347,7 +347,7 @@
     const comprarL = tiendaL.filter(x => x.porComprar).map(x => ({ x, l: (x.items || []).filter((it, i) => !x.porComprar[i]) })).filter(y => y.l.length);
     avisosC.push(...comprarL.map(({ x, l }) => ({ c: "laton", i: "cart", t: `Comprar: ${l.length === 1 ? `${l[0].cant} × ${l[0].nombre}` : `${l.length} cosas vendidas`}`, d: `Tienda · ${x.id}${x.cliente ? " · " + x.cliente.nombre : ""}`, accion: "Comprar", h: `#/tienda/${encodeURIComponent(x.id)}` })));
     avisosC.unshift(...tiendaL.filter(x => x.estado === "comprobante-recibido" || (x.estado === "cotizacion" && !x.cotizacion_id)).map(x => ({ c: x.estado === "cotizacion" ? "azul" : "laton", i: x.estado === "cotizacion" ? "send" : "file", t: `${x.estado === "cotizacion" ? "Cotizar" : "Revisar comprobante"}: ${x.cliente ? x.cliente.nombre : ""}`, d: `Tienda · ${x.id}${x.total ? " · " + Q(x.total) : ""}`, chip: x.estado === "cotizacion" ? "A cotizar" : "Por revisar", h: `#/tienda/${encodeURIComponent(x.id)}` })));
-    avisosC.unshift(...enlL.filter(x => x.tipo === "aprobo" || x.tipo === "mensaje" || x.tipo === "datos" || x.tipo === "estimacion" || x.tipo === "cambio"));
+    avisosC.unshift(...enlL.filter(x => x.tipo === "aprobo" || x.tipo === "mensaje" || x.tipo === "datos" || x.tipo === "estimacion" || x.tipo === "cambio" || x.tipo === "contrato"));
     const vistos = enlL.filter(x => x.tipo === "abrio" || x.tipo === "volvio");
     if (window.EMT_COSTOS) avisosC.unshift(...await window.EMT_COSTOS.avisos());
     if (window.EMT_SEGUIMIENTO) avisosC.unshift(...await window.EMT_SEGUIMIENTO.avisos());

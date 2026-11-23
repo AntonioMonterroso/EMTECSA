@@ -229,3 +229,6 @@ form { display: grid; gap: 14px; }
 .ver-c { border-color: var(--laton-300, #C8A96A); }
 .ver-otros { margin: 12px 0 0; }
 .usd-n { display: block; margin-top: 4px; }
+.ct-texto { max-height: 46vh; overflow: auto; padding: 12px 14px; border-radius: var(--radio-md); background: var(--bg2); font-size: var(--t-sm); line-height: 1.55; }
+.ct-texto p { margin: 0 0 10px; }
+.ct-texto p:first-child { font-weight: 750; }

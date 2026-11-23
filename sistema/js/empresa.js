@@ -2,7 +2,7 @@
 window.EMT_EMPRESA = (() => {
   const GRUPOS_E = [
     ["empresa", "La empresa", ["Datos de la empresa", "Constructora e ingeniero", "Logos de distribuidoras", "Colores del sistema"]],
-    ["firmas", "Firmas y documentos", ["Quién firma las propuestas", "Carta de presentación", "Documentos de la empresa", "Numeración de documentos"]],
+    ["firmas", "Firmas y documentos", ["Quién firma las propuestas", "Carta de presentación", "Contrato de obra", "Documentos de la empresa", "Numeración de documentos"]],
     ["cotizar", "Cómo se cotiza", ["Textos para cada cotización nueva", "Margen mínimo y descuentos", "Seguimiento de cotizaciones", "Del plano a la cotización"]],
     ["obras", "Obras", ["Etapas por tipo de trabajo", "Checklists de cada obra", "Costos de obra"]]
   ];
@@ -65,6 +65,7 @@ window.EMT_EMPRESA = (() => {
           <details class="caja plegable"><summary><span class="pl-t"><h2>Carta de presentación</h2></span><span class="chev">${ico("chev", 16, 2.2)}</span></summary><div class="pl-cuerpo">
             ${area("carta", "Texto de la carta", "Se completa sola con: {cliente}, {contacto}, {trabajo}, {sitio} y {en_sitio} (que pone «, en …» solo si la cotización tiene sitio).", 7)}
           </div></details>
+          <details class="caja plegable"><summary><span class="pl-t"><h2>Contrato de obra</h2><span class="suave">Texto base · se guarda con su botón</span></span><span class="chev">${ico("chev", 16, 2.2)}</span></summary><div class="pl-cuerpo" data-contrato-pl></div></details>
           <details class="caja plegable"><summary><span class="pl-t"><h2>Margen mínimo y descuentos</h2><span class="suave">Se guarda solo</span></span><span class="chev">${ico("chev", 16, 2.2)}</span></summary><div class="pl-cuerpo" data-margen></div></details>
           <details class="caja plegable"><summary><span class="pl-t"><h2>Numeración de documentos</h2><span class="suave">Prefijo y número · se guarda solo</span></span><span class="chev">${ico("chev", 16, 2.2)}</span></summary><div class="pl-cuerpo" data-nums></div></details>
           <details class="caja plegable"><summary><span class="pl-t"><h2>Textos para cada cotización nueva</h2></span><span class="chev">${ico("chev", 16, 2.2)}</span></summary><div class="pl-cuerpo">
@@ -239,6 +240,19 @@ window.EMT_EMPRESA = (() => {
       };
     };
     pintarMargen();
+    const pintarContrato = async () => {
+      const caja = $("[data-contrato-pl]", v); if (!caja) return;
+      const txt = await D.plantillaContrato().catch(() => D.PLANTILLA_CONTRATO);
+      caja.innerHTML = `<p class="suave" style="margin:0;font-size:13.5px">Cada obra llena sola lo que va entre llaves: ${D.CAMPOS_CONTRATO.map(k => `<code>{${esc(k)}}</code>`).join(" ")}. Conviene que lo revise su abogado.</p>
+        <label class="f-campo"><span class="sr">Texto del contrato</span><textarea data-contrato-txt rows="16" class="contrato-t" ${puede ? "" : "readonly"}>${esc(txt)}</textarea></label>
+        ${puede ? `<div class="fila-b"><button class="s-btn suave-b" type="button" data-contrato-base>Volver al texto base</button><button class="s-btn lleno" type="button" data-contrato-guardar>${ico("check", 15)}Guardar el contrato</button></div>` : ""}`;
+      caja.onclick = async ev => {
+        if (ev.target.closest("[data-contrato-base]")) { caja.querySelector("[data-contrato-txt]").value = D.PLANTILLA_CONTRATO; A().aviso("Se puso el texto base. Toque «Guardar el contrato» para quedarse con él."); return; }
+        const b = ev.target.closest("[data-contrato-guardar]"); if (!b) return;
+        b.disabled = true; try { await D.guardarPlantillaContrato(caja.querySelector("[data-contrato-txt]").value); A().aviso("Contrato guardado. Los contratos nuevos salen con este texto."); } catch (er) { A().aviso(er.message, "mal"); } finally { b.disabled = false; }
+      };
+    };
+    pintarContrato();
     e.ingenieros = D.ingenierosDe(e).map(i => ({ ...i }));
     const ING_C = [["nombre", "Ingeniero electricista"], ["titulo", "Título"], ["colegiado", "No. de colegiado activo"], ["vence", "Constancia vigente hasta", "date"], ["telefono", "Teléfono", "tel"], ["id", "Identificador en Energuate"]];
     const pintarIngs = () => {

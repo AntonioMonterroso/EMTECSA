@@ -126,6 +126,26 @@
         const ev = evento(d, e, "estimacion", `${s.numero} · ${n}${pu ? " · " + pu : ""}`); poner(CE, d); avisar(ev);
         return { ...s.aprobado, firma: undefined };
       },
+      async contratos(t) {
+        const { e } = buscar(t); if (!e || !e.aprobado) return [];
+        const ob = (leer("emtecsa.sistema.obras") || { obras: [] }).obras.find(o => o.cotizacion_id === e.cotizacion_id); if (!ob) return [];
+        return ((leer("emtecsa.sistema.docsobra") || { docs: [] }).docs).filter(s => s.obra_id === ob.id && s.tipo === "contrato" && (s.estado === "enviado" || s.estado === "firmado"))
+          .map(s => ({ id: s.id, numero: s.numero, estado: s.estado, datos: s.datos, firma: s.firma ? { ...s.firma, firma: undefined } : null }));
+      },
+      async firmarContrato(t, id, nombre, puesto, firma) {
+        const { d, e } = buscar(t); if (!e) throw new Error("no_existe"); if (!e.aprobado) throw new Error("no_aprobada");
+        const ob = (leer("emtecsa.sistema.obras") || { obras: [] }).obras.find(o => o.cotizacion_id === e.cotizacion_id);
+        const dd = leer("emtecsa.sistema.docsobra"); const s = ob && dd && dd.docs.find(x => x.id === id && x.obra_id === ob.id && x.tipo === "contrato"); if (!s) throw new Error("no_existe");
+        if (s.estado === "firmado") return { ...s.firma, firma: undefined };
+        if (s.estado !== "enviado") throw new Error("no_disponible");
+        const n = nombre.replace(/\s+/g, " ").trim(), pu = puesto.replace(/\s+/g, " ").trim() || null;
+        if (n.length < 3 || n.length > 120) throw new Error("nombre");
+        if (!/^data:image\/png;base64,/.test(firma) || firma.length < 200 || firma.length > 400000) throw new Error("firma");
+        s.estado = "firmado"; s.firma = { nombre: n, puesto: pu, firma, fecha: ahora(), en: "enlace" }; s.actualizado = ahora();
+        poner("emtecsa.sistema.docsobra", dd);
+        const ev = evento(d, e, "contrato", `${s.numero} · ${n}${pu ? " · " + pu : ""}`); poner(CE, d); avisar(ev);
+        return { ...s.firma, firma: undefined };
+      },
       async cambios(t) {
         const { e } = buscar(t); if (!e || !e.aprobado) return [];
         const ob = (leer("emtecsa.sistema.obras") || { obras: [] }).obras.find(o => o.cotizacion_id === e.cotizacion_id); if (!ob) return [];
@@ -167,6 +187,8 @@
     async descarga(t, cual) { try { await sb.rpc("enlace_descarga", { p_token: t, p_cual: cual }); } catch (e) {} },
     async archivo(a) { try { const r = await fetch(a.url); return r.ok ? await r.blob() : null; } catch (e) { return null; } },
     async estimaciones(t) { const r = await sb.rpc("enlace_estimaciones", { p_token: t }); return r.error ? [] : r.data || []; },
+    async contratos(t) { const r = await sb.rpc("enlace_contratos", { p_token: t }); return r.error ? [] : r.data || []; },
+    async firmarContrato(t, id, nombre, puesto, firma) { const r = await sb.rpc("enlace_firmar_contrato", { p_token: t, p_id: id, p_nombre: nombre, p_puesto: puesto, p_firma: firma }); if (r.error) throw new Error((r.error.message || "").match(/no_existe|no_aprobada|no_disponible|nombre|puesto|firma/)?.[0] || "red"); return r.data; },
     async cambios(t) { const r = await sb.rpc("enlace_ordenes_cambio", { p_token: t }); return r.error ? [] : r.data || []; },
     async aprobarOC(t, id, nombre, puesto, firma) { const r = await sb.rpc("enlace_aprobar_cambio", { p_token: t, p_id: id, p_nombre: nombre, p_puesto: puesto, p_firma: firma }); if (r.error) throw new Error((r.error.message || "").match(/no_existe|no_aprobada|no_disponible|nombre|puesto|firma/)?.[0] || "red"); return r.data; },
     async aprobarEst(t, id, nombre, puesto, firma) { const r = await sb.rpc("enlace_aprobar_estimacion", { p_token: t, p_id: id, p_nombre: nombre, p_puesto: puesto, p_firma: firma }); if (r.error) throw new Error((r.error.message || "").match(/no_existe|no_aprobada|no_disponible|nombre|puesto|firma/)?.[0] || "red"); return r.data; }
@@ -221,8 +243,10 @@
   function estadoHTML() {
     const ap = R.aprobado;
     if (R.equipo) return `<div class="banda azul">${ico("eye", 17)}<span><b>Así la ve su cliente.</b> Esta visita no se cuenta.</span></div>`;
-    if (ap && !(R.est || []).some(s => s.estado === "enviada") && !(R.oc || []).some(s => s.estado === "enviada")) return "";
+    if (ap && !(R.est || []).some(s => s.estado === "enviada") && !(R.oc || []).some(s => s.estado === "enviada") && !(R.ct || []).some(s => s.estado === "enviado")) return "";
     if (R.estado === "borrador") return `<div class="banda ambar">${ico("alerta", 17)}<span><b>EMTECSA está ajustando esta propuesta.</b> Por ahora no se puede aprobar; le avisarán cuando esté lista.</span></div>`;
+    const pc = ap && (R.ct || []).find(s => s.estado === "enviado");
+    if (pc) return `<div class="banda azul est-banda">${ico("firma", 17)}<span><b>Tiene un contrato por firmar.</b> Contrato ${esc(pc.numero)}.</span><button class="e-btn e-btn-p" type="button" data-ct="${pc.id}">Leer</button></div>`;
     const po = ap && (R.oc || []).find(s => s.estado === "enviada");
     if (po) return `<div class="banda azul est-banda">${ico("firma", 17)}<span><b>Tiene una orden de cambio por aprobar.</b> ${esc(po.datos.tipo === "deductivo" ? "Se quitan" : "Se agregan")} ${esc(Q(po.datos.total))}.</span><button class="e-btn e-btn-p" type="button" data-oc="${po.id}">Revisar</button></div>`;
     const pe = ap && (R.est || []).find(s => s.estado === "enviada");
@@ -268,6 +292,47 @@
     const n = lis.length + (cm.otros || []).length;
     return `<details class="pc-caja plg ver-c" ${R.aprobado ? "" : "open"}><summary><span><h2>Versión ${esc(d.version)} · qué cambió</h2><small>${cambioT ? `Total: ${esc(M(cm.total_antes))} → ${esc(M(cm.total_ahora))}` : n ? `${n} ${n === 1 ? "cambio" : "cambios"} desde la versión ${esc(cm.desde)}` : `Desde la versión ${esc(cm.desde)}`}</small></span><span class="chev">${ico("chev", 18)}</span></summary>
       <div class="part">${lis.join("")}${(cm.otros || []).length ? `<p class="suave chico ver-otros">También cambió: ${esc(cm.otros.join(", ").toLowerCase().replace(/^./, s => s.toUpperCase()))}.</p>` : ""}${!n ? `<p class="suave chico ver-otros">Se actualizaron detalles menores.</p>` : ""}</div></details>`;
+  }
+
+  function contratosHTML() {
+    const l = R.ct || []; if (!R.aprobado || !l.length) return "";
+    return `<section class="pc-caja est-c" id="contrato"><h2>Contrato</h2>
+      ${l.map(s => `<div class="est-f"><span class="pr-d"><b>Contrato de obra · <span class="nw">${esc(s.numero)}</span></b>${s.estado === "firmado" && s.firma ? `<small class="ok">Firmado por ${esc(s.firma.nombre)} · ${esc(fechaHora(s.firma.fecha))}</small>` : `<small>Léalo y fírmelo desde aquí.</small>`}</span><span class="est-der">${s.estado === "enviado" ? `<button class="e-btn e-btn-p" type="button" data-ct="${s.id}">${ico("firma", 17)}Leer y firmar</button>` : `<button class="e-btn" type="button" data-ct="${s.id}">Leer</button>`}</span></div>`).join("")}</section>`;
+  }
+  function verContrato(id) {
+    const s = (R.ct || []).find(x => x.id === id); if (!s) return;
+    const puede = s.estado === "enviado" && !R.equipo;
+    const texto = String((s.datos && s.datos.texto) || "").replace(/\{numero\}/g, s.numero);
+    let firma = null;
+    abrirHoja(`
+      <div class="hoja-cab"><h2>Contrato · <span class="nw">${esc(s.numero)}</span></h2><button class="x" type="button" aria-label="Cerrar" data-cerrar>${ico("x", 18)}</button></div>
+      <div class="ct-texto">${texto.split(/\n\s*\n/).map(p => `<p>${esc(p.trim())}</p>`).join("")}</div>
+      ${s.estado === "firmado" && s.firma ? `<p class="escogio"><span>Firmado</span><b>${esc(s.firma.nombre)}${s.firma.puesto ? ", " + esc(s.firma.puesto) : ""} · ${esc(fechaHora(s.firma.fecha))}</b></p>` : ""}
+      ${puede ? `<form data-f-ct novalidate>
+        <label class="campo">Su nombre completo<input name="nombre" autocomplete="name" value="${esc((s.datos && s.datos.cliente_representante) || (R.datos.contacto ? R.datos.contacto.nombre : ""))}" required></label>
+        <label class="campo"><span>Puesto <small>opcional</small></span><input name="puesto" autocomplete="organization-title" value="${esc((s.datos && s.datos.cliente_puesto) || "")}"></label>
+        <div class="campo"><span class="firma-t">Su firma<button class="lnk" type="button" data-borrar>Borrar</button></span><div class="firma-c"><canvas data-lienzo aria-label="Recuadro para firmar con el dedo o el mouse"></canvas><span class="firma-g" data-guia>Firme aquí con el dedo o el mouse</span></div></div>
+        <label class="chk"><input type="checkbox" name="acepto"><span>Leí el contrato ${esc(s.numero)} y lo acepto.</span></label>
+        <p class="err" data-err hidden></p>
+        <button class="e-btn e-btn-p ancho" type="submit" data-enviar>${ico("check", 18)}Firmar el contrato</button>
+      </form>` : ""}`, h => {
+      const f = h.querySelector("[data-f-ct]"); if (!f) return;
+      firma = lienzo(h.querySelector("[data-lienzo]"));
+      const guia = h.querySelector("[data-guia]");
+      h.querySelector("[data-lienzo]").addEventListener("firma", () => { guia.hidden = firma.tinta(); });
+      h.querySelector("[data-borrar]").addEventListener("click", () => firma.borrar());
+      const err = h.querySelector("[data-err]");
+      const mal = m => { err.textContent = m; err.hidden = false; };
+      f.addEventListener("submit", async ev => {
+        ev.preventDefault(); err.hidden = true;
+        if (f.nombre.value.trim().length < 3) { mal(ERR.nombre); f.nombre.focus(); return; }
+        if (firma.vacia()) { mal(ERR.firma); return; }
+        if (!f.acepto.checked) { mal("Marque la casilla de que leyó el contrato."); return; }
+        const b = h.querySelector("[data-enviar]"); b.disabled = true; b.lastChild.textContent = "Firmando…";
+        try { await API.firmarContrato(token, s.id, f.nombre.value, f.puesto.value, firma.png()); firma.soltar(); cerrarHoja(true); R.ct = await API.contratos(token).catch(() => R.ct); pintar(); aviso("Contrato firmado. Gracias."); }
+        catch (e) { mal(ERR[e.message] || ERR.red); b.disabled = false; b.lastChild.textContent = "Firmar el contrato"; }
+      });
+    });
   }
 
   function cambiosHTML() {
@@ -327,6 +392,7 @@
             ${d.incluye.length ? `<div class="alc"><h3>Incluye</h3>${lista(d.incluye)}</div>` : ""}${d.excluye.length ? `<div class="alc no"><h3>No incluye</h3>${lista(d.excluye)}</div>` : ""}</details>` : ""}
           ${cond.length || d.notas ? `<details class="pc-caja plg"><summary><span><h2>Condiciones</h2><small>${cond.map(x => x[0]).join(" · ") || "Notas"}</small></span><span class="chev">${ico("chev", 18)}</span></summary>
             <dl class="cond">${cond.map(([k, v]) => `<div><dt>${k}</dt><dd>${esc(v)}</dd></div>`).join("")}${d.notas ? `<div><dt>Notas</dt><dd>${esc(d.notas)}</dd></div>` : ""}</dl></details>` : ""}
+          ${contratosHTML()}
           ${cambiosHTML()}
           ${estimacionesHTML()}
           ${ap ? `<section class="pc-caja tramite-c"><h2>Para los trámites con Energuate</h2><p class="suave chico">${R.tramite && R.tramite.fecha ? "Ya mandó sus datos. Puede corregirlos si hace falta." : "Para pedir la licencia de construcción hacen falta sus datos y los de cada terreno por donde pasará la línea."}</p><button class="e-btn ${R.tramite && R.tramite.fecha ? "" : "e-btn-p"} ancho" type="button" data-tramite>${ico("pen", 17)}${R.tramite && R.tramite.fecha ? "Corregir mis datos" : "Llenar mis datos"}</button></section>` : ""}
@@ -638,6 +704,7 @@
     const cs = e.target.closest("[data-constancia]"); if (cs) constancia(cs);
     const es = e.target.closest("[data-est]"); if (es) verEst(Number(es.dataset.est));
     const oc = e.target.closest("[data-oc]"); if (oc) verOC(Number(oc.dataset.oc));
+    const ct = e.target.closest("[data-ct]"); if (ct) verContrato(Number(ct.dataset.ct));
   });
 
   async function cargar() {
@@ -645,7 +712,7 @@
     try { R = await API.ver(token); }
     catch (e) { raiz.innerHTML = `<section class="vacio-c"><span class="ic-c ambar">${ico("alerta", 26)}</span><h1>No se pudo abrir la propuesta</h1><p>${esc(ERR.red)}</p><div class="btns"><button class="e-btn e-btn-p" type="button" onclick="location.reload()">Intentar otra vez</button></div></section>`; return; }
     if (!R) { pintarNoHay(); return; }
-    if (R.aprobado) { R.tramite = await API.verTramite(token).catch(() => null); R.est = await API.estimaciones(token).catch(() => []); R.oc = await API.cambios(token).catch(() => []); }
+    if (R.aprobado) { R.tramite = await API.verTramite(token).catch(() => null); R.est = await API.estimaciones(token).catch(() => []); R.oc = await API.cambios(token).catch(() => []); R.ct = await API.contratos(token).catch(() => []); }
     if (R.vencido) pintarVencido(); else pintar();
   }
   window.addEventListener("hashchange", () => location.reload());

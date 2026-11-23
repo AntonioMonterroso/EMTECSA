@@ -101,7 +101,7 @@
   }
   const nombreGrupo = (c, g) => { if (!g) return "Va en todas"; const [t, id] = String(g).split(":"); const o = c.opciones || {}; if (t === "o") { const x = (o.lista || []).find(y => y.id === id); return x ? `Opción ${x.id}${x.nombre ? " · " + x.nombre : ""}` : "Va en todas"; } const x = (o.extras || []).find(y => y.id === id); return x ? `Extra · ${x.nombre}` : "Va en todas"; };
 
-  const TIPOS_NUM = { cot: { n: "Cotizaciones", p: "COT", dig: 4 }, obra: { n: "Obras", p: "OB", dig: 3 }, rec: { n: "Recibos de pago", p: "REC", dig: 4 }, est: { n: "Estimaciones de avance", p: "EST", dig: 4 }, oc: { n: "Órdenes de cambio", p: "OC", dig: 4 } };
+  const TIPOS_NUM = { cot: { n: "Cotizaciones", p: "COT", dig: 4 }, obra: { n: "Obras", p: "OB", dig: 3 }, rec: { n: "Recibos de pago", p: "REC", dig: 4 }, est: { n: "Estimaciones de avance", p: "EST", dig: 4 }, oc: { n: "Órdenes de cambio", p: "OC", dig: 4 }, ct: { n: "Contratos", p: "CT", dig: 4 }, ot: { n: "Órdenes de trabajo", p: "OT", dig: 4 }, ae: { n: "Actas de entrega", p: "AE", dig: 4 } };
   async function numeracion() {
     let v = {};
     if (!nube) v = leer().ajustes.numeracion || {};
@@ -116,6 +116,8 @@
   };
   async function numeroDe(tipo, lista) { const c = (await numeracion())[tipo]; return armarNumero(c, (lista || []).map(x => x && typeof x === "object" ? x.numero : x)); }
   async function numerosUsados(tipo) {
+    const TD = { ct: "contrato", ot: "ot", ae: "acta" }[tipo];
+    if (TD) { if (!nube) { try { return ((JSON.parse(localStorage.getItem("emtecsa.sistema.docsobra")) || {}).docs || []).filter(x => x.tipo === TD).map(x => x.numero); } catch (e) { return []; } } const r = await sb.from("obra_documentos").select("numero").eq("tipo", TD); return r.error ? [] : r.data.map(x => x.numero); }
     const T = { cot: ["cotizaciones", "emtecsa.sistema.cotizaciones", "cotizaciones"], obra: ["obras", "emtecsa.sistema.obras", "obras"], rec: ["pagos", "emtecsa.sistema.cobros", "pagos"], est: ["estimaciones", "emtecsa.sistema.estimaciones", "est"], oc: ["ordenes_cambio", "emtecsa.sistema.cambios", "oc"] }[tipo];
     if (!nube) { try { return ((JSON.parse(localStorage.getItem(T[1])) || {})[T[2]] || []).map(x => x.numero); } catch (e) { return []; } }
     const r = await sb.from(T[0]).select("numero"); return r.error ? [] : r.data.map(x => x.numero);

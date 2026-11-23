@@ -44,7 +44,7 @@ window.EMT_ENLACES = (() => {
     let en = await D.enlaceDe(c.id).catch(() => null);
     vivo = { id: c.id, refrescar: o.alAprobar, pintar: () => panel(o) };
     if (en) {
-      const ids = en.eventos.filter(x => !x.atendido && x.tipo !== "mensaje" && x.tipo !== "estimacion" && x.tipo !== "cambio").map(x => x.id);
+      const ids = en.eventos.filter(x => !x.atendido && x.tipo !== "mensaje" && x.tipo !== "estimacion" && x.tipo !== "cambio" && x.tipo !== "contrato").map(x => x.id);
       if (ids.length) { await D.atenderEventos(ids).catch(() => {}); insignia(); }
     }
     o.hayEnlace = !!en;
@@ -154,15 +154,16 @@ window.EMT_ENLACES = (() => {
     volvio: x => ({ c: "azul", i: "eye", t: `Volvió a verla: ${x.cliente}`, d: `${x.numero} · ${cuando(x.fecha)}`, chip: "Otra vez" }),
     datos: x => ({ c: "verde", i: "file", t: `Mandó sus datos para Energuate: ${x.cliente}`, d: `${x.numero} · ${cuando(x.fecha)}`, chip: "Datos" }),
     estimacion: x => ({ c: "verde", i: "check", t: `Aprobó una estimación: ${x.cliente}`, d: `${String(x.texto || "").split(" · ")[0]} · ${cuando(x.fecha)} · ya está en Por cobrar`, chip: "Aprobada", accion: "Ver" }),
+    contrato: x => ({ c: "verde", i: "check", t: `Firmó el contrato: ${x.cliente}`, d: `${String(x.texto || "").split(" · ")[0]} · ${cuando(x.fecha)}`, chip: "Firmado", accion: "Ver" }),
     cambio: x => ({ c: "verde", i: "check", t: `Aprobó una orden de cambio: ${x.cliente}`, d: `${String(x.texto || "").split(" · ")[0]} · ${cuando(x.fecha)}`, chip: "Aprobada", accion: "Ver" })
   };
-  const ORDEN = { aprobo: 0, estimacion: 1, cambio: 1, mensaje: 2, datos: 3, volvio: 4, abrio: 5 };
+  const ORDEN = { aprobo: 0, contrato: 1, estimacion: 1, cambio: 1, mensaje: 2, datos: 3, volvio: 4, abrio: 5 };
   async function porAtender() {
     if (!D.puede(A().sesion().perfil, "verEnlaces")) return [];
     const l = await D.pendientesEnlace().catch(() => []);
     const vistos = new Set();
     const obraDe = {};
-    const deObra = t2 => t2 === "estimacion" || t2 === "cambio";
+    const deObra = t2 => t2 === "estimacion" || t2 === "cambio" || t2 === "contrato";
     for (const x of l) if (deObra(x.tipo) && !(x.cotizacion_id in obraDe)) obraDe[x.cotizacion_id] = await D.obraDeCotizacion(x.cotizacion_id).catch(() => null);
     return l.filter(x => TXT[x.tipo]).filter(x => { const k = x.tipo === "mensaje" || deObra(x.tipo) ? x.tipo[0] + x.id : x.tipo + x.cotizacion_id; if (vistos.has(k)) return false; vistos.add(k); return true; })
       .sort((a, b) => ORDEN[a.tipo] - ORDEN[b.tipo])
@@ -171,7 +172,7 @@ window.EMT_ENLACES = (() => {
 
   async function insignia() {
     let n = 0;
-    try { if (D.puede(A().sesion().perfil, "verEnlaces")) n = (await D.pendientesEnlace()).filter(x => x.tipo === "aprobo" || x.tipo === "mensaje" || x.tipo === "estimacion" || x.tipo === "cambio").length; } catch (e) {}
+    try { if (D.puede(A().sesion().perfil, "verEnlaces")) n = (await D.pendientesEnlace()).filter(x => x.tipo === "aprobo" || x.tipo === "mensaje" || x.tipo === "estimacion" || x.tipo === "cambio" || x.tipo === "contrato").length; } catch (e) {}
     const m = document.querySelector(".barra [data-menu]"); if (m) { m.dataset.pCot = n; m.classList.toggle("con-punto", Number(m.dataset.pCot || 0) + Number(m.dataset.pTienda || 0) + Number(m.dataset.pEq || 0) > 0); }
     if (A().marcarInsignia) A().marcarInsignia("cotizaciones", n);
   }
@@ -190,7 +191,7 @@ window.EMT_ENLACES = (() => {
     x = x || l.find(y => y.cotizacion_id === m.cotizacion_id && y.tipo === m.tipo);
     const cliN = x && x.cotizacion && x.cotizacion.cliente ? x.cotizacion.cliente.nombre : "El cliente";
     const num = x && x.cotizacion ? x.cotizacion.numero : "";
-    const T = { aprobo: [`${cliN} aprobó ${num}`, x && x.texto ? "Firmó " + x.texto : "Con su firma"], mensaje: [`Pregunta de ${cliN}`, x ? String(x.texto || "").slice(0, 120) : ""], abrio: [`${cliN} abrió la propuesta`, num], volvio: [`${cliN} volvió a ver la propuesta`, num], datos: [`${cliN} mandó sus datos para Energuate`, num], estimacion: [`${cliN} aprobó una estimación`, x && x.texto ? String(x.texto) : num], cambio: [`${cliN} aprobó una orden de cambio`, x && x.texto ? String(x.texto) : num] }[m.tipo];
+    const T = { aprobo: [`${cliN} aprobó ${num}`, x && x.texto ? "Firmó " + x.texto : "Con su firma"], mensaje: [`Pregunta de ${cliN}`, x ? String(x.texto || "").slice(0, 120) : ""], abrio: [`${cliN} abrió la propuesta`, num], volvio: [`${cliN} volvió a ver la propuesta`, num], datos: [`${cliN} mandó sus datos para Energuate`, num], estimacion: [`${cliN} aprobó una estimación`, x && x.texto ? String(x.texto) : num], cambio: [`${cliN} aprobó una orden de cambio`, x && x.texto ? String(x.texto) : num], contrato: [`${cliN} firmó el contrato`, x && x.texto ? String(x.texto) : num] }[m.tipo];
     if (!T) return;
     A().aviso(T[0] + (m.tipo === "mensaje" ? "" : ""));
     notificar(T[0], T[1], m.cotizacion_id);

@@ -130,7 +130,7 @@ window.EMT_OBRAS = (() => {
         <a class="volver" href="#/obras">${ico("chev", 16, 2.2)}Obras</a>
         <div class="cab-v">
           <div><span class="eti">${esc(o.numero)}${cot ? ` · <a href="#/cotizaciones/${cot.id}">desde ${esc(cot.numero)}</a>` : ""}</span><h1 class="t">${esc(o.titulo || "Sin título")}</h1><p>${cli ? `<a href="#/clientes/${cli.id}">${esc(cli.nombre)}</a>` : "Cliente no encontrado"}${sitio ? " · " + esc(sitio.nombre) : ""}${o.responsable ? " · " + esc(o.responsable) : ""}${o.fecha_inicio ? " · inicia " + esc(fCorta(o.fecha_inicio)) : ""}</p></div>
-          <div class="fila-b">${ed ? `<label class="estado-sel"><span class="sr">Estado de la obra</span><select data-estado-obra>${Object.entries(D.ESTADOS_OBRA).map(([k, n]) => `<option value="${k}" ${o.estado === k ? "selected" : ""}>${esc(n)}</option>`).join("")}</select></label><button class="s-btn suave-b" type="button" data-ed-obra>${ico("pen", 15)}Editar</button>` : `<span class="chip ${CHIP[o.estado]}">${esc(D.ESTADOS_OBRA[o.estado])}</span>`}</div>
+          <div class="fila-b"><button class="s-btn suave-b" type="button" data-docs-obra>${ico("layers", 15)}Documentos</button>${ed ? `<label class="estado-sel"><span class="sr">Estado de la obra</span><select data-estado-obra>${Object.entries(D.ESTADOS_OBRA).map(([k, n]) => `<option value="${k}" ${o.estado === k ? "selected" : ""}>${esc(n)}</option>`).join("")}</select></label><button class="s-btn suave-b" type="button" data-ed-obra>${ico("pen", 15)}Editar</button>` : `<span class="chip ${CHIP[o.estado]}">${esc(D.ESTADOS_OBRA[o.estado])}</span>`}</div>
         </div>
         <div class="avance-o"><span><b>${av} %</b> de las etapas hechas</span><i><span style="transform:scaleX(${av / 100})"></span></i></div>
         ${tocaHTML}
@@ -177,6 +177,7 @@ window.EMT_OBRAS = (() => {
     };
     v.onclick = async e => {
       if (e.target.closest("[data-ed-obra]")) editarObra(o, cli, recargar);
+      if (e.target.closest("[data-docs-obra]") && window.EMT_DOCUMENTOS) window.EMT_DOCUMENTOS.panel(o, recargar);
       const th = e.target.closest("[data-toca-hecha]");
       if (th) { th.disabled = true; try { const x = o.etapas.find(z => z.id === Number(th.dataset.tocaHecha)); await D.guardarEtapa(o.id, { ...x, hecha: true, fecha_hecha: null }); aviso(`«${x.nombre}» quedó hecha.`); await recargar(); } catch (err) { th.disabled = false; aviso(err.message, "mal"); } return; }
       if (e.target.closest("[data-toca-fin]")) { try { await D.guardarObra({ ...o, estado: "terminada" }); aviso("La obra quedó terminada."); await recargar(); } catch (err) { aviso(err.message, "mal"); } return; }

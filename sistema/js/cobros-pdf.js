@@ -332,5 +332,123 @@
     return doc.save();
   }
 
-  Object.assign(P, { recibo, estadoCuenta, pedido, reporteFinanzas, estimacion, ordenCambio });
+  async function firmaEn(doc, pg, txt, F, hex, x, y, f, nombre, rol) {
+    if (f && f.firma && /^data:image\/png;base64,/.test(f.firma)) { try { const img = await doc.embedPng(Uint8Array.from(atob(f.firma.split(",")[1]), c => c.charCodeAt(0))); const hF = 46, wF = Math.min(200, hF * img.width / img.height); pg.drawImage(img, { x: x + 105 - wF / 2, y: y + 4, width: wF, height: hF }); } catch (e) {} }
+    pg.drawLine({ start: { x, y }, end: { x: x + 210, y }, thickness: 0.8, color: hex(COL.texto) });
+    txt(pg, nombre || "", x + 105, y - 16, { f: F.b, s: 10, centro: true });
+    txt(pg, rol, x + 105, y - 30, { s: 8.5, c: COL.gris, centro: true });
+  }
+  const fFirma = f => f && f.fecha ? new Date(f.fecha).toLocaleString("es-GT", { timeZone: "America/Guatemala", day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "";
+
+  async function contrato({ doc: dc, emp }) {
+    const d = dc.datos || {};
+    const { doc, F, hex, txt, cabeza, pie } = await nuevo(`${dc.numero} · Contrato`, emp);
+    const paginas = [];
+    let pg = doc.addPage([W, H]); paginas.push(pg);
+    cabeza(pg, "CONTRATO DE OBRA", dc.numero, (emp.ciudad ? emp.ciudad + ", " : "") + fLarga(dc.fecha));
+    if (dc.estado === "borrador") txt(pg, "BORRADOR", W / 2, H / 2 - 40, { f: F.x, s: 80, c: "#EEF1F4", centro: true });
+    let y = H - 160;
+    const texto = String(d.texto || "").replace(/\{numero\}/g, dc.numero);
+    const parrafos = texto.split(/\n\s*\n/).map(x => x.replace(/\s*\n\s*/g, " ").trim()).filter(Boolean);
+    for (const [i, p] of parrafos.entries()) {
+      if (i === 0 && /^CONTRATO/i.test(p)) continue;
+      const m = p.match(/^([A-ZÁÉÍÓÚÑ]+\. [^.]+\.)\s*(.*)$/);
+      const lineas = partir(p, F.r, 10, W - 2 * M);
+      if (y - lineas.length * 14 < PIE + 30) { pg = doc.addPage([W, H]); paginas.push(pg); y = H - M - 10; }
+      if (m) {
+        const cab = m[1], resto = m[2];
+        const l2 = partir(cab + " " + resto, F.r, 10, W - 2 * M);
+        let usados = 0;
+        l2.forEach((l, j) => {
+          if (j === 0) { const wC = F.b.widthOfTextAtSize(cab, 10); const enLinea = l.startsWith(cab); if (enLinea) { txt(pg, cab, M, y, { f: F.b, s: 10 }); txt(pg, l.slice(cab.length), M + wC, y, { s: 10 }); } else txt(pg, l, M, y, { s: 10 }); }
+          else txt(pg, l, M, y, { s: 10 });
+          y -= 14; usados++;
+        });
+      } else lineas.forEach(l => { txt(pg, l, M, y, { s: 10 }); y -= 14; });
+      y -= 8;
+    }
+    y -= 50;
+    if (y < PIE + 90) { pg = doc.addPage([W, H]); paginas.push(pg); y = H - M - 120; }
+    await firmaEn(doc, pg, txt, F, hex, M, y, null, d.empresa_representante || emp.firma_nombre || "", ["EL CONTRATISTA", d.empresa || emp.nombre].filter(Boolean).join(" · "));
+    const fc = dc.firma;
+    await firmaEn(doc, pg, txt, F, hex, W - M - 210, y, fc, fc ? fc.nombre : d.cliente_representante || "", fc ? ["EL CLIENTE", fc.puesto, fFirma(fc)].filter(Boolean).join(" · ") : ["EL CLIENTE", d.cliente].filter(Boolean).join(" · "));
+    if (dc.estado === "anulado") txt(paginas[0], "ANULADO", W / 2, H / 2 - 40, { f: F.x, s: 80, c: "#B3261E", centro: true });
+    paginas.forEach((p, i) => { pie(p); txt(p, `Página ${i + 1} de ${paginas.length}`, W - M, PIE - 4, { s: 7.5, c: COL.gris, der: true }); });
+    return doc.save();
+  }
+
+  async function ordenTrabajo({ doc: dc, emp }) {
+    const d = dc.datos || {};
+    const { doc, F, hex, txt, cabeza, pie } = await nuevo(`${dc.numero} · Orden de trabajo`, emp);
+    const cant = n => Number(n || 0).toLocaleString("en-US", { maximumFractionDigits: 3 });
+    const paginas = [];
+    let pg = doc.addPage([W, H]); paginas.push(pg);
+    cabeza(pg, "ORDEN DE TRABAJO", dc.numero, fLarga(d.fecha || dc.fecha));
+    let y = H - 160;
+    const nueva = () => { pg = doc.addPage([W, H]); paginas.push(pg); y = H - M - 10; };
+    const lugar = h => { if (y - h < PIE + 30) nueva(); };
+    const dato = (eti, val, x, w, lin = 2) => { txt(pg, eti.toUpperCase(), x, y, { f: F.b, s: 7.5, c: COL.gris }); const l = partir(val || "—", F.s, 10.5, w).slice(0, lin); l.forEach((t2, i) => txt(pg, t2, x, y - 15 - i * 13, { f: F.s, s: 10.5 })); return l.length; };
+    const a1 = dato("Obra", [d.obra && d.obra.numero, d.obra && d.obra.titulo].filter(Boolean).join(" · "), M, 300), b1 = dato("Responsable", (d.obra && d.obra.responsable) || "", 400, W - M - 400);
+    y -= 26 + Math.max(a1, b1) * 13;
+    const a2 = dato("Cliente", [d.cliente, d.contacto, d.telefono].filter(Boolean).join(" · "), M, 300), b2 = dato("Dónde", d.sitio || "", 400, W - M - 400, 3);
+    y -= 26 + Math.max(a2, b2) * 13;
+    if (d.mapa) { txt(pg, "UBICACIÓN: " + d.mapa, M, y, { s: 8.5, c: COL.gris }); y -= 22; }
+    const titulo = t2 => { lugar(40); pg.drawRectangle({ x: M, y: y - 8, width: W - 2 * M, height: 22, color: hex(COL.marino) }); txt(pg, t2, M + 8, y, { f: F.b, s: 8, c: "#FFFFFF" }); y -= 26; };
+    titulo("QUIÉN VA");
+    (d.recursos || []).forEach(r => { lugar(18); txt(pg, `${r.nombre}${r.turno && r.turno !== "dia" ? ` · ${r.turno === "manana" ? "mañana" : "tarde"}` : ""}`, M + 8, y, { f: F.s, s: 10 }); txt(pg, [r.tipo === "cuadrilla" && r.personas ? `${r.personas} personas` : "", r.detalle, r.telefono, r.nota].filter(Boolean).join(" · "), M + 230, y, { s: 9, c: COL.gris }); y -= 16; });
+    y -= 8;
+    titulo("QUÉ SE HACE");
+    (d.etapas || []).forEach(e => { lugar(18); txt(pg, e.nombre, M + 8, y, { f: F.s, s: 10 }); if (e.inicio && e.fin) txt(pg, `${fCorta(e.inicio)} al ${fCorta(e.fin)}`, W - M - 8, y, { s: 9, c: COL.gris, der: true }); y -= 16; });
+    if (!(d.etapas || []).length) { txt(pg, "Según indique el responsable de la obra.", M + 8, y, { s: 9.5, c: COL.gris }); y -= 16; }
+    y -= 8;
+    if ((d.material || []).length) {
+      titulo("MATERIAL DE LA OBRA");
+      d.material.forEach((m, i) => { const l = partir(m.d, F.r, 9, W - 2 * M - 170).slice(0, 2); lugar(10 + l.length * 12); if (i % 2) pg.drawRectangle({ x: M, y: y - l.length * 12 + 8, width: W - 2 * M, height: l.length * 12 + 4, color: hex("#F5F7F9") }); txt(pg, m.codigo || "", M + 8, y, { s: 8.5, c: COL.gris }); l.forEach((t2, j) => txt(pg, t2, M + 70, y - j * 12, { s: 9 })); txt(pg, `${cant(m.c)} ${m.unidad || ""}`.trim(), W - M - 8, y, { s: 9, f: F.s, der: true }); y -= 4 + l.length * 12; });
+      y -= 8;
+    }
+    if ((d.seguridad || []).length) {
+      titulo("ANTES DE EMPEZAR · SEGURIDAD");
+      d.seguridad.forEach(p => { const l = partir(p, F.r, 9.5, W - 2 * M - 30).slice(0, 2); lugar(8 + l.length * 13); pg.drawRectangle({ x: M + 8, y: y - 2, width: 9, height: 9, borderColor: hex(COL.texto), borderWidth: 0.8 }); l.forEach((t2, j) => txt(pg, t2, M + 26, y - j * 13, { s: 9.5 })); y -= 4 + l.length * 13; });
+    }
+    y -= 60; if (y < PIE + 70) { nueva(); y = H - M - 90; }
+    await firmaEn(doc, pg, txt, F, hex, M, y, null, (d.obra && d.obra.responsable) || "", "Entrega la orden");
+    const fj = dc.firma;
+    await firmaEn(doc, pg, txt, F, hex, W - M - 210, y, fj, fj ? fj.nombre : "", fj ? ["Recibió", fj.puesto, fFirma(fj)].filter(Boolean).join(" · ") : "Jefe de cuadrilla · recibió");
+    paginas.forEach((p, i) => { pie(p); txt(p, `Página ${i + 1} de ${paginas.length}`, W - M, PIE - 4, { s: 7.5, c: COL.gris, der: true }); });
+    return doc.save();
+  }
+
+  async function actaEntrega({ doc: dc, emp }) {
+    const d = dc.datos || {};
+    const { doc, F, hex, txt, cabeza, pie } = await nuevo(`${dc.numero} · Acta de entrega`, emp);
+    const cant = n => Number(n || 0).toLocaleString("en-US", { maximumFractionDigits: 3 });
+    const paginas = [];
+    let pg = doc.addPage([W, H]); paginas.push(pg);
+    cabeza(pg, "ACTA DE ENTREGA", dc.numero, (emp.ciudad ? emp.ciudad + ", " : "") + fLarga(d.fecha || dc.fecha));
+    let y = H - 160;
+    const nueva = () => { pg = doc.addPage([W, H]); paginas.push(pg); y = H - M - 10; };
+    const lugar = h => { if (y - h < PIE + 30) nueva(); };
+    const parr = (t2, s = 10, f = F.r, c = COL.texto) => partir(t2, f, s, W - 2 * M).forEach(l => { lugar(14); txt(pg, l, M, y, { s, f, c }); y -= 14; });
+    parr(`${emp.razon_social || emp.nombre || "EMTECSA"} entrega a ${d.cliente || "el cliente"} la obra ${[d.obra && d.obra.numero, d.obra && d.obra.titulo].filter(Boolean).join(" · ")}${d.sitio ? `, en ${d.sitio}` : ""}, terminada el ${fLarga(d.fecha || dc.fecha)}.`);
+    y -= 10;
+    const titulo = t2 => { lugar(40); pg.drawRectangle({ x: M, y: y - 8, width: W - 2 * M, height: 22, color: hex(COL.marino) }); txt(pg, t2, M + 8, y, { f: F.b, s: 8, c: "#FFFFFF" }); y -= 26; };
+    if ((d.equipos || []).length) { titulo("EQUIPOS INSTALADOS"); d.equipos.forEach(e => { lugar(18); txt(pg, e.d, M + 8, y, { f: F.s, s: 10 }); txt(pg, e.serie ? "Serie " + e.serie : "Sin serie anotada", W - M - 8, y, { s: 9, c: COL.gris, der: true }); y -= 16; }); y -= 8; }
+    if ((d.instalado || []).length) {
+      titulo("LO INSTALADO");
+      d.instalado.forEach(g => { lugar(30); txt(pg, g.g, M + 8, y, { f: F.b, s: 9.5 }); y -= 15; g.l.forEach(m => { const l = partir(m.d, F.r, 9, W - 2 * M - 160).slice(0, 2); lugar(4 + l.length * 12); l.forEach((t2, j) => txt(pg, t2, M + 18, y - j * 12, { s: 9 })); txt(pg, `${cant(m.c)} ${m.unidad || ""}`.trim(), W - M - 70, y, { s: 9, der: true }); txt(pg, m.instalado ? "Instalado" : "Pendiente", W - M - 8, y, { s: 8.5, der: true, c: m.instalado ? "#1F6B4C" : "#8A5A00" }); y -= 4 + l.length * 12; }); y -= 6; });
+      y -= 4;
+    }
+    if ((d.revision || []).length) { titulo("REVISIÓN DE ENTREGA"); d.revision.forEach(r => { const l = partir(r.texto + (r.nota ? ` (${r.nota})` : ""), F.r, 9.5, W - 2 * M - 110).slice(0, 2); lugar(4 + l.length * 13); l.forEach((t2, j) => txt(pg, t2, M + 8, y - j * 13, { s: 9.5 })); txt(pg, r.hecho ? "Revisado" : "Pendiente", W - M - 8, y, { s: 8.5, der: true, f: F.s, c: r.hecho ? "#1F6B4C" : "#8A5A00" }); y -= 4 + l.length * 13; }); y -= 8; }
+    if (d.pruebas) { titulo("PRUEBAS REALIZADAS"); parr(d.pruebas, 9.5); y -= 8; }
+    if (d.observaciones) { titulo("OBSERVACIONES"); parr(d.observaciones, 9.5); y -= 8; }
+    parr("Con su firma, EL CLIENTE recibe la obra. Tiene cinco días hábiles para señalar observaciones por escrito.", 9, F.r, COL.gris);
+    y -= 60; if (y < PIE + 70) { nueva(); y = H - M - 90; }
+    await firmaEn(doc, pg, txt, F, hex, M, y, null, d.entrega || emp.firma_nombre || "", ["Entrega", emp.nombre || "EMTECSA"].filter(Boolean).join(" · "));
+    const fr = dc.firma;
+    await firmaEn(doc, pg, txt, F, hex, W - M - 210, y, fr, fr ? fr.nombre : (d.recibe && d.recibe.nombre) || "", fr ? ["Recibe", fr.puesto, fFirma(fr)].filter(Boolean).join(" · ") : ["Recibe", d.recibe && d.recibe.puesto].filter(Boolean).join(" · "));
+    paginas.forEach((p, i) => { pie(p); txt(p, `Página ${i + 1} de ${paginas.length}`, W - M, PIE - 4, { s: 7.5, c: COL.gris, der: true }); });
+    return doc.save();
+  }
+
+  Object.assign(P, { recibo, estadoCuenta, pedido, reporteFinanzas, estimacion, ordenCambio, contrato, ordenTrabajo, actaEntrega });
 })();

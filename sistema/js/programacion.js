@@ -61,12 +61,13 @@ window.EMT_PROGRAMACION = (() => {
     let turno = p0.turno || "dia";
     const m = modal({
       titulo: `${r ? r.nombre : "Programar"} · ${fDia(p0.fecha)}`, guardarTxt: "Guardar",
+      extra: p0.id && window.EMT_DOCUMENTOS ? `<button class="s-btn suave-b" type="button" data-prog-ot>${A().ico("file", 15)}Orden de trabajo</button>` : "",
       quitar: p0.id ? async () => { try { await D.quitarAsignacion(p0.id); cerrarCapas(); aviso("Quitado de la programación."); await recargar(); } catch (er) { aviso(er.message, "mal"); } } : null,
       cuerpo: lista.length ? `<label class="f-campo">Obra<select name="obra"><option value="">Escoja la obra</option>${lista.map(o => `<option value="${o.id}" ${o.id === p0.obra_id ? "selected" : ""}>${esc(o.numero)} · ${esc(o.cliente ? o.cliente.nombre : "")}${o.titulo ? " · " + esc(o.titulo) : ""}</option>`).join("")}</select></label>
         <div class="f-campo"><span>Turno</span><div class="seg" role="group" aria-label="Turno">${Object.entries(D.TURNOS).map(([k, t]) => `<button type="button" data-turno="${k}" aria-pressed="${k === turno}">${t}</button>`).join("")}</div></div>
         <label class="f-campo">Nota <small>opcional</small><input name="nota" value="${esc(p0.nota || "")}" autocomplete="off" placeholder="Por ejemplo: llevar escalera de 32 pies"></label>`
         : `<p class="suave" style="font-size:15px">No hay obras programadas ni en curso para escoger.</p>`,
-      alAbrir: (f, mm) => mm.addEventListener("click", ev => { const b = ev.target.closest("[data-turno]"); if (!b) return; turno = b.dataset.turno; mm.querySelectorAll("[data-turno]").forEach(x => x.setAttribute("aria-pressed", String(x === b))); }),
+      alAbrir: (f, mm) => mm.addEventListener("click", ev => { if (ev.target.closest("[data-prog-ot]")) { cerrarCapas(); window.EMT_DOCUMENTOS.ordenDelDia(p0.obra_id, p0.fecha); return; } const b = ev.target.closest("[data-turno]"); if (!b) return; turno = b.dataset.turno; mm.querySelectorAll("[data-turno]").forEach(x => x.setAttribute("aria-pressed", String(x === b))); }),
       alGuardar: async f => { if (!f.obra) { cerrarCapas(); return; } await D.asignar({ id: p0.id || null, fecha: p0.fecha, recurso_id: p0.recurso_id, obra_id: f.obra.value, turno, nota: f.nota.value }); cerrarCapas(); aviso("Programado."); await recargar(); }
     });
     return m;
