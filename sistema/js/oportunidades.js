@@ -106,6 +106,7 @@ window.EMT_OPORTUNIDADES = (() => {
     const l = (t2, v2) => `<div><span>${t2}</span><b>${v2}</b></div>`;
     const extras = [`<button class="s-btn suave-b" type="button" data-ov="editar">${ico("pen", 15)}Cambiar</button>`];
     if (tel) extras.push(`<a class="s-btn suave-b" href="https://wa.me/${tel.length === 8 ? "502" + tel : tel}" target="_blank" rel="noopener">${ico("chat", 15)}WhatsApp</a>`);
+    if (abierta && window.EMT_VISITAS) extras.push(`<button class="s-btn suave-b" type="button" data-ov="visita">${ico("map", 15)}Agendar visita</button>`);
     if (abierta) extras.push(`<button class="s-btn suave-b" type="button" data-ov="ganada">${ico("check", 15)}Ganada</button><button class="s-btn suave-b" type="button" data-ov="perdida">${ico("x", 15)}Perdida</button>`);
     else extras.push(`<button class="s-btn suave-b" type="button" data-ov="reabrir">${ico("clock", 15)}Volver a abrir</button>`);
     const principal = x.cotizacion_id ? "Abrir la cotización" : abierta ? "Cotizar" : "Listo";
@@ -114,7 +115,7 @@ window.EMT_OPORTUNIDADES = (() => {
       cuerpo: `<p class="est-estado"><span class="chip ${CHIP[x.etapa]}">${esc(D.ETAPAS_OP[x.etapa].n)}</span><span class="suave">${esc(x.quien)}${x.cliente_id ? "" : " · prospecto"}${x.etapa === "perdida" && x.motivo ? " · " + esc(x.motivo) : ""}</span></p>
         ${abierta ? `<div class="seg op-mover" role="group" aria-label="Mover a la etapa">${D.ABIERTAS_OP.map(k => `<button type="button" data-mover="${k}" aria-pressed="${x.etapa === k}">${esc(D.ETAPAS_OP[k].n)}</button>`).join("")}</div>` : ""}
         <div class="vm-prev">${l("Monto estimado", x.monto != null ? esc(Q(x.monto)) : "—")}${l("Probabilidad", `${esc(x.prob)} %${x.probabilidad == null ? " (por etapa)" : ""}`)}${l("Cierre esperado", x.cierre ? esc(fCorta(x.cierre)) : "—")}${l("De dónde vino", esc(D.ORIGENES_OP[x.origen]))}${l("Quién la lleva", esc(x.responsable_nombre || "Nadie todavía"))}${pr.telefono && !x.cliente_id ? l("Teléfono", esc(pr.telefono)) : ""}</div>
-        ${x.notas ? `<p class="suave" style="margin:0;font-size:13.5px">${esc(x.notas)}</p>` : ""}`,
+        ${x.notas ? `<p class="suave" style="margin:0;font-size:13.5px">${esc(x.notas)}</p>` : ""}<div class="op-vis" data-op-vis hidden></div>`,
       alGuardar: async () => {
         if (x.cotizacion_id) { cerrarCapas(); location.hash = `#/cotizaciones/${x.cotizacion_id}`; return; }
         if (!abierta) { cerrarCapas(); return; }
@@ -122,10 +123,17 @@ window.EMT_OPORTUNIDADES = (() => {
         const cot = await D.cotizarOportunidad(x); cerrarCapas(); aviso("Cotización creada y ligada a la oportunidad."); location.hash = `#/cotizaciones/${cot}`;
       }
     });
+    if (D.visitasDeOportunidad) D.visitasDeOportunidad(x.id).then(l => {
+      const c = m.querySelector("[data-op-vis]"); if (!c || !l.length) return;
+      const fv = f => new Date(f + "T12:00:00").toLocaleDateString("es-GT", { weekday: "short", day: "numeric", month: "short" });
+      c.innerHTML = `<b>Visitas técnicas</b>${l.map(z => `<a class="op-vis-f" href="#/visitas"><span>${esc(fv(z.fecha))}${z.hora ? " · " + esc(z.hora) : ""} · ${esc(z.ingeniero_nombre || "Sin asignar")}</span><span class="chip ${z.estado === "hecha" ? "verde" : z.estado === "cancelada" ? "gris" : "azul"}">${esc(D.ESTADOS_VISITA[z.estado])}</span>${z.resultado && z.resultado.que ? `<small>${esc(z.resultado.que)}</small>` : ""}</a>`).join("")}`;
+      c.hidden = false;
+    }).catch(() => {});
     m.addEventListener("click", async ev => {
       const mv = ev.target.closest("[data-mover]"); if (mv && mv.dataset.mover !== x.etapa) { try { await D.moverOportunidad(x.id, mv.dataset.mover); cerrarCapas(); aviso(`Pasó a ${D.ETAPAS_OP[mv.dataset.mover].n}.`); await recargar(); } catch (er) { aviso(er.message, "mal"); } return; }
       const b = ev.target.closest("[data-ov]"); if (!b) return;
       if (b.dataset.ov === "editar") editar(x, recargar);
+      if (b.dataset.ov === "visita") window.EMT_VISITAS.agendar(null, recargar, x);
       if (b.dataset.ov === "ganada") { await D.moverOportunidad(x.id, "ganada"); cerrarCapas(); aviso("¡Ganada!"); await recargar(); }
       if (b.dataset.ov === "reabrir") { await D.moverOportunidad(x.id, "negociacion"); cerrarCapas(); aviso("Volvió a negociación."); await recargar(); }
       if (b.dataset.ov === "perdida") {
