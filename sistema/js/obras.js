@@ -125,7 +125,7 @@ window.EMT_OBRAS = (() => {
     const tocaHTML = cerrada ? "" : !etOrd.length ? (ed ? `<section class="caja toca-obra"><span><small>Lo que toca ahora</small><b>Ponerle etapas a la obra</b></span><a class="s-btn lleno" href="#/obras/${o.id}/avance">${ico("plus", 15)}Agregar etapas</a></section>` : "")
       : sigE ? `<section class="caja toca-obra"><span><small>Lo que toca ahora</small><b>${esc(sigE.nombre)}</b><small>${[sigE.inicio || sigE.fin ? `${esc(fCorta(sigE.inicio) || "…")} → ${esc(fCorta(sigE.fin) || "…")}` : "", sigE.responsable ? esc(sigE.responsable) : ""].filter(Boolean).join(" · ") || "Etapa " + (etOrd.indexOf(sigE) + 1) + " de " + etOrd.length}</small></span>${ed ? `<button class="s-btn lleno" type="button" data-toca-hecha="${sigE.id}">${ico("check", 15)}Marcar hecha</button>` : ""}</section>`
       : ed ? `<section class="caja toca-obra"><span><small>Lo que toca ahora</small><b>Todas las etapas están hechas</b></span><button class="s-btn lleno" type="button" data-toca-fin>${ico("check", 15)}Dar la obra por terminada</button></section>` : "";
-    v.innerHTML = `
+    const cuerpoHTML = `
       <div class="cuerpo">
         <a class="volver" href="#/obras">${ico("chev", 16, 2.2)}Obras</a>
         <div class="cab-v">
@@ -138,10 +138,12 @@ window.EMT_OBRAS = (() => {
         <label class="busca-v"><span class="sr">Buscar en esta pestaña</span>${ico("search", 16)}<input type="search" data-busca-pest placeholder="Buscar en esta pestaña" value="${esc(buscaP)}" autocomplete="off"></label></div>
         <div data-pest></div>
       </div>`;
-    const box = $("[data-pest]", v);
     const recargar = () => A().quieto(() => ficha(v, id, grupo));
-    box.innerHTML = `<div class="sub-o" data-sub="a"></div><div class="sub-o" data-sub="b"></div>`;
-    const sa = box.querySelector('[data-sub="a"]'), sb2 = box.querySelector('[data-sub="b"]');
+    const sa = document.createElement("div"), sb2 = document.createElement("div");
+    sa.className = sb2.className = "sub-o"; sa.dataset.sub = "a"; sb2.dataset.sub = "b";
+    let box = null;
+    const montar = () => { v.innerHTML = cuerpoHTML; box = $("[data-pest]", v); box.append(sa, sb2); };
+    if (grupo !== "dinero") montar();
     if (grupo === "avance") { pEtapas(sa, o, ed, recargar); await pBitacora(sb2, o, ed, recargar); }
     else if (grupo === "material") { pMateriales(sa, o, cat, mover, recargar); await window.EMT_COMPRAS.tabObra(sb2, o, recargar); }
     else if (grupo === "tramites") {
@@ -151,8 +153,10 @@ window.EMT_OBRAS = (() => {
       sb2.innerHTML = `<div class="sub"><h2>Plano</h2><a class="s-btn suave-b" href="#/plano/obra/${o.id}">${ico(mini ? "pen" : "plus", 15)}${mini ? "Abrir el plano" : "Dibujar el plano"}</a></div>${mini ? `<a class="caja mini-plano-c" href="#/plano/obra/${o.id}">${mini}</a>` : `<div class="vacio chico"><p>${o.cotizacion_id ? "La cotización no tiene plano." : "Todavía no hay plano."}</p></div>`}`;
     }
     else if (grupo === "dinero") {
-      if (D.puede(p, "verCobros") || D.puede(p, "verGastos")) await window.EMT_COBROS.tabObra(sa, o, recargar);
-      if (D.puede(p, "verCosto") || D.puede(p, "verGastos")) await window.EMT_COSTOS.tabObra(sb2, o, recargar);
+      try {
+        if (D.puede(p, "verCobros") || D.puede(p, "verGastos")) await window.EMT_COBROS.tabObra(sa, o, recargar);
+        if (D.puede(p, "verCosto") || D.puede(p, "verGastos")) await window.EMT_COSTOS.tabObra(sb2, o, recargar);
+      } finally { montar(); }
     }
     if (ancla && sb2.innerHTML) setTimeout(() => { const y = sb2.getBoundingClientRect().top + scrollY - 90; scrollTo({ top: Math.max(0, y), behavior: "instant" }); }, 0);
     const filtrarP = () => { A().filtrar(box, ".lista > .fila, .tm-fila, section.dia", buscaP); [sa, sb2].forEach(b => b.trasFiltro && b.trasFiltro()); box.querySelectorAll("details.movs").forEach(d => { const q = buscaP.trim(); const vis = [...d.querySelectorAll(".lista > .fila")].some(f => !f.hidden); d.hidden = !!q && !vis; if (q && vis) d.open = true; }); };
