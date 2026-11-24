@@ -1792,3 +1792,57 @@ fieldset.empresa[data-grupo-act="obras"] > details[data-grupo-e="obras"] { displ
   .vis-h { grid-template-columns: 48px minmax(0, 1fr); }
   .vis-h .chip { grid-column: 2; justify-self: start; }
 }
+.chip.rojo { background: color-mix(in srgb, var(--peligro) 16%, transparent); color: var(--peligro); }
+.icono.rojo { background: linear-gradient(145deg, #D9534F, #9E2A27); }
+.aviso-caja { padding: 12px 14px; border-radius: 14px; font-size: 14px; }
+.aviso-caja.ambar { background: var(--aviso-fondo); color: var(--aviso); }
+.lista .fila.lic-f, .lista .fila.lic-doc { grid-template-columns: 40px minmax(0, 1fr) auto; }
+.fila.lic-f > span:nth-child(2), .fila.lic-doc > span:nth-child(2) { display: grid; gap: 2px; min-width: 0; }
+.fila.lic-f b, .fila.lic-doc b { overflow-wrap: anywhere; }
+.fila.lic-f .der { display: grid; justify-items: end; gap: 4px; }
+.fila.lic-doc .der, .fila.lic-p .der { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+.lic-nota { margin: -4px 0 12px; font-size: 13.5px; }
+.lic-modo { flex-wrap: wrap; }
+.licv .widgets { margin-bottom: 4px; }
+.lic-acc { gap: 10px; margin: 0 0 16px; }
+.lic-acc .s-btn.chico { margin: 0; }
+.lic-ficha .cab-v .fila-b { flex-wrap: nowrap; align-items: center; }
+.lic-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-bottom: 16px; align-items: start; }
+.lic-ficha > .caja { margin-bottom: 16px; }
+.lic-cal { list-style: none; margin: 0; padding: 0; display: grid; }
+.lic-cal li { display: grid; grid-template-columns: 14px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 10px 0; position: relative; }
+.lic-cal li + li { border-top: 1px solid var(--linea-s); }
+.lic-cal li > span:nth-child(2) { display: grid; gap: 2px; } .lic-cal small { color: var(--text-muted); font-size: 13px; }
+.lic-punto { width: 10px; height: 10px; border-radius: 50%; background: var(--info); justify-self: center; }
+.lic-cal li.paso { opacity: .55; } .lic-cal li.paso .lic-punto { background: var(--text-muted); }
+.lic-cal li.pronto .lic-punto { background: var(--aviso); box-shadow: 0 0 0 4px var(--aviso-fondo); }
+.lic-barra { height: 8px; border-radius: 999px; background: var(--seg); overflow: hidden; }
+.lic-barra i { display: block; height: 100%; background: var(--exito); transform-origin: left; transition: transform 300ms var(--ease-out); }
+.lic-pap-acc { display: flex; justify-content: flex-end; }
+.lic-pap-acc .s-btn.chico { margin: 0; }
+.lista .fila.lic-p { grid-template-columns: minmax(0, 1fr) auto; cursor: default; padding: 10px 14px; }
+.lic-chk { display: flex; align-items: center; gap: 12px; cursor: pointer; min-width: 0; min-height: 40px; }
+.lic-chk input { width: 22px; height: 22px; flex: none; accent-color: var(--exito); cursor: pointer; }
+.lic-chk > span { display: grid; gap: 2px; min-width: 0; } .lic-chk b { font-weight: 600; overflow-wrap: anywhere; } .lic-chk small { font-size: 12.5px; color: var(--text-muted); }
+.lic-chk small.falta { color: var(--peligro); }
+.lic-chk:has(input:checked) b { color: var(--text-muted); }
+.lic-add { display: flex; gap: 12px; align-items: end; }
+.lic-add .f-campo { flex: 1; margin: 0; }
+.lic-add .s-btn { flex: none; }
+.lic-fechas { border: 1px solid var(--capa-borde); border-radius: 18px; padding: 12px 16px 4px; margin: 0; display: grid; gap: 10px; min-width: 0; }
+.lic-fechas legend { padding: 0 6px; font-weight: 650; font-size: 14px; }
+.lic-res-seg { flex-wrap: wrap; }
+.lic-res .nw, .lic-res b { white-space: nowrap; }
+@media (max-width: 760px) { .lic-grid { grid-template-columns: 1fr; } }
+@media (max-width: 640px) {
+  .pest-grupo.pest-o:has(> a:nth-child(6)) { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-radius: 22px; gap: 4px; }
+  .pest-grupo.pest-o:has(> a:nth-child(6)) > a { grid-column: auto; padding: 0 4px; font-size: 13px; }
+  .lista .fila.lic-f, .lista .fila.lic-doc { grid-template-columns: 36px minmax(0, 1fr); }
+  .fila.lic-f .der, .fila.lic-doc .der { grid-column: 2; grid-row: 2; justify-items: start; justify-content: flex-start; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; text-align: left; }
+  .fila.lic-f .der small { margin: 0; }
+  .herr > .seg.lic-modo { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); width: 100%; border-radius: 20px; }
+  .lic-add { flex-direction: column; align-items: stretch; }
+  .lic-ficha .cab-v { flex-direction: column; align-items: stretch; }
+  .lic-ficha .cab-v .fila-b > .s-btn { flex: 1; justify-content: center; }
+}
+.lic-ficha h1.t { font-size: clamp(26px, 3.4vw, 40px); overflow-wrap: anywhere; }

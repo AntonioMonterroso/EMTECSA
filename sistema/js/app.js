@@ -36,12 +36,12 @@
   ];
   const MENU = [
     { id: "hoy", n: "Hoy", i: "home", c: "marino" },
-    { id: "ventas", n: "Ventas", i: "file", c: "laton", ir: "cotizaciones", grupo: ["cotizaciones", "oportunidades", "visitas", "clientes", "tienda"] },
+    { id: "ventas", n: "Ventas", i: "file", c: "laton", ir: "cotizaciones", grupo: ["cotizaciones", "oportunidades", "visitas", "licitaciones", "clientes", "tienda"] },
     { id: "obras", n: "Obras", i: "hammer", c: "mezcla", ir: "obras", grupo: ["obras", "programacion"] },
     { id: "dinero", n: "Finanzas", i: "wallet", c: "claro", ir: "cobros", grupo: ["cobros", "finanzas", "personal"] },
     { id: "catalogo", n: "Catálogo", i: "box", c: "gris" }
   ];
-  const PESTANAS_GRUPO = { obras: [["obras", "Obras"], ["programacion", "Programación"]], ventas: [["cotizaciones", "Cotizaciones"], ["oportunidades", "Oportunidades", "editarCotizacion"], ["visitas", "Visitas"], ["clientes", "Clientes"], ["tienda", "Tienda", "verTienda"]], dinero: [["cobros", "Cobros", "verCobros"], ["finanzas", "Empresa", "verFinanzas"], ["personal", "Personal", "finanzasPersonales"]] };
+  const PESTANAS_GRUPO = { obras: [["obras", "Obras"], ["programacion", "Programación"]], ventas: [["cotizaciones", "Cotizaciones"], ["oportunidades", "Oportunidades", "editarCotizacion"], ["visitas", "Visitas"], ["licitaciones", "Licitaciones", "editarCotizacion"], ["clientes", "Clientes"], ["tienda", "Tienda", "verTienda"]], dinero: [["cobros", "Cobros", "verCobros"], ["finanzas", "Empresa", "verFinanzas"], ["personal", "Personal", "finanzasPersonales"]] };
   const menuDe = s => MENU.find(m => m.id === s || (m.grupo || []).includes(s));
   const menuVisible = () => MENU.filter(m => m.id !== "dinero" || !sesion || D.puede(sesion.perfil, "verCobros") || D.puede(sesion.perfil, "verCosto") || D.puede(sesion.perfil, "verFinanzas"));
   const conteos = {};
@@ -52,7 +52,7 @@
   }
   function marcarInsignia(clave, n) { conteos[clave] = Number(n) || 0; pintarInsignias(); }
   function pestanasGrupo(v, s, sub) {
-    const m = menuDe(s); const l = m && PESTANAS_GRUPO[m.id]; if (!l || sub) return;
+    const m = menuDe(s); const l = m && PESTANAS_GRUPO[m.id]; if (!l || (sub && !(s === "licitaciones" && !/^\d+$/.test(sub)))) return;
     const vis = l.filter(([, , perm]) => !perm || D.puede(sesion.perfil, perm)); if (vis.length < 2) return;
     const cu = v.querySelector(".cuerpo"); if (!cu || cu.querySelector(".pest-grupo")) return;
     const n = document.createElement("nav"); n.className = "seg pest-o pest-grupo"; n.setAttribute("aria-label", m.n);
@@ -280,7 +280,7 @@
     if (guardiaAct && location.hash !== rutaActual && !guardiaAct.limpio()) { const destino = location.hash; ignorarHash = true; location.hash = rutaActual; preguntarSalida(destino); return; }
     guardiaAct = null;
     const [sec = "hoy", sub = "", sub2 = ""] = location.hash.replace(/^#\/?/, "").split("/");
-    const s = SECCIONES.find(x => x.id === sec) || sec === "empresa" || sec === "plano" || sec === "equipo" || sec === "perfil" || sec === "errores" || sec === "finanzas" || sec === "personal" || sec === "programacion" || sec === "oportunidades" || sec === "visitas" ? sec : "hoy";
+    const s = SECCIONES.find(x => x.id === sec) || sec === "empresa" || sec === "plano" || sec === "equipo" || sec === "perfil" || sec === "errores" || sec === "finanzas" || sec === "personal" || sec === "programacion" || sec === "oportunidades" || sec === "visitas" || sec === "licitaciones" ? sec : "hoy";
     const mActual = menuDe(s);
     $$("[data-sec]").forEach(a => { if (mActual && a.dataset.sec === mActual.id) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current"); });
     const v = $("#vista");
@@ -305,6 +305,7 @@
       else if (s === "programacion") await window.EMT_PROGRAMACION.vista(v);
       else if (s === "oportunidades") await window.EMT_OPORTUNIDADES.vista(v);
       else if (s === "visitas") await window.EMT_VISITAS.vista(v);
+      else if (s === "licitaciones") await window.EMT_LICITACIONES.vista(v, sub);
       else if (s === "tienda") await window.EMT_TIENDA.vista(v, sub);
       else if (s === "equipo") await window.EMT_EQUIPO.vista(v, sub);
       else if (s === "perfil") await window.EMT_PERFIL.vista(v);
@@ -362,6 +363,7 @@
     if (D.puede(sesion.perfil, "autorizarDescuento")) avisosC.unshift(...(await D.cotizaciones().catch(() => [])).filter(x => x.descuento_aut && x.descuento_aut.estado === "pendiente").map(x => ({ c: "laton", i: "alerta", t: `Autorizar descuento: ${x.cliente ? x.cliente.nombre : ""}`, d: `${x.numero} · lo pide ${x.descuento_aut.pedido_por || "ventas"} · ${x.descuento_aut.tipo === "pct" ? x.descuento_aut.valor + " %" : Q(x.descuento_aut.valor)}`, chip: "Esperando", accion: "Revisar", h: `#/cotizaciones/${x.id}` })));
     if (window.EMT_OPORTUNIDADES) avisosC.push(...await window.EMT_OPORTUNIDADES.avisosHoy(sesion.perfil));
     if (window.EMT_VISITAS) avisosC.unshift(...await window.EMT_VISITAS.avisosHoy(sesion.perfil).catch(() => []));
+    if (window.EMT_LICITACIONES) avisosC.unshift(...await window.EMT_LICITACIONES.avisosHoy(sesion.perfil).catch(() => []));
     const etAv = [];
     obrasL.filter(o => o.estado === "en_curso" || o.estado === "programada").forEach(o => (o.etapas || []).forEach(e => { const st = D.estadoEtapa(e); if (st === "atrasada" || st === "pronto") etAv.push({ o, e, st }); }));
     etAv.sort((a, b) => (a.st === "atrasada" ? 0 : 1) - (b.st === "atrasada" ? 0 : 1) || String(a.e.fin).localeCompare(String(b.e.fin)));
