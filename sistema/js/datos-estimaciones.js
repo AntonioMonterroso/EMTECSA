@@ -136,14 +136,25 @@
     if (!nube) {
       const d = leer(); const y = d.config.find(z => z.obra_id === obra.id);
       if (y) Object.assign(y, datos, { actualizado: new Date().toISOString() }); else d.config.push({ obra_id: obra.id, ...datos, garantia_parte_id: null, creado: new Date().toISOString() });
-      escribir(d); return;
+      escribir(d); await cobroAnticipo(obra, datos.anticipo); return;
     }
     await ok(x.cfg ? await sb.from("estimacion_config").update({ ...datos, actualizado: new Date().toISOString() }).eq("obra_id", obra.id) : await sb.from("estimacion_config").insert({ obra_id: obra.id, ...datos }), "No se pudo guardar cómo se cobra la obra.");
+    await cobroAnticipo(obra, datos.anticipo);
+  }
+  async function cobroAnticipo(obra, monto) {
+    const r = await D.resumenCobros();
+    const mias = r.partes.filter(p => p.obra_id === obra.id);
+    const ya = mias.find(p => p.orden === 100);
+    if (ya && ya.pagado > 0) return;
+    if (ya && r2(ya.monto) === r2(monto)) return;
+    if (ya) await D.quitarParte(ya.id);
+    if (monto > 0 && !mias.some(p => (p.orden || 0) < 100 && /anticipo/i.test(p.descripcion || ""))) await D.agregarParte(obra.id, { descripcion: "Anticipo", monto, vence: hoy(), orden: 100 });
   }
 
   async function quitarConfigEst(obra) {
     const x = await estimacionesDe(obra);
     if (x.lista.some(e => e.estado !== "anulada" && e.estado !== "borrador")) throw new Error("Ya hay estimaciones mandadas o aprobadas: anúlelas primero.");
+    await cobroAnticipo(obra, 0);
     if (!nube) { const d = leer(); d.config = d.config.filter(c => c.obra_id !== obra.id); d.est = d.est.filter(e => e.obra_id !== obra.id || e.estado === "anulada"); escribir(d); return; }
     await ok(await sb.from("estimaciones").delete().eq("obra_id", obra.id).eq("estado", "borrador"), "No se pudo quitar.");
     await ok(await sb.from("estimacion_config").delete().eq("obra_id", obra.id), "No se pudo quitar.");

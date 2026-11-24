@@ -107,6 +107,7 @@
     await poner(v.id, { estado: "hecha", resultado: r, fotos });
     if (v.oportunidad_id && D.moverOportunidad) {
       if (r.siguiente === "no_aplica") await D.moverOportunidad(v.oportunidad_id, "perdida", "No aplica (visita técnica)").catch(() => {});
+      if (r.siguiente === "cotizar") { const op = (await D.oportunidades().catch(() => [])).find(z => z.id === v.oportunidad_id); if (op && (op.etapa === "nueva" || op.etapa === "visita")) await D.moverOportunidad(op.id, "cotizando").catch(() => {}); }
     }
     return r;
   }

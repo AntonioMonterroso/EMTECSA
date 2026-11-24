@@ -54,7 +54,9 @@
   function pestanasGrupo(v, s, sub) {
     const m = menuDe(s); const l = m && PESTANAS_GRUPO[m.id]; if (!l || (sub && !(s === "licitaciones" && !/^\d+$/.test(sub)))) return;
     const vis = l.filter(([, , perm]) => !perm || D.puede(sesion.perfil, perm)); if (vis.length < 2) return;
-    const cu = v.querySelector(".cuerpo"); if (!cu || cu.querySelector(".pest-grupo")) return;
+    const cu = v.querySelector(".cuerpo"); if (!cu) return;
+    const ya = cu.querySelector(".pest-grupo");
+    if (ya) { ya.querySelectorAll("[data-tab-sec]").forEach(a => { if (a.dataset.tabSec === s) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current"); }); return; }
     const n = document.createElement("nav"); n.className = "seg pest-o pest-grupo"; n.setAttribute("aria-label", m.n);
     n.innerHTML = vis.map(([k, t]) => `<a href="#/${k}" data-tab-sec="${k}" ${k === s ? 'aria-current="page"' : ""}>${t}</a>`).join("");
     cu.prepend(n); pintarInsignias();
@@ -96,6 +98,7 @@
     el.querySelector("span").textContent = texto;
     caja.appendChild(el);
     setTimeout(() => { el.classList.add("sale"); setTimeout(() => el.remove(), 220); }, 3600);
+    return el;
   }
 
   function pintarBarra() {

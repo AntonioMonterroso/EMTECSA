@@ -196,7 +196,7 @@ window.EMT_DOCUMENTOS = (() => {
     if (d.tipo === "contrato" && o.cotizacion_id && D.enlaceDe) { en = await D.enlaceDe(o.cotizacion_id).catch(() => null); if (en && !(en.activo && en.aprobado)) en = null; }
     if (puede && d.estado === "borrador") {
       extras.push(btn("pdf", "eye", "Ver PDF"), btn("cambiar", "pen", "Cambiar"));
-      if (d.tipo === "contrato") { if (en) { principal = "Mandar al cliente"; accion = () => mandar(o, d, en, recargar); } else { principal = "Firmó en papel"; accion = () => papel(d, recargar); } }
+      if (d.tipo === "contrato") { if (en) { principal = "Mandar al cliente"; accion = () => mandar(o, d, en, recargar); } else { principal = "Firmó en papel"; accion = () => papel(d, recargar, o); } }
       else { principal = d.tipo === "ot" ? "Firma el jefe de cuadrilla" : "Firma el cliente"; accion = () => firmarDoc(o, d, recargar); }
     } else if (puede && d.estado === "enviado") {
       extras.push(btn("pdf", "eye", "Ver PDF"), btn("papel", "check", "Firmó en papel"), btn("regresar", "pen", "Regresar a borrador"));
@@ -218,7 +218,7 @@ window.EMT_DOCUMENTOS = (() => {
       const k = b.dataset.da;
       if (k === "pdf") verPdf(d);
       if (k === "cambiar") { if (d.tipo === "contrato") armarContrato(o, d, alCambiar); else if (d.tipo === "acta") armarActa(o, d, alCambiar); else ordenDelDia(o.id, d.programacion_fecha); }
-      if (k === "papel") papel(d, recargar);
+      if (k === "papel") papel(d, recargar, o);
       if (k === "regresar") { try { await D.regresarDocumento(d.id); cerrarCapas(); aviso("Regresó a borrador. El cliente ya no lo ve."); await recargar(); } catch (er) { aviso(er.message, "mal"); } }
     });
   }
@@ -228,14 +228,22 @@ window.EMT_DOCUMENTOS = (() => {
     const ini = d.tipo === "acta" ? (d.datos.recibe || {}) : { nombre: ((d.datos.recursos || []).find(x => x.tipo === "cuadrilla") || {}).detalle || "" };
     firmar(d.tipo === "ot" ? "Recibe la orden de trabajo" : "Recibe la obra", d.tipo === "ot" ? "El jefe de cuadrilla firma que recibió la orden y el material." : "El cliente firma que recibe la obra. Tiene cinco días hábiles para señalar observaciones.", ini, async f => {
       await D.firmarDocumento(d.id, { ...f, en: "obra", por: A().sesion().perfil.nombre });
-      cerrarCapas(); aviso("Firmado."); await recargar(); abrir(o, d.id);
+      cerrarCapas(); aviso("Firmado."); await recargar();
+      if (d.tipo === "acta") ofrecerTerminar(o, recargar); else abrir(o, d.id);
     });
   }
-  function papel(d, recargar) {
+  function ofrecerTerminar(o, recargar) {
+    if (o.estado === "terminada" || o.estado === "cancelada" || !D.puede(A().sesion().perfil, "editarObra")) return;
+    const { modal, cerrarCapas, aviso, esc } = A();
+    modal({ titulo: "¿Dar la obra por terminada?", guardarTxt: "Sí, terminada",
+      cuerpo: `<p class="suave" style="font-size:15px">El cliente ya recibió la obra. ${esc(o.numero)} pasa a «Terminada».</p>`,
+      alGuardar: async () => { await D.guardarObra({ ...o, estado: "terminada" }); cerrarCapas(); aviso("La obra quedó terminada."); await recargar(); } });
+  }
+  function papel(d, recargar, o) {
     const { modal, cerrarCapas, aviso } = A();
     modal({ titulo: "Firmó en papel", guardarTxt: "Marcar firmado",
       cuerpo: `<p class="suave" style="font-size:14.5px">Para cuando lo firmaron impreso. Guarde el papel firmado.</p><label class="f-campo">Quién firmó<input name="nombre" value="${A().esc(d.datos.cliente_representante || (d.datos.recibe && d.datos.recibe.nombre) || "")}" autocomplete="off"></label><label class="f-campo">Puesto <small>opcional</small><input name="puesto" value="${A().esc(d.datos.cliente_puesto || "")}" autocomplete="off"></label>`,
-      alGuardar: async f => { await D.firmarDocumento(d.id, { nombre: f.nombre.value, puesto: f.puesto.value, en: "papel", por: A().sesion().perfil.nombre }); cerrarCapas(); aviso("Marcado como firmado."); await recargar(); } });
+      alGuardar: async f => { await D.firmarDocumento(d.id, { nombre: f.nombre.value, puesto: f.puesto.value, en: "papel", por: A().sesion().perfil.nombre }); cerrarCapas(); aviso("Marcado como firmado."); await recargar(); if (d.tipo === "acta" && o) ofrecerTerminar(o, recargar); } });
   }
   function anular(d, recargar) {
     const { modal, cerrarCapas, aviso } = A();

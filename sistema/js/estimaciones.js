@@ -86,11 +86,12 @@ window.EMT_ESTIMACIONES = (() => {
     const val = k => e0 ? e0.avance[k] : antes[k] || 0;
     const corr = e0 ? e0.correlativo : x.lista.reduce((a, e) => Math.max(a, e.correlativo), 0) + 1;
     const desde0 = e0 ? e0.desde : ult && ult.hasta ? (([y, m, d]) => { const z = new Date(y, m - 1, d + 1); return `${z.getFullYear()}-${String(z.getMonth() + 1).padStart(2, "0")}-${String(z.getDate()).padStart(2, "0")}`; })(ult.hasta.split("-").map(Number)) : o.fecha_inicio || "";
+    const hasta0 = e0 ? e0.hasta || "" : desde0 && desde0 > hoyISO() ? desde0 : hoyISO();
     const cuerpoR = x.renglones ? `<div class="est-rs" data-est-rs>${x.renglones.map(r => `<div class="est-r"><span class="est-d"><b>${esc(r.d)}</b><small>Contratado ${esc(A().cant(r.c))} · antes ${esc(A().cant(antes[r.k] || 0))}</small></span><label class="f-campo est-in"><span>Hecho a la fecha</span><input data-est-k="${esc(r.k)}" inputmode="decimal" autocomplete="off" value="${esc(val(r.k))}"></label><button class="s-btn suave-b chico" type="button" data-est-todo="${esc(r.k)}" data-c="${r.c}">Todo</button></div>`).join("")}</div>`
       : `<label class="f-campo">Avance de la obra a la fecha (%)<input name="general" inputmode="decimal" autocomplete="off" value="${esc(e0 ? e0.avance.general : ult ? ult.pct_acum : "")}"><small>${ult ? `La estimación anterior llegó a ${esc(pctTxt(ult.pct_acum))}.` : "Porcentaje de toda la obra que ya está hecho."}</small></label>`;
     const m = modal({
       titulo: e0 ? `Cambiar la ${nombreEst(e0)}` : `Estimación ${corr}`, guardarTxt: "Guardar",
-      cuerpo: `<div class="f-fila est-fechas"><label class="f-campo">Fecha<input type="date" name="fecha" value="${esc(e0 ? e0.fecha : hoyISO())}"></label><label class="f-campo">Período desde<input type="date" name="desde" value="${esc(desde0 || "")}"></label><label class="f-campo">Hasta<input type="date" name="hasta" value="${esc(e0 ? e0.hasta || "" : hoyISO())}"></label></div>
+      cuerpo: `<div class="f-fila est-fechas"><label class="f-campo">Fecha<input type="date" name="fecha" value="${esc(e0 ? e0.fecha : hoyISO())}"></label><label class="f-campo">Período desde<input type="date" name="desde" value="${esc(desde0 || "")}"></label><label class="f-campo">Hasta<input type="date" name="hasta" value="${esc(hasta0)}"></label></div>
         ${cuerpoR}
         <label class="f-campo">Notas <small>opcional</small><textarea name="notas" rows="2">${esc(e0 ? e0.notas || "" : "")}</textarea></label>
         <div class="est-cuenta" data-est-cuenta aria-live="polite"></div>`,

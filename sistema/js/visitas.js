@@ -19,7 +19,7 @@ window.EMT_VISITAS = (() => {
     if (!l.some(u => u.id === p.id)) l.unshift({ id: p.id, nombre: p.nombre, rol: p.rol });
     return l;
   }
-  const mensaje = (v, emp) => { const n = (v.contacto || (v.prospecto && v.prospecto.nombre) || "").split(/\s+/)[0]; return `Buen día${n ? ", " + n : ""}. Le escribimos de ${emp.nombre || "EMTECSA"} para confirmar la visita técnica del ${fDia(v.fecha)}${v.hora ? " a las " + v.hora : ""}. Va ${v.ingeniero_nombre || "nuestro ingeniero"}${v.lugar ? ` a ${v.lugar}` : ""}. ¿Nos confirma, por favor?`; };
+  const mensaje = (v, emp) => { const n = String(v.contacto || "").trim().split(/\s+/)[0]; return `Buen día${n ? ", " + n : ""}. Le escribimos de ${emp.nombre || "EMTECSA"} para confirmar la visita técnica del ${fDia(v.fecha)}${v.hora ? " a las " + v.hora : ""}. Va ${v.ingeniero_nombre || "nuestro ingeniero"}${v.lugar ? ` a ${v.lugar}` : ""}. ¿Nos confirma, por favor?`; };
 
   async function vista(v) {
     const { esc, ico } = A();
@@ -134,13 +134,14 @@ window.EMT_VISITAS = (() => {
         f.querySelector("[data-fotos-in]").addEventListener("change", ev => { archivos = archivos.concat([...ev.target.files]); f.querySelector("[data-fotos-n]").textContent = `${archivos.length} ${archivos.length === 1 ? "foto nueva" : "fotos nuevas"} para subir${quitar.length ? ` · ${quitar.length} para quitar` : ""}.`; });
       },
       alGuardar: async f => {
-        aviso(archivos.length ? "Guardando y subiendo fotos…" : "Guardando…");
+        const espera = archivos.length ? aviso("Guardando y subiendo fotos…") : null;
         const res = await D.guardarResultado(v, { que: f.que.value, carga_kw: f.carga.value, voltaje: f.voltaje.value, corriente: f.corr.value, fp: f.fp.value, trafo_kva: f.kva.value, trafo_estado: f.trafo.value, siguiente: f.dataset.sig, notas: f.notas.value }, archivos, quitar);
+        if (espera) espera.remove();
         cerrarCapas(); await recargar();
         if (res.siguiente === "otra") { aviso("Levantamiento guardado. Agende la otra visita."); agendar({ fecha: sumar(v.fecha, 7), ingeniero: v.ingeniero, cliente_id: v.cliente_id, prospecto: v.prospecto, oportunidad_id: v.oportunidad_id, lugar: v.lugar, lat: v.lat, lng: v.lng, contacto: v.contacto, telefono: v.telefono, motivo: v.motivo, hora: v.hora }, recargar); return; }
         if (res.siguiente === "cotizar" && v.oportunidad_id && D.cotizarOportunidad) {
           const op = (await D.oportunidades()).find(z => z.id === v.oportunidad_id);
-          if (op && !op.cotizacion_id) { aviso("Levantamiento guardado."); modal({ titulo: "Levantamiento guardado", guardarTxt: "Cotizar ahora", cuerpo: `<p class="suave" style="font-size:15px">La oportunidad «${esc(op.titulo)}» está lista para cotizar.</p>`, alGuardar: async () => { if (!op.cliente_id) { cerrarCapas(); location.hash = "#/oportunidades"; aviso("Abra la oportunidad y toque «Cotizar» para crear la ficha del cliente."); return; } const cot = await D.cotizarOportunidad(op); cerrarCapas(); location.hash = `#/cotizaciones/${cot}`; } }); return; }
+          if (op && !op.cotizacion_id) { aviso("Levantamiento guardado."); modal({ titulo: "Levantamiento guardado", guardarTxt: "Cotizar ahora", cuerpo: `<p class="suave" style="font-size:15px">La oportunidad «${esc(op.titulo)}» está lista para cotizar.</p>`, alGuardar: async () => { if (!op.cliente_id) { window.EMT_OPORTUNIDADES.crearCliente(op, recargar); return; } const cot = await D.cotizarOportunidad(op); cerrarCapas(); location.hash = `#/cotizaciones/${cot}`; } }); return; }
         }
         aviso("Levantamiento guardado.");
       }

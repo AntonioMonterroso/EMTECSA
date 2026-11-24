@@ -165,5 +165,5 @@ window.EMT_OPORTUNIDADES = (() => {
       .map(x => ({ c: "ambar", i: "chart", t: `Oportunidad sin cerrar: ${x.titulo}`, d: `${x.quien} · el cierre era el ${fCorta(x.cierre)}${x.responsable_nombre ? " · " + x.responsable_nombre : ""}`, chip: "Vencida", accion: "Ver", h: "#/oportunidades" }));
   }
 
-  return { vista, avisosHoy };
+  return { vista, avisosHoy, crearCliente };
 })();

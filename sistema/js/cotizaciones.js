@@ -271,7 +271,9 @@ window.EMT_COTIZACIONES = (() => {
       const sig = $("[data-sig]", v);
       if (paso < 4) { sig.hidden = false; sig.textContent = "Siguiente: " + PASOS4[paso][1]; sig.dataset.accion = "siguiente"; }
       else if (c.estado === "borrador" && puede && D.puede(p, "verEnlaces")) { sig.hidden = false; sig.textContent = "Mandar al cliente"; sig.dataset.accion = "mandar"; }
+      else if (orig.estado === "aprobada" && c.estado === "aprobada" && !obraId && puedeObra) { sig.hidden = false; sig.textContent = "Crear la obra"; sig.dataset.accion = "obra"; }
       else { sig.hidden = false; sig.textContent = "Ver la propuesta"; sig.dataset.accion = "ver"; }
+      const hb = $(".cab-v [data-crear-obra]", v); if (hb) hb.hidden = sig.dataset.accion === "obra";
       const pr = $("[data-prev-res]", v); if (pr) pr.textContent = `${k.partidas.length} ${k.partidas.length === 1 ? "partida" : "partidas"} · ${Q(k.total)}${c.iva ? " con IVA" : ""}`;
       const pf = $("[data-prev-foto]", v); if (pf) pf.src = `../img/${c.foto || "torre-luna-2"}.jpg`;
     };
@@ -376,9 +378,20 @@ window.EMT_COTIZACIONES = (() => {
         <p class="opc-nota">Los totales de abajo son de lo marcado.</p></div>`;
     };
     const pintarCargos = () => {
-      cargoBox.innerHTML = c.cargos.map((g, i) => `<div class="cargo"><label class="f-campo"><span class="sr">Descripción</span><input data-gdesc="${i}" value="${esc(g.descripcion)}" placeholder="Flete, grúa, camión canasta…" autocomplete="off"></label>
-        <label class="f-campo"><span class="sr">Monto</span><span class="f-monto"><span>Q</span><input data-gmonto="${i}" inputmode="decimal" value="${esc(montoTxt(g.monto))}" placeholder="0.00" autocomplete="off"></span></label>
-        <button class="s-ib" type="button" aria-label="Quitar cargo" data-gquitar="${i}">${ico("x", 15)}</button></div>`).join("");
+      cargoBox.innerHTML = c.cargos.map((g, i) => `<div class="cargo-f"><span class="cargo-d">${esc(g.descripcion)}</span><b class="e-cifra">${esc(Q(g.monto))}</b><button class="s-ib" type="button" aria-label="Cambiar ${esc(g.descripcion)}" data-gedit="${i}">${ico("pen", 15)}</button></div>`).join("");
+    };
+    const editarCargo = i => {
+      const g0 = i >= 0 ? c.cargos[i] : { descripcion: "", monto: 0 };
+      const m = A().modal({ titulo: i >= 0 ? "Cambiar transporte o equipo" : "Agregar transporte o equipo",
+        cuerpo: `<label class="f-campo">Descripción<input name="desc" value="${esc(g0.descripcion)}" placeholder="Flete, grúa, camión canasta…" autocomplete="off"></label>${A().campoMonto("monto", "Monto", i >= 0 ? g0.monto : "")}`,
+        quitar: i >= 0 ? () => { c.cargos.splice(i, 1); A().cerrarCapas(); pintarCargos(); marcar(); pintarTotales(); } : null,
+        alGuardar: async f => {
+          const desc = f.desc.value.trim(); if (!desc) throw new Error("Escriba qué es: flete, grúa, camión canasta…");
+          const monto = numero(f.monto.value); if (monto == null || !(monto >= 0)) throw new Error("Escriba el monto.");
+          if (i >= 0) c.cargos[i] = { ...g0, descripcion: desc, monto }; else c.cargos.push({ descripcion: desc, monto });
+          A().cerrarCapas(); pintarCargos(); marcar(); pintarTotales();
+        } });
+      A().formatoAlSalir(m);
     };
     const ORIGEN = { cotizacion: ["azul", "Solo aquí"], catalogo: ["verde", "Del catálogo"], aumento: ["gris", "Aumento"], fijo: ["gris", "Fijo"] };
     const pasaBusca = (m, q) => !q || (m.material.descripcion + " " + m.material.codigo).toLowerCase().includes(q);
@@ -596,8 +609,7 @@ window.EMT_COTIZACIONES = (() => {
         return;
       }
       if (t.dataset.pcant != null) { const n = Number(String(t.value).replace(/,/g, "")); c.partidas[Number(t.dataset.pcant)].cantidad = isFinite(n) ? n : 0; marcar(); pintarTotales(); }
-      if (t.dataset.gdesc != null) { c.cargos[Number(t.dataset.gdesc)].descripcion = t.value; marcar(); }
-      if (t.dataset.gmonto != null) { c.cargos[Number(t.dataset.gmonto)].monto = leerNum(t.value, 0); marcar(); pintarTotales(); }
+
     };
     v.onchange = async e => {
       const t = e.target;
@@ -627,7 +639,6 @@ window.EMT_COTIZACIONES = (() => {
       if (t.dataset.opc === "usd") { c.moneda = t.checked ? "USD" : "GTQ"; $("[data-sub-usd]", v).hidden = !t.checked; if (t.checked && !(Number(c.tipo_cambio) > 0)) await usarCambioHoy(); marcar(); pintarTotales(); }
       if (t.dataset.opc === "imp") { c.imprevistos_pct = t.checked ? (leerNum($('[data-c="imprevistos_pct"]', v).value, 0)) : null; $("[data-sub-imp]", v).hidden = !t.checked; marcar(); pintarTotales(); if (t.checked) $('[data-c="imprevistos_pct"]', v).focus(); }
       if (t.dataset.opc === "desc") { c.descuento_tipo = t.checked ? ($('[data-dtipo="pct"]', v).getAttribute("aria-pressed") === "true" ? "pct" : "monto") : null; c.descuento = t.checked ? leerNum($('[data-c="descuento"]', v).value, 0) : null; $("[data-sub-desc]", v).hidden = !t.checked; marcar(); pintarTotales(); if (t.checked) $('[data-c="descuento"]', v).focus(); }
-      if (t.dataset.gmonto != null) t.value = montoTxt(leerNum(t.value, 0));
     };
     const elegir = boton => {
       const es = D.escenariosCotizacion(c, cat);
@@ -722,8 +733,8 @@ window.EMT_COTIZACIONES = (() => {
       }
       const pa = e.target.closest("[data-pajustar]"); if (pa && !pa.closest("fieldset:disabled")) ajustar(Number(pa.dataset.pajustar));
       const q = e.target.closest("[data-pquitar]"); if (q) quitarPartida(Number(q.dataset.pquitar));
-      if (e.target.closest("[data-nuevo-cargo]")) { c.cargos.push({ descripcion: "", monto: 0 }); pintarCargos(); marcar(); cargoBox.querySelector(`[data-gdesc="${c.cargos.length - 1}"]`)?.focus(); }
-      const gq = e.target.closest("[data-gquitar]"); if (gq) { c.cargos.splice(Number(gq.dataset.gquitar), 1); pintarCargos(); marcar(); pintarTotales(); }
+      if (e.target.closest("[data-nuevo-cargo]")) editarCargo(-1);
+      const ge = e.target.closest("[data-gedit]"); if (ge) editarCargo(Number(ge.dataset.gedit));
       const dt = e.target.closest("[data-dtipo]"); if (dt && !dt.closest("fieldset:disabled")) { c.descuento_tipo = dt.dataset.dtipo; $$("[data-dtipo]", v).forEach(b => b.setAttribute("aria-pressed", String(b === dt))); marcar(); pintarTotales(); }
       const es = e.target.closest("[data-estado]");
       if (es && es.dataset.estado !== c.estado && es.dataset.estado === "aprobada" && hayOp() && !es.dataset.elegido) { elegir(es); return; }
@@ -739,7 +750,12 @@ window.EMT_COTIZACIONES = (() => {
         pintarPasos();
         if (antes !== "borrador" && c.estado === "borrador") aviso("En borrador los precios se recalculan con el catálogo de hoy.");
         k = D.calcularCotizacion(c, cat); pintarPartidas(); aplicarFijo(); marcar(); pintarTotales();
-        if (conMotivo) { const g = $("[data-guardar-cot]", v); if (g) g.click(); }
+        if (puede || conMotivo) {
+          if (await guardarCot()) {
+            if (c.estado !== "borrador") aviso({ enviada: "Marcada como enviada.", aprobada: obraId ? "Marcada como aprobada." : "Aprobada. Ya puede crear la obra.", rechazada: "Marcada como rechazada." }[c.estado]);
+            if (c.estado === "aprobada" || antes === "aprobada") await A().quieto(() => editor(v, id));
+          } else { c.estado = antes; pintarPasos(); k = D.calcularCotizacion(c, cat); pintarPartidas(); aplicarFijo(); pintarTotales(); }
+        }
       }
       if (e.target.closest("[data-guardar-cot]")) { if (await guardarCot()) aviso("Cotización guardada."); return; }
       if (e.target.closest("[data-usd-hoy]") && !e.target.closest("fieldset:disabled")) { await usarCambioHoy(); marcar(); pintarTotales(); return; }
@@ -755,6 +771,7 @@ window.EMT_COTIZACIONES = (() => {
       const sg = e.target.closest("[data-sig]");
       if (sg) {
         if (sg.dataset.accion === "siguiente") { if (paso === 2 && !c.partidas.length) { aviso("Agregue al menos una estructura o material.", "mal"); $("[data-busca-est]", v)?.focus(); return; } if (sucio && puede && !fijo()) { if (!(await guardarCot())) return; } irPaso(paso + 1); return; }
+        if (sg.dataset.accion === "obra") { if (sucio) { aviso("Guarde primero los cambios de la cotización.", "mal"); return; } window.EMT_OBRAS.desdeCotizacion(c, D.calcularCotizacion(c, cat), cli); return; }
         if (sg.dataset.accion === "mandar") { if (sucio && !(await guardarCot())) return; if (!(await revisarAntesDeMandar())) return; window.EMT_ENLACES.mandar(enlO).catch(err => aviso(err.message, "mal")); return; }
         const vb = $('[data-pdf="ver"]', v); if (vb) vb.click(); return;
       }

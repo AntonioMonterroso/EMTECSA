@@ -354,7 +354,8 @@
       if (i === 0 && /^CONTRATO/i.test(p)) continue;
       const m = p.match(/^([A-ZÁÉÍÓÚÑ]+\. [^.]+\.)\s*(.*)$/);
       const lineas = partir(p, F.r, 10, W - 2 * M);
-      if (y - lineas.length * 14 < PIE + 30) { pg = doc.addPage([W, H]); paginas.push(pg); y = H - M - 10; }
+      const conFirmas = i === parrafos.length - 1 ? 150 : 0;
+      if (y - lineas.length * 14 - conFirmas < PIE + 30) { pg = doc.addPage([W, H]); paginas.push(pg); y = H - M - 10; }
       if (m) {
         const cab = m[1], resto = m[2];
         const l2 = partir(cab + " " + resto, F.r, 10, W - 2 * M);

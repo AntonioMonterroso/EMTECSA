@@ -76,7 +76,7 @@ window.EMT_COBROS = (() => {
         <span><b>${esc(p.cliente ? p.cliente.nombre : "Cliente")}</b><small>${p.obra ? `<a href="#/obras/${p.obra.id}/cobros">${esc(p.obra.numero)}</a> · ` : ""}${esc(p.descripcion)}${p.vence ? " · vence " + esc(fCorta(p.vence)) : " · sin fecha"}${p.pagado ? ` · abonado ${esc(Q(p.pagado))}` : ""}</small></span>
         <span class="der"><b class="e-cifra">${esc(Q(p.saldo))}</b><small>${chipVenc(p)}</small></span>
         ${puede ? `<button class="s-btn suave-b chico" type="button" data-cobrar="${p.id}">Cobrar</button>` : "<span></span>"}</div>`).join("")}</div>`
-      : `<div class="vacio"><span class="icono laton">${ico("wallet", 24)}</span><h2>No hay nada pendiente de cobrar</h2><p>Los cobros salen del plan de pagos de cada obra: abra la obra, pestaña «Cobros y gastos», y arme sus pagos (por ejemplo 60 % de anticipo y 40 % al entregar).</p><a class="s-btn suave-b" href="#/obras">Ver obras</a></div>`;
+      : `<div class="vacio"><span class="icono laton">${ico("wallet", 24)}</span><h2>No hay nada pendiente de cobrar</h2><p>Los cobros salen del plan de pagos de cada obra: abra la obra, pestaña «Dinero», y arme el plan de pagos (por ejemplo 60 % de anticipo y 40 % al entregar) o cobre por estimaciones.</p><a class="s-btn suave-b" href="#/obras">Ver obras</a></div>`;
     box.onclic = e => { const b = e.target.closest("[data-cobrar]"); if (b) cobrar(r.pendientes.find(x => x.id === Number(b.dataset.cobrar)), recargar); };
   }
 
@@ -208,7 +208,15 @@ window.EMT_COBROS = (() => {
     const cli = await D.cliente(pago.cliente_id);
     const obra = pago.obra_id ? r.obras[pago.obra_id] : null;
     const parte = pago.parte_id ? r.partes.find(x => x.id === pago.parte_id) : null;
-    const saldoObra = obra ? r.partes.filter(x => x.obra_id === obra.id).reduce((a, x) => a + x.saldo, 0) : null;
+    let saldoObra = null;
+    if (obra) {
+      const cot = obra.cotizacion_id ? await D.cotizacion(obra.cotizacion_id).catch(() => null) : null;
+      const oc = cot && D.cambiosDe ? ((await D.cambiosDe(obra).catch(() => null)) || { neto: 0 }).neto : 0;
+      const cfg = D.estimacionesDe ? ((await D.estimacionesDe(obra).catch(() => null)) || {}).cfg : null;
+      const total = cfg ? cfg.contrato + oc : cot ? D.calcularCotizacion(cot, await D.catalogo()).total + oc : r.partes.filter(x => x.obra_id === obra.id && (x.orden || 0) < 100).reduce((a, x) => a + x.monto, 0);
+      const abonado = r.pagos.filter(x => x.obra_id === obra.id && !x.anulado).reduce((a, x) => a + D.aplicadoPago(x), 0);
+      saldoObra = Math.max(0, Math.round((total - abonado) * 100) / 100);
+    }
     return { pago, cli, obra, parte, saldoObra, emp: await D.empresa() };
   }
   function ofrecerRecibo(pagoId) {
@@ -342,6 +350,7 @@ window.EMT_COBROS = (() => {
     const ocNeto = interno && D.cambiosDe ? ((await D.cambiosDe(o).catch(() => null)) || { neto: 0 }).neto : 0;
     let costoMat = null, sinIva = null;
     if (interno && kc) { costoMat = kc.costoMat; sinIva = kc.neto; }
+    const viejoEst = (box.querySelector("[data-est]") || {}).innerHTML || "", viejoOC = (box.querySelector("[data-oc]") || {}).innerHTML || "";
     box.innerHTML = `
       ${verC ? `<div class="sub"><h2>Plan de pagos</h2>${edC ? `<button class="s-btn suave-b" type="button" data-plan>${ico("pen", 15)}${partes.length ? "Cambiar el plan" : "Armar el plan"}</button>` : ""}</div>
       ${partes.length ? `<div class="lista">${partes.map(x => `<div class="fila cobro" style="cursor:default"><span class="icono ${x.saldo <= 0 ? "verde" : x.venc === "vencido" ? "ambar" : "laton"}">${ico(x.saldo <= 0 ? "check" : "wallet", 18)}</span><span><b>${esc(x.descripcion)}${x.porcentaje != null ? ` · ${A().cant(x.porcentaje)} %` : ""}</b><small>${x.vence ? "vence " + esc(fCorta(x.vence)) : "sin fecha"}${x.pagado ? ` · pagado ${esc(Q(x.pagado))}` : ""}${x.pagado && x.saldo > 0 ? ` · falta ${esc(Q(x.saldo))}` : ""}</small></span><span class="der"><b class="e-cifra">${esc(Q(x.monto))}</b><small>${x.saldo <= 0 ? '<span class="chip verde">Pagado</span>' : chipVenc(x)}</small></span>${edC && x.saldo > 0 ? `<button class="s-btn suave-b chico" type="button" data-cobrar-o="${x.id}">Cobrar</button>` : "<span></span>"}</div>`).join("")}</div>`
@@ -353,6 +362,8 @@ window.EMT_COBROS = (() => {
       ${interno ? `<div class="sub"><h2>Cómo va la obra</h2></div><div class="datos-cli"><div><small>${kc ? "Total con IVA" : "Total del plan"}${ocNeto ? " y cambios" : ""}</small><span class="e-cifra">${esc(Q(total + ocNeto))}</span></div><div><small>Cobrado</small><span class="e-cifra">${esc(Q(cobrado))}</span></div><div><small>Gastos</small><span class="e-cifra">${esc(Q(gastado))}</span></div><div><small>${sinIva != null ? "Queda (sin IVA)" : "Queda"}</small><span class="e-cifra"><b>${esc(Q(sinIva != null ? sinIva + (ocNeto / (kc && kc.iva ? 1.12 : 1)) - costoMat - gastado : total + ocNeto - gastado))}</b></span></div>
         <div class="ancho2"><small>Cómo se calcula</small><span class="suave" style="font-size:13px">${sinIva != null ? `Total sin IVA ${esc(Q(sinIva))}${ocNeto ? ` ${ocNeto > 0 ? "más" : "menos"} órdenes de cambio sin IVA ${esc(Q(Math.abs(ocNeto) / (kc && kc.iva ? 1.12 : 1)))}` : ""} menos costo de materiales ${esc(Q(costoMat))} menos gastos ${esc(Q(gastado))}. Solo lo ve gerencia.` : `Total del plan de pagos ${esc(Q(total))} menos gastos ${esc(Q(gastado))}. Sin cotización no se descuentan el IVA ni el costo de materiales. Solo lo ve gerencia.`}</span></div></div>` : ""}`;
     const cajaEst = box.querySelector("[data-est]");
+    if (cajaEst && viejoEst) cajaEst.innerHTML = viejoEst;
+    { const c0 = box.querySelector("[data-oc]"); if (c0 && viejoOC) c0.innerHTML = viejoOC; }
     const ctxD = { partes: todas, total, recargar, cobrar: async x => cobrar({ ...x, cliente: o.cliente || await D.cliente(o.cliente_id), cliente_id: o.cliente_id, obra: o }, recargar) };
     if (cajaEst) await window.EMT_ESTIMACIONES.seccion(cajaEst, o, ctxD);
     const cajaOC = box.querySelector("[data-oc]");
