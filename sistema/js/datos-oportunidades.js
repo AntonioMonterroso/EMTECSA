@@ -26,7 +26,7 @@
       let cambio = false;
       d.ops.forEach(x => {
         const c = x.cotizacion_id && cots[x.cotizacion_id]; if (!c) return;
-        const nueva = c.estado === "aprobada" ? "ganada" : c.estado === "rechazada" && x.etapa !== "ganada" ? "perdida" : c.estado === "enviada" && (x.etapa === "nueva" || x.etapa === "visita") ? "cotizando" : x.etapa;
+        const nueva = c.estado === "aprobada" ? "ganada" : c.estado === "rechazada" && x.etapa !== "ganada" ? "perdida" : c.estado === "enviada" && (x.etapa === "nueva" || x.etapa === "visita" || x.etapa === "cotizando") ? "negociacion" : x.etapa;
         if (nueva !== x.etapa) { x.etapa = nueva; if (nueva === "ganada" || nueva === "perdida") x.cerrada = x.cerrada || hoy(); if (nueva === "ganada" && c.total) x.monto = Number(c.total); cambio = true; }
       });
       if (cambio) escribir(d);

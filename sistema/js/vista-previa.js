@@ -63,7 +63,7 @@ window.EMT_PREVIA = (() => {
     document.body.appendChild(el);
     document.documentElement.classList.add("con-previa");
     const cuerpo = el.querySelector(".prev-cuerpo"), nPag = el.querySelector("[data-prev-n]");
-    const estado = { el, cuerpo, obs: null, urls: [], antes: document.activeElement };
+    const estado = { el, cuerpo, obs: null, urls: [], antes: document.activeElement, hash: location.hash };
     abierto = estado;
     el.addEventListener("click", async e => {
       if (e.target.closest("[data-prev-x]")) { cerrar(); return; }
@@ -83,5 +83,10 @@ window.EMT_PREVIA = (() => {
       cuerpo.innerHTML = `<iframe class="prev-marco" src="${u}" title="${esc(titulo)}"></iframe>`;
     });
   }
+  addEventListener("hashchange", e => {
+    if (!abierto) return;
+    let viejo = ""; try { viejo = new URL(e.oldURL).hash; } catch (_) {}
+    if (viejo === abierto.hash && location.hash !== abierto.hash) cerrar();
+  });
   return { abrir, cerrar, bajar };
 })();

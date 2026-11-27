@@ -209,7 +209,7 @@ window.EMT_COTIZACIONES = (() => {
             </section>
           </aside>
         </div>
-        <div class="barra-cot" data-barra-cot><span><small data-total-barra-t>Total</small><b data-total-barra></b></span><span class="barra-acc">${puede ? `<button class="s-btn suave-b" type="button" data-guardar-cot>Guardar</button>` : ""}<button class="s-btn lleno" type="button" data-sig></button></span></div>
+        <div class="barra-cot" data-barra-cot><span><small data-total-barra-t>Total</small><b data-total-barra></b></span><span class="barra-acc">${puede ? `<button class="s-btn suave-b" type="button" data-guardar-cot aria-label="Guardar" title="Guardar"><span class="g-ico">${ico("check", 18)}</span><span class="g-txt">Guardar</span></button>` : ""}<button class="s-btn lleno" type="button" data-sig></button></span></div>
       </div>`;
 
     const PASOS = ["borrador", "enviada", "aprobada"];
@@ -269,10 +269,10 @@ window.EMT_COTIZACIONES = (() => {
       const h = hechos();
       $("[data-pasos4]", v).innerHTML = PASOS4.map(([n, t]) => `<button type="button" data-ir-paso="${n}" class="${Number(n) === paso ? "ahora" : h[n] ? "hecho" : ""}" ${Number(n) === paso ? 'aria-current="step"' : ""}><i>${h[n] && Number(n) !== paso ? ico("check", 12, 2.8) : n}</i><span>${t}</span></button>`).join("");
       const sig = $("[data-sig]", v);
-      if (paso < 4) { sig.hidden = false; sig.textContent = "Siguiente: " + PASOS4[paso][1]; sig.dataset.accion = "siguiente"; }
-      else if (c.estado === "borrador" && puede && D.puede(p, "verEnlaces")) { sig.hidden = false; sig.textContent = "Mandar al cliente"; sig.dataset.accion = "mandar"; }
-      else if (orig.estado === "aprobada" && c.estado === "aprobada" && !obraId && puedeObra) { sig.hidden = false; sig.textContent = "Crear la obra"; sig.dataset.accion = "obra"; }
-      else { sig.hidden = false; sig.textContent = "Ver la propuesta"; sig.dataset.accion = "ver"; }
+      if (paso < 4) { sig.hidden = false; sig.innerHTML = `Siguiente<span class="sig-paso">: ${esc(PASOS4[paso][1])}</span>`; sig.setAttribute("aria-label", "Siguiente: " + PASOS4[paso][1]); sig.dataset.accion = "siguiente"; }
+      else if (c.estado === "borrador" && puede && D.puede(p, "verEnlaces")) { sig.hidden = false; sig.textContent = "Mandar al cliente"; sig.removeAttribute("aria-label"); sig.dataset.accion = "mandar"; }
+      else if (orig.estado === "aprobada" && c.estado === "aprobada" && !obraId && puedeObra) { sig.hidden = false; sig.textContent = "Crear la obra"; sig.removeAttribute("aria-label"); sig.dataset.accion = "obra"; }
+      else { sig.hidden = false; sig.textContent = "Ver la propuesta"; sig.removeAttribute("aria-label"); sig.dataset.accion = "ver"; }
       const hb = $(".cab-v [data-crear-obra]", v); if (hb) hb.hidden = sig.dataset.accion === "obra";
       const pr = $("[data-prev-res]", v); if (pr) pr.textContent = `${k.partidas.length} ${k.partidas.length === 1 ? "partida" : "partidas"} · ${Q(k.total)}${c.iva ? " con IVA" : ""}`;
       const pf = $("[data-prev-foto]", v); if (pf) pf.src = `../img/${c.foto || "torre-luna-2"}.jpg`;
